@@ -12,6 +12,9 @@ export const Colors = {
   light: {
     text: '#11181C',
     background: '#fff',
+    surface: '#FFFFFF',
+    // surfaceVariant: used for subtle dividers / grabbers in light theme
+    surfaceVariant: '#E5E7EB',
     tint: tintColorLight,
     icon: '#687076',
     tabIconDefault: '#687076',
@@ -20,6 +23,9 @@ export const Colors = {
   dark: {
     text: '#ECEDEE',
     background: '#000000',
+    surface: '#000000',
+    // surfaceVariant is slightly lighter to be visible on top of surface
+    surfaceVariant: '#374151',
     tint: tintColorDark,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',

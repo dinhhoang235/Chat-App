@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/themeContext';
 import type { Contact } from '../constants/mockData';
 
 type Props = {
@@ -13,32 +14,33 @@ type Props = {
 
 export function ContactRow({ contact, onPress, onCall, onVideo }: Props) {
   const insets = useSafeAreaInsets();
+  const { scheme } = useTheme();
+  const iconColor = scheme === 'dark' ? '#E5E7EB' : '#0F172A';
   const initials = contact.initials ?? contact.name.split(' ').map(n => n[0]).slice(0, 2).join('');
 
   return (
     <TouchableOpacity onPress={onPress} className="px-4 py-3 flex-row items-center" style={{ paddingRight: 0 }}>
       <View className="flex-row items-center">
         <View
-          className="w-12 h-12 rounded-full items-center justify-center"
-          style={{ backgroundColor: contact.color || '#6B7280' }}
+          style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: contact.color || '#6B7280' }}
         >
-          <Text className="text-white font-bold">{initials}</Text>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
         </View>
 
-        <View className="ml-4 flex-1">
-          <Text className="text-base text-gray-900 dark:text-white">{contact.name}</Text>
+        <View style={{ marginLeft: 12, flex: 1 }}>
+          <Text style={{ color: scheme === 'dark' ? '#E5E7EB' : '#0F172A', fontSize: 16 }}>{contact.name}</Text>
           {contact.phone ? (
-            <Text className="text-sm text-gray-500 dark:text-gray-400 mt-1">{contact.phone}</Text>
+            <Text style={{ color: scheme === 'dark' ? '#9CA3AF' : '#6B7280', marginTop: 4 }}>{contact.phone}</Text>
           ) : null}
         </View>
       </View>
 
       <View className="items-center space-x-3" style={{ position: 'absolute', right: insets.right + 4, top: 0, bottom: 0, justifyContent: 'center', flexDirection: 'row', zIndex: 20 }}>
         <TouchableOpacity onPress={onCall} className="p-2 rounded-full" accessibilityLabel="Gọi" hitSlop={{ top: 14, left: 14, bottom: 14, right: 14 }}>
-          <MaterialIcons name="call" size={22} color="#0F172A" />
+          <MaterialIcons name="call" size={22} color={iconColor} />
         </TouchableOpacity>
         <TouchableOpacity onPress={onVideo} className="p-2 rounded-full" accessibilityLabel="Gọi video" hitSlop={{ top: 14, left: 14, bottom: 14, right: 14 }}>
-          <MaterialIcons name="videocam" size={22} color="#0F172A" />
+          <MaterialIcons name="videocam" size={22} color={iconColor} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

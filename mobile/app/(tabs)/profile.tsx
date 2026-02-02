@@ -1,9 +1,9 @@
 import { View, Text } from "react-native";
 
-export default function Messages() {
+export default function Profile() {
   return (
     <View className="flex-1 items-center justify-center bg-white">
-      <Text className="text-3xl font-bold">Tin nhắn</Text>
+      <Text className="text-3xl font-bold">Cá nhân</Text>
     </View>
   );
 }

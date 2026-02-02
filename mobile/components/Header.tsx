@@ -1,7 +1,7 @@
 import { View, Text, TextInput, TouchableOpacity } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
+import { useTheme } from "../context/themeContext";
 
 interface HeaderProps {
   title: string;
@@ -14,6 +14,7 @@ interface HeaderProps {
   addHref?: string;
   showBack?: boolean;
   onBackPress?: () => void;
+  variant?: "light" | "dark";
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -27,43 +28,49 @@ export const Header: React.FC<HeaderProps> = ({
   addHref,
   showBack = false,
   onBackPress,
+  variant,
 }) => {
   const router = useRouter();
+  const theme = useTheme();
+  const isDark = variant === "dark" ? true : variant === "light" ? false : theme.scheme === "dark";
 
   const handleBack = () => {
     if (onBackPress) return onBackPress();
     router.back();
   };
 
+  const iconColor = isDark ? "#fff" : "#666";
+  const titleClass = isDark ? "text-2xl font-bold text-white" : "text-2xl font-bold text-gray-900";
+
   return (
-    <SafeAreaView edges={["top"]} className="bg-white px-6 pb-4">
+    <View className={`${theme.scheme === 'dark' ? 'bg-background-dark border-b border-gray-800' : 'bg-background border-b border-gray-100'} px-6`}>
       <View>
         {!showSearch ? (
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center">
               {showBack && (
                 <TouchableOpacity className="mr-3" onPress={handleBack}>
-                  <MaterialIcons name="arrow-back" color="#666" size={28} />
+                  <MaterialIcons name="arrow-back" color={iconColor} size={28} />
                 </TouchableOpacity>
               )}
-              <Text className="text-2xl font-bold text-gray-900">{title}</Text>
+              <Text className={titleClass}>{title}</Text>
             </View>
             <View className="flex-row items-center gap-4">
               {onFilterPress && (
                 <TouchableOpacity onPress={onFilterPress}>
-                  <MaterialIcons name="tune" color="#666" size={28} />
+                  <MaterialIcons name="tune" color={iconColor} size={28} />
                 </TouchableOpacity>
               )}
               {addHref ? (
                 <Link href={addHref as any} asChild>
                   <TouchableOpacity>
-                    <MaterialIcons name={addIconName as any} color="#666" size={28} />
+                    <MaterialIcons name={addIconName as any} color={iconColor} size={28} />
                   </TouchableOpacity>
                 </Link>
               ) : (
                 onAddPress && (
                   <TouchableOpacity onPress={onAddPress}>
-                    <MaterialIcons name={addIconName as any} color="#666" size={24} />
+                    <MaterialIcons name={addIconName as any} color={iconColor} size={24} />
                   </TouchableOpacity>
                 )
               )}
@@ -71,31 +78,31 @@ export const Header: React.FC<HeaderProps> = ({
           </View>
         ) : (
           <>
-            <View className="flex-row items-center mt-3">
+            <View className="flex-row items-center">
               {showBack && (
                 <TouchableOpacity className="mr-3" onPress={handleBack}>
-                  <MaterialIcons name="arrow-back" color="#666" size={24} />
+                  <MaterialIcons name="arrow-back" color={iconColor} size={24} />
                 </TouchableOpacity>
               )}
 
-              <View style={{ marginHorizontal: -24, elevation: 1 }} className="flex-row items-center bg-white rounded-lg px-3 py-2 flex-1">
-                <MaterialIcons name="search" color="#666" size={24} />
+              <View style={{ marginHorizontal: -24, elevation: 1 }} className={`${theme.scheme === 'dark' ? 'bg-background-dark' : 'bg-background'} flex-row items-center rounded-lg px-3 py-2 flex-1`}>
+                <MaterialIcons name="search" color={iconColor} size={24} />
                 <TextInput
-                  className="flex-1 ml-3 text-gray-900 text-sm"
+                  className={`${isDark ? "flex-1 ml-3 text-white text-sm" : "flex-1 ml-3 text-gray-900 text-sm"}`}
                   placeholder="Tìm kiếm..."
-                  placeholderTextColor="#999"
+                  placeholderTextColor={isDark ? "#ccc" : "#999"}
                   onChangeText={onSearch}
                 />
                 {addHref ? (
                   <Link href={addHref as any} asChild>
                     <TouchableOpacity className="px-3">
-                      <MaterialIcons name={addIconName as any} color="#666" size={24} />
+                      <MaterialIcons name={addIconName as any} color={iconColor} size={24} />
                     </TouchableOpacity>
                   </Link>
                 ) : (
                   onAddPress && (
                     <TouchableOpacity className="px-3" onPress={onAddPress}>
-                      <MaterialIcons name={addIconName as any} color="#666" size={24} />
+                      <MaterialIcons name={addIconName as any} color={iconColor} size={24} />
                     </TouchableOpacity>
                   )
                 )}
@@ -104,6 +111,6 @@ export const Header: React.FC<HeaderProps> = ({
           </>
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 };

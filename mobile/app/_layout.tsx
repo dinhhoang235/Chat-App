@@ -1,18 +1,31 @@
 import { Stack } from "expo-router";
 import "../global.css";
+import { View } from "react-native";
 import { AuthProvider } from "../context/authContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ThemeProvider, useTheme } from "../context/themeContext";
+
+function ThemeRoot() {
+  const { scheme } = useTheme();
+  return (
+    <View className={`flex-1 ${scheme === 'dark' ? 'dark' : ''}`}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="login" />
+            <Stack.Screen name="signup" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </View>
+  );
+}
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="login" />
-          <Stack.Screen name="signup" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <ThemeRoot />
+    </ThemeProvider>
   );
-}
+} 

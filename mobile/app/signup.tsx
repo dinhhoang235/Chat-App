@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { useAuth } from "../context/authContext";
+import { useTheme } from "../context/themeContext";
 
 export default function SignupScreen() {
   const [phone, setPhone] = useState("");
@@ -10,6 +12,7 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const router = useRouter();
   const { signup } = useAuth();
+  const theme = useTheme();
 
   const handleSignup = () => {
     if (!phone || !fullName || !password || !confirmPassword) {
@@ -31,17 +34,18 @@ export default function SignupScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-white" contentContainerStyle={{ flexGrow: 1 }}>
-      <View className="flex-1 px-6 py-8 justify-center">
-        <View className="mb-8">
-          <Text className="text-3xl font-bold text-gray-900 mb-2">Đăng ký</Text>
-          <Text className="text-gray-600">Tạo tài khoản mới</Text>
-        </View>
+    <SafeAreaView className={`${theme.scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <View className="flex-1 px-6 py-8 justify-center">
+          <View className="mb-8">
+            <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-3xl font-bold text-gray-900'} mb-2`}>Đăng ký</Text>
+            <Text className={`${theme.scheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Tạo tài khoản mới</Text>
+          </View>
 
         <View className="mb-4">
-          <Text className="text-gray-700 font-semibold mb-2">Số điện thoại</Text>
+          <Text className="text-gray-700 dark:text-gray-300 font-semibold mb-2">Số điện thoại</Text>
           <TextInput
-            className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+            className="border border-gray-300 rounded-lg px-4 py-3 bg-background dark:bg-background-dark"
             placeholder="Nhập số điện thoại"
             keyboardType="phone-pad"
             value={phone}
@@ -50,9 +54,9 @@ export default function SignupScreen() {
         </View>
 
         <View className="mb-4">
-          <Text className="text-gray-700 font-semibold mb-2">Họ và tên</Text>
+          <Text className="text-gray-700 dark:text-gray-300 font-semibold mb-2">Họ và tên</Text>
           <TextInput
-            className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+            className="border border-gray-300 rounded-lg px-4 py-3 bg-background dark:bg-background-dark"
             placeholder="Nhập họ và tên"
             value={fullName}
             onChangeText={setFullName}
@@ -60,9 +64,9 @@ export default function SignupScreen() {
         </View>
 
         <View className="mb-4">
-          <Text className="text-gray-700 font-semibold mb-2">Mật khẩu</Text>
+          <Text className="text-gray-700 dark:text-gray-300 font-semibold mb-2">Mật khẩu</Text>
           <TextInput
-            className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+            className="border border-gray-300 rounded-lg px-4 py-3 bg-background dark:bg-background-dark"
             placeholder="Nhập mật khẩu"
             secureTextEntry
             value={password}
@@ -71,9 +75,9 @@ export default function SignupScreen() {
         </View>
 
         <View className="mb-6">
-          <Text className="text-gray-700 font-semibold mb-2">Xác nhận mật khẩu</Text>
+          <Text className="text-gray-700 dark:text-gray-300 font-semibold mb-2">Xác nhận mật khẩu</Text>
           <TextInput
-            className="border border-gray-300 rounded-lg px-4 py-3 bg-white"
+            className="border border-gray-300 rounded-lg px-4 py-3 bg-background dark:bg-background-dark"
             placeholder="Xác nhận mật khẩu"
             secureTextEntry
             value={confirmPassword}
@@ -91,7 +95,7 @@ export default function SignupScreen() {
         </TouchableOpacity>
 
         <View className="flex-row justify-center">
-          <Text className="text-gray-600">Đã có tài khoản? </Text>
+          <Text className="text-gray-600 dark:text-gray-400">Đã có tài khoản? </Text>
           <Link href="/login" asChild>
             <TouchableOpacity>
               <Text className="text-blue-500 font-semibold">Đăng nhập</Text>
@@ -99,6 +103,7 @@ export default function SignupScreen() {
           </Link>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

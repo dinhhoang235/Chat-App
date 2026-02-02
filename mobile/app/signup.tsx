@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from "react-native";
 import { Link, useRouter } from "expo-router";
-import { useAuth } from "./context/authContext";
+import { useAuth } from "../context/authContext";
 
 export default function SignupScreen() {
   const [phone, setPhone] = useState("");

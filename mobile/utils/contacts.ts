@@ -2,6 +2,9 @@ import { Contact } from '../constants/mockData';
 
 export const VN_ALPHABET = ['A','Ă','Â','B','C','D','Đ','E','Ê','G','H','I','K','L','M','N','O','Ô','Ơ','P','Q','R','S','T','U','Ư','V','X','Y','Z'];
 
+const VI_COLLATOR = new Intl.Collator('vi', { sensitivity: 'base', ignorePunctuation: true });
+const VN_INDEX_MAP = new Map(VN_ALPHABET.map((c, i) => [c, i]));
+
 export function getLetter(name: string): string {
   if (!name) return '#';
   const trimmed = name.trim();
@@ -33,30 +36,30 @@ export function getLetter(name: string): string {
 }
 
 export function buildContactSections(contacts: Contact[]): { title: string; data: Contact[] }[] {
-  const map = new Map<string, Contact[]>();
+  const groups = new Map<string, Contact[]>();
 
-  // Sort by VN alphabet order and then by Vietnamese locale within group
-  const sorted = [...contacts].sort((a, b) => {
-    const la = getLetter(a.name);
-    const lb = getLetter(b.name);
-    const ia = VN_ALPHABET.indexOf(la);
-    const ib = VN_ALPHABET.indexOf(lb);
-    if (ia !== ib) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-    return a.name.localeCompare(b.name, 'vi');
+  // Precompute letter and alphabet index for each contact
+  const items = contacts.map((c) => {
+    const letter = getLetter(c.name);
+    const idx = VN_INDEX_MAP.has(letter) ? VN_INDEX_MAP.get(letter)! : 999;
+    return { contact: c, letter, idx };
   });
 
-  sorted.forEach((c) => {
-    const letter = getLetter(c.name);
+  // Sort by VN alphabet index, then by Vietnamese collation
+  items.sort((a, b) => (a.idx - b.idx) || VI_COLLATOR.compare(a.contact.name, b.contact.name));
+
+  // Group into sections
+  items.forEach(({ contact, letter }) => {
     const key = VN_ALPHABET.includes(letter) ? letter : '#';
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(c);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(contact);
   });
 
   const result: { title: string; data: Contact[] }[] = [];
   VN_ALPHABET.forEach((title) => {
-    if (map.has(title)) result.push({ title, data: map.get(title)! });
+    if (groups.has(title)) result.push({ title, data: groups.get(title)! });
   });
-  if (map.has('#')) result.push({ title: '#', data: map.get('#')! });
+  if (groups.has('#')) result.push({ title: '#', data: groups.get('#')! });
 
   return result;
 }

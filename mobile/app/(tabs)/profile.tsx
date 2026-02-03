@@ -33,7 +33,7 @@ export default function Profile() {
 
       <View >
         {/* User card */}
-        <View style={{overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+        <View style={{ marginTop: -8, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
           {user && (
             <View className="flex-row items-center" style={{ padding: 12, backgroundColor: colors.card }}>
               <View style={{ width: 56, height: 56, backgroundColor: colors.tint, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>

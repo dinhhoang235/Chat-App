@@ -6,6 +6,7 @@ import { AuthProvider } from "../context/authContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "../context/themeContext";
 import { SelectionProvider } from "../context/selectionContext";
+import { SearchProvider } from "../context/searchContext";
 
 function ThemeRoot() {
   const { scheme, colors } = useTheme();
@@ -15,11 +16,13 @@ function ThemeRoot() {
       <SafeAreaProvider>
         <SelectionProvider>
           <AuthProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="login" />
-              <Stack.Screen name="signup" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
+            <SearchProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="login" />
+                <Stack.Screen name="signup" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+            </SearchProvider>
           </AuthProvider>
         </SelectionProvider>
       </SafeAreaProvider>

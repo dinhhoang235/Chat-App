@@ -13,7 +13,7 @@ type ChatMessage = {
   reactions?: { emoji: string; count?: number }[];
 };
 
-export default function MessageBubble({ message, onPress }: { message: ChatMessage, onPress?: () => void }) {
+export default function MessageBubble({ message, onPress, highlightQuery }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string }) {
   const { colors } = useTheme();
 
   if (message.type === 'separator') {
@@ -37,6 +37,34 @@ export default function MessageBubble({ message, onPress }: { message: ChatMessa
     borderColor = colors.bubbleMe;
     textColor = colors.bubbleMeText;
   }
+
+  // helper to render highlighted parts
+  const renderHighlighted = (text?: string) => {
+    if (!text || !highlightQuery) return <Text style={{ color: textColor }}>{text}</Text>;
+    const q = highlightQuery.trim().toLowerCase();
+    if (!q) return <Text style={{ color: textColor }}>{text}</Text>;
+
+    const parts: { text: string; highlight: boolean }[] = [];
+    let remaining = text;
+    while (remaining.length > 0) {
+      const idx = remaining.toLowerCase().indexOf(q);
+      if (idx === -1) {
+        parts.push({ text: remaining, highlight: false });
+        break;
+      }
+      if (idx > 0) parts.push({ text: remaining.slice(0, idx), highlight: false });
+      parts.push({ text: remaining.slice(idx, idx + q.length), highlight: true });
+      remaining = remaining.slice(idx + q.length);
+    }
+
+    return (
+      <Text>
+        {parts.map((p, i) => (
+          <Text key={i} style={p.highlight ? { backgroundColor: '#FFD54F', color: '#000', fontWeight: '700' } : { color: textColor }}>{p.text}</Text>
+        ))}
+      </Text>
+    );
+  };
 
   // Contact card style
   if (message.type === 'contact') {
@@ -87,7 +115,7 @@ export default function MessageBubble({ message, onPress }: { message: ChatMessa
             {message.type === 'sticker' ? (
               <Image source={{ uri: 'https://via.placeholder.com/120x120.png?text=STK' }} style={{ width: 120, height: 120, borderRadius: 12 }} />
             ) : (
-              <Text style={{ color: textColor }}>{message.text}</Text>
+              renderHighlighted(message.text)
             )}
           </View>
 

@@ -1,11 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { View, FlatList, TextInput, TouchableOpacity, Keyboard } from 'react-native';
 import { Header } from '../../components/Header';
+import InThreadSearch from '../../components/InThreadSearch';
 import MessageBubble from '../../components/MessageBubble';
 import { MaterialIcons } from '@expo/vector-icons';
 import ComposerActionsSheet from '../../components/ComposerActionsSheet';
 import { useTheme } from '../../context/themeContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSearch } from '../../context/searchContext';
+import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from "react-native-safe-area-context";
 
 
@@ -27,76 +30,164 @@ export default function ChatThread() {
   const { colors } = useTheme();
   const params = useLocalSearchParams();
   const router = useRouter();
+
+  // Search mode toggled by Options or header
+  const initialSearch = !!(params as any).search;
+  const [searchMode, setSearchMode] = useState<boolean>(initialSearch);
+  const flatListRef = useRef<FlatList>(null);
+
+  // lifted search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [resultIndices, setResultIndices] = useState<number[]>([]);
+  const [currentResultIndex, setCurrentResultIndex] = useState(0);
+
   const [composerVisible, setComposerVisible] = useState(false);
   const inputRef = useRef<any>(null);
   const [messageText, setMessageText] = useState('');
 
-  const renderItem = ({ item }: any) => (
-    <MessageBubble message={item} onPress={() => { if (composerVisible) setComposerVisible(false); }} />
-  );
+  React.useEffect(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      setResultIndices([]);
+      setCurrentResultIndex(0);
+      return;
+    }
+    const idxs: number[] = [];
+    sampleMessages.forEach((m, idx) => {
+      if (m.type === 'text' && m.text?.toLowerCase().includes(q)) idxs.push(idx);
+    });
+    setResultIndices(idxs);
+    setCurrentResultIndex(0);
+  }, [searchQuery]);
+
+  // Listen to SearchContext open events to avoid navigation flicker
+  const { openFor, close } = useSearch();
+  const isFocused = useIsFocused();
+  const [pendingOpen, setPendingOpen] = useState(false);
+
+  React.useEffect(() => {
+    // if a request to open search for this chat is received
+    if (openFor && openFor === (params as any).id) {
+      if (isFocused) {
+        setSearchMode(true);
+        setPendingOpen(false);
+      } else {
+        // wait until screen is focused
+        setPendingOpen(true);
+      }
+    }
+  }, [openFor, params, isFocused]);
+
+  // when screen becomes focused and we have pending open, enable search mode
+  React.useEffect(() => {
+    if (isFocused && pendingOpen) {
+      setSearchMode(true);
+      setPendingOpen(false);
+    }
+  }, [isFocused, pendingOpen]);
+
+  // When searchMode is closed, tell context to close
+  React.useEffect(() => {
+    if (!searchMode && openFor === (params as any).id) {
+      close();
+    }
+  }, [searchMode, openFor, params, close]);
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
-      <Header 
-        title={(params as any).id || 'Chat'} 
-        showBack 
-        onBackPress={() => router.back()}
-        rightActions={[
-          { icon: 'call', onPress: () => console.log('Call pressed') },
-          { icon: 'videocam', onPress: () => console.log('Video call pressed') },
-          { icon: 'more-vert', onPress: () => router.push(`/chat/${(params as any).id}/options`) },
-        ]}
-      />
+      {searchMode ? (
+        // header replaced by search header
+        <InThreadSearch
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          resultIndices={resultIndices}
+          currentResultIndex={currentResultIndex}
+          onSetCurrentResultIndex={setCurrentResultIndex}
+          onClose={() => setSearchMode(false)}
+          onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
+          renderMode="header"
+        />
+      ) : (
+        <Header 
+          title={(params as any).id || 'Chat'} 
+          showBack 
+          onBackPress={() => router.back()}
+          rightActions={[
+            { icon: 'call', onPress: () => console.log('Call pressed') },
+            { icon: 'videocam', onPress: () => console.log('Video call pressed') },
+            { icon: 'more-vert', onPress: () => router.push(`/chat/${(params as any).id}/options`) },
+          ]}
+        />
+      )}
 
       <FlatList
+        ref={flatListRef}
         data={sampleMessages}
         keyExtractor={(i) => i.id}
-        renderItem={renderItem}
+        renderItem={({ item, index }: any) => (
+          <MessageBubble message={item} highlightQuery={searchQuery} onPress={() => { if (composerVisible) setComposerVisible(false); }} />
+        )}
         contentContainerStyle={{ paddingVertical: 12 }}
       />
 
+      {/* Bottom search bar: replace composer when in searchMode */}
+      {searchMode ? (
+        <InThreadSearch
+          messages={sampleMessages as any}
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          resultIndices={resultIndices}
+          currentResultIndex={currentResultIndex}
+          onSetCurrentResultIndex={setCurrentResultIndex}
+          onClose={() => setSearchMode(false)}
+          onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
+          renderMode="bottom"
+        />
+      ) : null}
 
+      {/* Composer: hidden when search mode is active */}
+      {!searchMode && (
+        <View className="px-4 flex-row items-center" style={{ borderTopWidth: 1, borderTopColor: colors.surfaceVariant, backgroundColor: colors.surface }}>
+          <TouchableOpacity className="mr-3">
+            <MaterialIcons name="emoji-emotions" size={24} color={colors.icon} />
+          </TouchableOpacity>
 
-      <View className="px-4 flex-row items-center" style={{ borderTopWidth: 1, borderTopColor: colors.surfaceVariant, backgroundColor: colors.surface }}>
-        <TouchableOpacity className="mr-3">
-          <MaterialIcons name="emoji-emotions" size={24} color={colors.icon} />
-        </TouchableOpacity>
+          <View className="flex-1 px-2 py-2 mr-3" style={{ backgroundColor: colors.surface, borderRadius: 8 }}>
+            <TextInput
+              ref={inputRef}
+              value={messageText}
+              onChangeText={text => setMessageText(text)}
+              placeholder="Tin nhắn"
+              placeholderTextColor={colors.textSecondary}
+              style={{ color: colors.text }}
+              onFocus={() => setComposerVisible(false)}
+            />
+          </View>
 
-        <View className="flex-1 px-2 py-2 mr-3" style={{ backgroundColor: colors.surface, borderRadius: 8 }}>
-          <TextInput
-            ref={inputRef}
-            value={messageText}
-            onChangeText={text => setMessageText(text)}
-            placeholder="Tin nhắn"
-            placeholderTextColor={colors.textSecondary}
-            style={{ color: colors.text }}
-            onFocus={() => setComposerVisible(false)}
-          />
+          {/* Right action icons: show send when typing, otherwise more/mic/image */}
+          <View className="flex-row items-center">
+            {messageText.trim().length > 0 ? (
+              <TouchableOpacity onPress={() => { console.log('Send:', messageText); setMessageText(''); inputRef.current?.blur?.(); Keyboard.dismiss(); }}>
+                <MaterialIcons name="send" size={28} color={colors.tint} />
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity className="mr-4" onPress={() => { inputRef.current?.blur?.(); Keyboard.dismiss(); setComposerVisible(v => !v); }}>
+                  <MaterialIcons name="more-horiz" size={20} color={composerVisible ? colors.tint : colors.icon} />
+                </TouchableOpacity>
+
+                <TouchableOpacity className="mr-4" onPress={() => console.log('Mic pressed')}>
+                  <MaterialIcons name="mic" size={24} color={colors.icon} />
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => console.log('Image pressed')}>
+                  <MaterialIcons name="image" size={22} color={colors.icon} />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
-
-        {/* Right action icons: show send when typing, otherwise more/mic/image */}
-        <View className="flex-row items-center">
-          {messageText.trim().length > 0 ? (
-            <TouchableOpacity onPress={() => { console.log('Send:', messageText); setMessageText(''); inputRef.current?.blur?.(); Keyboard.dismiss(); }}>
-              <MaterialIcons name="send" size={28} color={colors.tint} />
-            </TouchableOpacity>
-          ) : (
-            <>
-              <TouchableOpacity className="mr-4" onPress={() => { inputRef.current?.blur?.(); Keyboard.dismiss(); setComposerVisible(v => !v); }}>
-                <MaterialIcons name="more-horiz" size={20} color={composerVisible ? colors.tint : colors.icon} />
-              </TouchableOpacity>
-
-              <TouchableOpacity className="mr-4" onPress={() => console.log('Mic pressed')}>
-                <MaterialIcons name="mic" size={24} color={colors.icon} />
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => console.log('Image pressed')}>
-                <MaterialIcons name="image" size={22} color={colors.icon} />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
+      )}
 
       {composerVisible && (
         <ComposerActionsSheet

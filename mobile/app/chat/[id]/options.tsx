@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Image, Switch, ScrollView } from 'react-native';
 import { useTheme } from '../../../context/themeContext';
+import { useSearch } from '../../../context/searchContext';
 import { Header } from '../../../components/Header';
 import MuteOptionsSheet from '../../../components/MuteOptionsSheet';
 import MuteSettingsModal from '../../../components/MuteSettingsModal';
@@ -36,6 +37,7 @@ export default function ChatOptions() {
   const { colors } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { open } = useSearch();
   const [pinned, setPinned] = useState(false);
   const [muteVisible, setMuteVisible] = useState(false);
   const [muteSettingsVisible, setMuteSettingsVisible] = useState(false);
@@ -44,20 +46,34 @@ export default function ChatOptions() {
 
   const isMuted = selectedMuteOption !== 'Không tắt';
 
+  const name = (params as any).id || 'Người dùng';
+  const avatar = (params as any).avatar as string | undefined;
+  const getInitials = (n: string) => {
+    const parts = n.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header title="Tùy chọn" showBack onBackPress={() => router.back()} />
 
-      <View className="items-center px-4 py-3 border-b" style={{ borderBottomColor: colors.border }}>
-        <View className="w-24 h-24 rounded-full overflow-hidden mb-3">
-          <Image source={{ uri: 'https://via.placeholder.com/96' }} style={{ width: 96, height: 96, borderRadius: 48 }} />
+      <View className="items-center px-4 py-3" style={{ borderBottomColor: colors.border }}>
+        <View className="w-24 h-24 rounded-full overflow-hidden mb-3 items-center justify-center" style={{ backgroundColor: colors.surfaceVariant }}>
+          {avatar ? (
+            <Image source={{ uri: avatar }} style={{ width: 96, height: 96, borderRadius: 48 }} resizeMode="cover" />
+          ) : (
+            <View style={{ width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }}>
+              <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700' }}>{getInitials(name)}</Text>
+            </View>
+          )}
         </View>
-        <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{(params as any).id || 'Người dùng'}</Text>
+        <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{name}</Text>
       </View>
 
       <ScrollView>
         <View className="px-4 py-4 flex-row items-center justify-around">
-          <TouchableOpacity className="items-center">
+          <TouchableOpacity className="items-center" onPress={() => { const id = (params as any).id; open(id); router.back(); }}>
             <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 2, elevation: 1 }}>
               <MaterialIcons name="search" size={20} color={colors.text} />
             </View>

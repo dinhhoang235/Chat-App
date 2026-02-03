@@ -7,11 +7,13 @@ import { useTheme } from "../../context/themeContext";
 import { useSelection } from "../../context/selectionContext";
 import { messages as initialMessages } from '../../constants/mockData';
 import { MessageRow } from '../../components/MessageRow';
+import { useRouter } from 'expo-router';
 
 import { useState } from 'react';
 
 export default function Messages() {
   const { scheme } = useTheme();
+  const router = useRouter();
   const [data, setData] = useState(initialMessages);
   const { selectionMode, setSelectionMode } = useSelection();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -85,7 +87,7 @@ export default function Messages() {
         renderItem={({ item }) => (
           <MessageRow
             message={item}
-            onPress={() => { if (!selectionMode) console.log('Open chat', item.id); }}
+            onPress={() => { if (!selectionMode) router.push(`/chat/${item.id}`); }}
             onAction={(action) => handleRowAction(action, item.id)}
             selectionMode={selectionMode}
             selected={selectedIds.includes(item.id)}

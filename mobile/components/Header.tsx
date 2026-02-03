@@ -9,6 +9,7 @@ interface HeaderProps {
   showSearch?: boolean;
   onSearch?: (text: string) => void;
   onFilterPress?: () => void;
+  rightActions?: { icon: string; onPress?: () => void; size?: number }[];
   onAddPress?: () => void;
   addIconName?: string;
   addHref?: string;
@@ -23,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   showSearch = false,
   onSearch,
   onFilterPress,
+  rightActions,
   onAddPress,
   addIconName = "add",
   addHref,
@@ -61,6 +63,13 @@ export const Header: React.FC<HeaderProps> = ({
                   <MaterialIcons name="tune" color={iconColor} size={28} />
                 </TouchableOpacity>
               )}
+
+              {rightActions && rightActions.map((a, idx) => (
+                <TouchableOpacity key={idx} onPress={a.onPress} className="ml-2">
+                  <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 24} />
+                </TouchableOpacity>
+              ))}
+
               {addHref ? (
                 <Link href={addHref as any} asChild>
                   <TouchableOpacity>
@@ -93,6 +102,12 @@ export const Header: React.FC<HeaderProps> = ({
                   placeholderTextColor={isDark ? "#ccc" : "#999"}
                   onChangeText={onSearch}
                 />
+                {rightActions && rightActions.map((a, idx) => (
+                  <TouchableOpacity key={idx} className="px-3" onPress={a.onPress}>
+                    <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 24} />
+                  </TouchableOpacity>
+                ))}
+
                 {addHref ? (
                   <Link href={addHref as any} asChild>
                     <TouchableOpacity className="px-3">

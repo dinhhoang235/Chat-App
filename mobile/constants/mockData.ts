@@ -82,3 +82,23 @@ export const messages: Message[] = [
   { id: 'm29', name: 'Hỗ trợ Zalo', lastMessage: 'Đã nhận yêu cầu của bạn', time: '10 phút', unread: 1, initials: 'HZ', color: '#F472B6' },
   { id: 'm30', name: 'Tin tức', lastMessage: 'Bản tin sáng: Thị trường...', time: '6 giờ', unread: 0, initials: 'TT', color: '#F59E0B' },
 ];
+
+export interface FriendRequest {
+  id: string;
+  name: string;
+  message?: string;
+  time: string;
+  initials?: string;
+  color?: string;
+}
+
+export const friendRequests: FriendRequest[] = [
+  { id: 'fr1', name: 'Huyền Tuyên Sinh Elearning', message: 'Xin chào, mình là Huyền Tuyên Sinh Elearning. Mình tìm thấy bạn b...', time: '12/01', initials: 'HT', color: '#34D399' },
+  { id: 'fr2', name: 'Nguyen Coway', message: 'Muốn kết bạn', time: '11/01', initials: 'NC', color: '#60A5FA' },
+  { id: 'fr3', name: 'Đăng Hải', message: 'Muốn kết bạn', time: '10/01', initials: 'ĐH', color: '#F472B6' },
+  { id: 'fr4', name: 'Minh Cũ', message: 'Muốn kết bạn', time: '08/01', initials: 'MC', color: '#F59E0B' },
+  { id: 'fr5', name: 'Người lạ', message: 'Muốn kết bạn', time: '12/12', initials: 'NL', color: '#FB7185' },
+];
+
+// Sent friend requests (mock) — currently empty, filled later from API
+export const friendRequestsSent: FriendRequest[] = [];

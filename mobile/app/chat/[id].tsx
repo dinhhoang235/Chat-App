@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, FlatList, TextInput, TouchableOpacity, Keyboard } from 'react-native';
+import { View, FlatList, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { Header } from '../../components/Header';
 import InThreadSearch from '../../components/InThreadSearch';
 import MessageBubble from '../../components/MessageBubble';
@@ -94,110 +94,113 @@ export default function ChatThread() {
   }, [searchMode, openFor, params, close]);
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
-      {searchMode ? (
-        // header replaced by search header
-        <InThreadSearch
-          query={searchQuery}
-          onQueryChange={setSearchQuery}
-          resultIndices={resultIndices}
-          currentResultIndex={currentResultIndex}
-          onSetCurrentResultIndex={setCurrentResultIndex}
-          onClose={() => setSearchMode(false)}
-          onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
-          renderMode="header"
-        />
-      ) : (
-        <Header 
-          title={(params as any).id || 'Chat'} 
-          showBack 
-          onBackPress={() => router.back()}
-          rightActions={[
-            { icon: 'call', onPress: () => console.log('Call pressed') },
-            { icon: 'videocam', onPress: () => console.log('Video call pressed') },
-            { icon: 'more-vert', onPress: () => router.push(`/chat/${(params as any).id}/options`) },
-          ]}
-        />
-      )}
-
-      <FlatList
-        ref={flatListRef}
-        data={sampleMessages}
-        keyExtractor={(i) => i.id}
-        renderItem={({ item, index }: any) => (
-          <MessageBubble message={item} highlightQuery={searchQuery} onPress={() => { if (composerVisible) setComposerVisible(false); }} />
-        )}
-        contentContainerStyle={{ paddingVertical: 12 }}
-      />
-
-      {/* Bottom search bar: replace composer when in searchMode */}
-      {searchMode ? (
-        <InThreadSearch
-          messages={sampleMessages as any}
-          query={searchQuery}
-          onQueryChange={setSearchQuery}
-          resultIndices={resultIndices}
-          currentResultIndex={currentResultIndex}
-          onSetCurrentResultIndex={setCurrentResultIndex}
-          onClose={() => setSearchMode(false)}
-          onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
-          renderMode="bottom"
-        />
-      ) : null}
-
-      {/* Composer: hidden when search mode is active */}
-      {!searchMode && (
-        <View className="px-4 flex-row items-center" style={{ borderTopWidth: 1, borderTopColor: colors.surfaceVariant, backgroundColor: colors.surface }}>
-          <TouchableOpacity className="mr-3">
-            <MaterialIcons name="emoji-emotions" size={24} color={colors.icon} />
-          </TouchableOpacity>
-
-          <View className="flex-1 px-2 py-2 mr-3" style={{ backgroundColor: colors.surface, borderRadius: 8 }}>
-            <TextInput
-              ref={inputRef}
-              value={messageText}
-              onChangeText={text => setMessageText(text)}
-              placeholder="Tin nhắn"
-              placeholderTextColor={colors.textSecondary}
-              style={{ color: colors.text }}
-              onFocus={() => setComposerVisible(false)}
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.surface }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
+          {searchMode ? (
+            // header replaced by search header
+            <InThreadSearch
+              query={searchQuery}
+              onQueryChange={setSearchQuery}
+              resultIndices={resultIndices}
+              currentResultIndex={currentResultIndex}
+              onSetCurrentResultIndex={setCurrentResultIndex}
+              onClose={() => setSearchMode(false)}
+              onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
+              renderMode="header"
             />
-          </View>
+          ) : (
+            <Header
+              title={(params as any).id || 'Chat'}
+              showBack
+              onBackPress={() => router.back()}
+              rightActions={[
+                { icon: 'call', onPress: () => console.log('Call pressed') },
+                { icon: 'videocam', onPress: () => console.log('Video call pressed') },
+                { icon: 'more-vert', onPress: () => router.push(`/chat/${(params as any).id}/options`) },
+              ]}
+            />
+          )}
 
-          {/* Right action icons: show send when typing, otherwise more/mic/image */}
-          <View className="flex-row items-center">
-            {messageText.trim().length > 0 ? (
-              <TouchableOpacity onPress={() => { console.log('Send:', messageText); setMessageText(''); inputRef.current?.blur?.(); Keyboard.dismiss(); }}>
-                <MaterialIcons name="send" size={28} color={colors.tint} />
-              </TouchableOpacity>
-            ) : (
-              <>
-                <TouchableOpacity className="mr-4" onPress={() => { inputRef.current?.blur?.(); Keyboard.dismiss(); setComposerVisible(v => !v); }}>
-                  <MaterialIcons name="more-horiz" size={20} color={composerVisible ? colors.tint : colors.icon} />
-                </TouchableOpacity>
-
-                <TouchableOpacity className="mr-4" onPress={() => console.log('Mic pressed')}>
-                  <MaterialIcons name="mic" size={24} color={colors.icon} />
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => console.log('Image pressed')}>
-                  <MaterialIcons name="image" size={22} color={colors.icon} />
-                </TouchableOpacity>
-              </>
+          <FlatList
+            ref={flatListRef}
+            data={sampleMessages}
+            keyExtractor={(i) => i.id}
+            renderItem={({ item, index }: any) => (
+              <MessageBubble message={item} highlightQuery={searchQuery} onPress={() => { if (composerVisible) setComposerVisible(false); }} />
             )}
-          </View>
-        </View>
-      )}
+            contentContainerStyle={{ paddingVertical: 12 }}
+          />
 
-      {composerVisible && (
-        <ComposerActionsSheet
-          inline
-          visible={composerVisible}
-          onClose={() => setComposerVisible(false)}
-          onAction={(key) => { console.log('Composer action:', key); setComposerVisible(false); }}
-        />
-      )}
+          {/* Bottom search bar: replace composer when in searchMode */}
+          {searchMode ? (
+            <InThreadSearch
+              messages={sampleMessages as any}
+              query={searchQuery}
+              onQueryChange={setSearchQuery}
+              resultIndices={resultIndices}
+              currentResultIndex={currentResultIndex}
+              onSetCurrentResultIndex={setCurrentResultIndex}
+              onClose={() => setSearchMode(false)}
+              onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
+              renderMode="bottom"
+            />
+          ) : null}
 
+          {/* Composer: hidden when search mode is active */}
+          {!searchMode && (
+            <View className="px-4 flex-row items-center" style={{ borderTopWidth: 1, borderTopColor: colors.surfaceVariant, backgroundColor: colors.surface }}>
+              <TouchableOpacity className="mr-3">
+                <MaterialIcons name="emoji-emotions" size={26} color={colors.icon} />
+              </TouchableOpacity>
+
+              <View className="flex-1 px-2 py-2 mr-3" style={{ backgroundColor: colors.surface, borderRadius: 10, minHeight: 48, justifyContent: 'center' }}>
+                <TextInput
+                  ref={inputRef}
+                  value={messageText}
+                  onChangeText={text => setMessageText(text)}
+                  placeholder="Tin nhắn"
+                  placeholderTextColor={colors.textSecondary}
+                  style={{ color: colors.text, fontSize: 16, paddingVertical: 6 }}
+                  onFocus={() => setComposerVisible(false)}
+                />
+              </View>
+
+              {/* Right action icons: show send when typing, otherwise more/mic/image */}
+              <View className="flex-row items-center">
+                {messageText.trim().length > 0 ? (
+                  <TouchableOpacity onPress={() => { console.log('Send:', messageText); setMessageText(''); inputRef.current?.blur?.(); Keyboard.dismiss(); }} style={{ padding: 6 }}>
+                    <MaterialIcons name="send" size={34} color={colors.tint} />
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <TouchableOpacity className="mr-4" onPress={() => { inputRef.current?.blur?.(); Keyboard.dismiss(); setComposerVisible(v => !v); }} style={{ padding: 6 }}>
+                      <MaterialIcons name="more-horiz" size={24} color={composerVisible ? colors.tint : colors.icon} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity className="mr-4" onPress={() => console.log('Mic pressed')} style={{ padding: 6 }}>
+                      <MaterialIcons name="mic" size={28} color={colors.icon} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => console.log('Image pressed')} style={{ padding: 6 }}>
+                      <MaterialIcons name="image" size={26} color={colors.icon} />
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </View>
+          )}
+
+          {composerVisible && (
+            <ComposerActionsSheet
+              inline
+              visible={composerVisible}
+              onClose={() => setComposerVisible(false)}
+              onAction={(key) => { console.log('Composer action:', key); setComposerVisible(false); }}
+            />
+          )}
+
+        </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
-  );
-}
+  );}

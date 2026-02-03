@@ -32,7 +32,7 @@ export default function ChatThread() {
   const [messageText, setMessageText] = useState('');
 
   const renderItem = ({ item }: any) => (
-    <MessageBubble message={item} />
+    <MessageBubble message={item} onPress={() => { if (composerVisible) setComposerVisible(false); }} />
   );
 
   return (
@@ -57,12 +57,12 @@ export default function ChatThread() {
 
 
 
-      <View className="px-4 py-3 flex-row items-center" style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
+      <View className="px-4 flex-row items-center" style={{ borderTopWidth: 1, borderTopColor: colors.surfaceVariant, backgroundColor: colors.surface }}>
         <TouchableOpacity className="mr-3">
           <MaterialIcons name="emoji-emotions" size={24} color={colors.icon} />
         </TouchableOpacity>
 
-        <View className="flex-1 px-2 py-2 mr-3" style={{ backgroundColor: 'transparent', borderRadius: 8 }}>
+        <View className="flex-1 px-2 py-2 mr-3" style={{ backgroundColor: colors.surface, borderRadius: 8 }}>
           <TextInput
             ref={inputRef}
             value={messageText}

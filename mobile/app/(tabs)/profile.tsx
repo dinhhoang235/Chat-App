@@ -31,23 +31,28 @@ export default function Profile() {
         addIconName="settings"
       />
 
-      <View className="px-4">
-        {user && (
-          <View className="flex-row items-center py-4">
-            <View style={{ width: 56, height: 56, backgroundColor: colors.tint, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
-              <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>{user.fullName.charAt(0).toUpperCase()}</Text>
+      <View >
+        {/* User card */}
+        <View style={{overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+          {user && (
+            <View className="flex-row items-center" style={{ padding: 12, backgroundColor: colors.card }}>
+              <View style={{ width: 56, height: 56, backgroundColor: colors.tint, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>{user.fullName.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: '600' }}>{user.fullName}</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{user.phone}</Text>
+              </View>
             </View>
-            <View>
-              <Text style={{ color: colors.text, fontWeight: '600' }}>{user.fullName}</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{user.phone}</Text> 
-            </View>
-          </View>
-        )}
-        <View style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
-          {items.map((it) => (
+          )}
+        </View>
+
+        {/* Items card (separated) */}
+        <View style={{ marginTop: 10, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+          {items.map((it, idx) => (
             <Link key={it.title} href={it.href as any} asChild>
-              <TouchableOpacity className="flex-row items-center py-3" style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
-                <View style={{ width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.surface }}>
+              <TouchableOpacity className="flex-row items-center" style={{ borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: colors.border, backgroundColor: colors.card, paddingVertical: 12 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.card }}>
                   <MaterialIcons name={it.icon as any} size={20} color={colors.tint} />
                 </View>
                 <View className="flex-1">

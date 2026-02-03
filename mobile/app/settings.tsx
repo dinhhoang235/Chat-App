@@ -46,7 +46,7 @@ export default function Settings() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header title="Cài đặt" showSearch={false} showBack={true} />
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingVertical: 8 }}>
+      <ScrollView className="flex-1">
         <View>
           {settingsItems.map((it) => (
             <TouchableOpacity

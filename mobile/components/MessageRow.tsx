@@ -76,16 +76,16 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
         }}
         delayLongPress={200}
         className="px-4 py-3 flex-row items-center"
-        style={selectionMode && (selected ? { backgroundColor: scheme === 'dark' ? colors.surface : '#EEF6FF', borderRadius: 8 } : { borderRadius: 8 })}
+        style={selectionMode && (selected ? { backgroundColor: colors.surface, borderRadius: 8 } : { borderRadius: 8 })}
       >
         {/* Left: checkbox + avatar in selection mode, otherwise avatar */}
         {selectionMode ? (
           <View style={{ width: 92, flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity onPress={() => onToggleSelect?.(message.id)} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
               {selected ? (
-                <MaterialIcons name="check-circle" size={26} color="#2563EB" />
+                <MaterialIcons name="check-circle" size={26} color={colors.tint} />
               ) : (
-                <MaterialIcons name="radio-button-unchecked" size={22} color={scheme === 'dark' ? '#9CA3AF' : '#9CA3AF'} />
+                <MaterialIcons name="radio-button-unchecked" size={22} color={colors.textSecondary} />
               )}
             </TouchableOpacity>
 
@@ -103,12 +103,12 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
         )}
 
         <View style={{ marginLeft: 12, flex: 1 }}>
-          <Text style={{ color: scheme === 'dark' ? '#E5E7EB' : '#0F172A', fontSize: 16, fontWeight: '700' }}>{message.name}</Text>
-          <Text style={{ color: scheme === 'dark' ? '#9CA3AF' : '#6B7280', marginTop: 4 }}>{message.lastMessage}</Text>
+          <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700' }}>{message.name}</Text>
+          <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{message.lastMessage}</Text>
         </View>
 
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={{ color: scheme === 'dark' ? '#9CA3AF' : '#9CA3AF', fontSize: 12 }}>{message.time}</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{message.time}</Text>
           {message.unread && message.unread > 0 ? (
             <View className="bg-red-500 rounded-full px-2 py-0.5 mt-2">
               <Text className="text-white text-xs font-bold">{message.unread}</Text>

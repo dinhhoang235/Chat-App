@@ -6,7 +6,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "../../context/themeContext";
 
 export default function LanguageSettings() {
-  const { preference, setPreference, scheme } = useTheme();
+  const { preference, setPreference, scheme, colors } = useTheme();
   const language = 'Tiếng Việt';
 
   return (
@@ -90,20 +90,21 @@ export default function LanguageSettings() {
         <Text className={`${scheme === 'dark' ? 'text-gray-300' : 'text-gray-700'} font-semibold mb-2`}>Ngôn ngữ</Text>
 
         <TouchableOpacity
-          className={`${scheme === 'dark' ? 'flex-row items-center justify-between px-4 py-3 bg-background-dark border border-gray-800 rounded-lg' : 'flex-row items-center justify-between px-4 py-3 bg-background border border-gray-100 rounded-lg'}`}
+          className={`flex-row items-center justify-between px-4 py-3 rounded-lg`}
+          style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
           onPress={() => Alert.alert('Thay đổi ngôn ngữ', 'Chức năng chưa được triển khai')}
         >
           <View className="flex-row items-center">
-            <View className={`${scheme === 'dark' ? 'w-8 h-8 rounded-full bg-gray-800 items-center justify-center mr-3' : 'w-8 h-8 rounded-full bg-gray-100 items-center justify-center mr-3'}`}>
+            <View className={`w-8 h-8 rounded-full items-center justify-center mr-3`} style={{ backgroundColor: colors.surfaceVariant }}>
               <Text>🇻🇳</Text>
             </View>
             <View>
-              <Text className={`${scheme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Thay đổi ngôn ngữ</Text>
-              <Text className={`${scheme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>{language}</Text>
+              <Text style={{ color: colors.text }}>Thay đổi ngôn ngữ</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{language}</Text>
             </View>
           </View>
 
-          <MaterialIcons name="chevron-right" size={24} color="#9CA3AF" />
+          <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

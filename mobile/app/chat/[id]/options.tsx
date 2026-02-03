@@ -9,23 +9,23 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 function Row({ icon, title, subtitle, rightNode, onPress, showChevron = false }: any) {
-  const { scheme } = useTheme();
+  const { scheme, colors } = useTheme();
   return (
     <TouchableOpacity onPress={onPress} className={`${scheme === 'dark' ? 'border-b border-gray-800' : 'border-b border-gray-200'} px-4 py-4 flex-row items-center justify-between`}>
       <View className="flex-row items-center">
-        <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: scheme === 'dark' ? '#111827' : '#F3F4F6' }}>
-          <MaterialIcons name={icon as any} size={20} color={scheme === 'dark' ? '#9CA3AF' : '#6B7280'} />
+        <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.surfaceVariant }}>
+          <MaterialIcons name={icon as any} size={20} color={colors.textSecondary} />
         </View>
         <View>
-          <Text style={{ color: scheme === 'dark' ? '#fff' : '#111827', fontWeight: '600' }}>{title}</Text>
-          {subtitle ? <Text style={{ color: scheme === 'dark' ? '#9CA3AF' : '#6B7280', marginTop: 2 }}>{subtitle}</Text> : null}
+          <Text style={{ color: colors.text, fontWeight: '600' }}>{title}</Text>
+          {subtitle ? <Text style={{ color: colors.textSecondary, marginTop: 2 }}>{subtitle}</Text> : null}
         </View>
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {rightNode}
         {showChevron && (
-          <MaterialIcons name="chevron-right" size={22} color={scheme === 'dark' ? '#9CA3AF' : '#9CA3AF'} />
+          <MaterialIcons name="chevron-right" size={22} color={colors.textSecondary} />
         )}
       </View>
     </TouchableOpacity>
@@ -33,7 +33,7 @@ function Row({ icon, title, subtitle, rightNode, onPress, showChevron = false }:
 }
 
 export default function ChatOptions() {
-  const { scheme } = useTheme();
+  const { scheme, colors } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
   const [pinned, setPinned] = useState(false);
@@ -48,35 +48,35 @@ export default function ChatOptions() {
     <SafeAreaView className={`${scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
       <Header title="Tùy chọn" showBack onBackPress={() => router.back()} />
 
-      <View className="items-center px-4 py-3 border-b" style={{ borderBottomColor: scheme === 'dark' ? '#111827' : '#F3F4F6' }}>
+      <View className="items-center px-4 py-3 border-b" style={{ borderBottomColor: colors.border }}>
         <View className="w-24 h-24 rounded-full overflow-hidden mb-3">
           <Image source={{ uri: 'https://via.placeholder.com/96' }} style={{ width: 96, height: 96, borderRadius: 48 }} />
         </View>
-        <Text style={{ color: scheme === 'dark' ? '#fff' : '#111827', fontSize: 20, fontWeight: '700' }}>{(params as any).id || 'Người dùng'}</Text>
+        <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{(params as any).id || 'Người dùng'}</Text>
       </View>
 
       <ScrollView>
         <View className="px-4 py-4 flex-row items-center justify-around">
           <TouchableOpacity className="items-center">
-            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: scheme === 'dark' ? '#111827' : '#fff', borderWidth: 1, borderColor: scheme === 'dark' ? '#1F2937' : '#E5E7EB', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 2, elevation: 1 }}>
-              <MaterialIcons name="search" size={20} color={scheme === 'dark' ? '#fff' : '#111827'} />
+            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 2, elevation: 1 }}>
+              <MaterialIcons name="search" size={20} color={colors.text} />
             </View>
-            <Text style={{ color: scheme === 'dark' ? '#fff' : '#111827' }}>Tìm tin nhắn</Text>
+            <Text style={{ color: colors.text }}>Tìm tin nhắn</Text>
           </TouchableOpacity>
 
           <TouchableOpacity className="items-center" onPress={() => setMuteVisible(true)}>
-            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: isMuted ? '#2563EB' : (scheme === 'dark' ? '#111827' : '#fff'), borderWidth: 1, borderColor: isMuted ? '#1E40AF' : (scheme === 'dark' ? '#1F2937' : '#E5E7EB'), shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 2, elevation: 1 }}>
-              <MaterialIcons name="notifications-off" size={20} color={isMuted ? '#fff' : (scheme === 'dark' ? '#fff' : '#111827')} />
+            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: isMuted ? colors.tint : colors.surface, borderWidth: 1, borderColor: isMuted ? colors.tint : colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 2, elevation: 1 }}>
+              <MaterialIcons name="notifications-off" size={20} color={isMuted ? '#fff' : colors.text} />
             </View>
-            <Text style={{ color: scheme === 'dark' ? '#fff' : '#111827' }}>{isMuted ? 'Đã tắt' : 'Tắt thông báo'}</Text>
+            <Text style={{ color: colors.text }}>{isMuted ? 'Đã tắt' : 'Tắt thông báo'}</Text>
           </TouchableOpacity> 
         </View>
 
-        <View className="mt-4 border-t" style={{ borderTopColor: scheme === 'dark' ? '#111827' : '#F3F4F6' }}>
+        <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
           <Row icon="edit" title="Đổi tên gợi nhớ" onPress={() => {}} />
         </View>
 
-        <View className="mt-4 border-t" style={{ borderTopColor: scheme === 'dark' ? '#111827' : '#F3F4F6' }}>
+        <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
           <Row
             icon="image"
             title="Ảnh, file, link"
@@ -89,8 +89,8 @@ export default function ChatOptions() {
                 <View style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', marginRight: 8 }}>
                   <Image source={{ uri: 'https://via.placeholder.com/80/eee' }} style={{ width: 48, height: 48 }} />
                 </View>
-                <View style={{ width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: scheme === 'dark' ? '#111827' : '#F3F4F6' }}>
-                  <MaterialIcons name="arrow-forward" size={18} color={scheme === 'dark' ? '#9CA3AF' : '#6B7280'} />
+                <View style={{ width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant }}>
+                  <MaterialIcons name="arrow-forward" size={18} color={colors.textSecondary} />
                 </View>
               </View>
             )}
@@ -106,12 +106,12 @@ export default function ChatOptions() {
           <Row icon="notifications" title="Báo cuộc gọi đến" rightNode={<Switch value={true} />} onPress={() => {}} />
         </View>
 
-        <View className="mt-4 border-t px-4 py-6" style={{ borderTopColor: scheme === 'dark' ? '#111827' : '#F3F4F6' }}>
+        <View className="mt-4 border-t px-4 py-6" style={{ borderTopColor: colors.border }}>
           <TouchableOpacity className="py-3" onPress={() => console.log('Manage block')}>
-            <Text style={{ color: scheme === 'dark' ? '#fff' : '#111827' }}>Quản lý chặn</Text>
+            <Text style={{ color: colors.text }}>Quản lý chặn</Text>
           </TouchableOpacity>
           <TouchableOpacity className="py-3" onPress={() => console.log('Clear chat')}>
-            <Text style={{ color: scheme === 'dark' ? '#fff' : '#111827' }}>Xóa lịch sử trò chuyện</Text>
+            <Text style={{ color: colors.text }}>Xóa lịch sử trò chuyện</Text>
           </TouchableOpacity>
         </View>
 

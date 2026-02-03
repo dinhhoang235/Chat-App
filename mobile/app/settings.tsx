@@ -41,38 +41,39 @@ export default function Settings() {
     ]);
   };
 
-  const theme = useTheme();
+  const { scheme, colors } = useTheme();
 
   return (
-    <SafeAreaView className={`${theme.scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+    <SafeAreaView className={`${scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
       <Header title="Cài đặt" showSearch={false} showBack={true} />
       <ScrollView className="flex-1" contentContainerStyle={{ paddingVertical: 8 }}>
         <View>
           {settingsItems.map((it) => (
             <TouchableOpacity
               key={it.title}
-              className={`${theme.scheme === 'dark' ? 'flex-row items-center px-4 py-3 border-t border-gray-800 bg-background-dark' : 'flex-row items-center px-4 py-3 border-t border-gray-100 bg-background'}`}
+              className={`${scheme === 'dark' ? 'flex-row items-center px-4 py-3 border-t border-gray-800 bg-background-dark' : 'flex-row items-center px-4 py-3 border-t border-gray-100 bg-background'}`}
               onPress={() => (it.route ? router.push(it.route) : Alert.alert(it.title))}
             >
-              <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${theme.scheme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                <MaterialIcons name={it.icon as any} size={20} color="#4F46E5" />
+              <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${scheme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                <MaterialIcons name={it.icon as any} size={20} color={colors.tint} />
               </View>
               <View className="flex-1">
-                <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-medium`}>{it.title}</Text>
+                <Text className={`${scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-medium`}>{it.title}</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={24} color="#9CA3AF" />
+              <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
 
-      <SafeAreaView edges={["bottom"]} className={`${theme.scheme === 'dark' ? 'bg-background-dark' : 'bg-background'}`}>
+      <SafeAreaView edges={["bottom"]} className={`${scheme === 'dark' ? 'bg-background-dark' : 'bg-background'}`}>
         <TouchableOpacity
-          className={`flex-row items-center justify-center mx-6 py-3 rounded-full mb-6 bg-gray-800 border border-gray-700`}
+          className="flex-row items-center justify-center mx-6 py-3 rounded-full mb-6"
+          style={{ backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.border }}
           onPress={handleLogout}
         >
-          <MaterialIcons name="logout" color="#fff" size={20} />
-          <Text className="text-white font-semibold ml-2">Đăng xuất</Text>
+          <MaterialIcons name="logout" color={colors.text} size={20} />
+          <Text style={{ color: colors.text, fontWeight: '600', marginLeft: 8 }}>Đăng xuất</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </SafeAreaView>

@@ -57,7 +57,7 @@ export default function ChatThread() {
 
 
 
-      <View className="border-t border-gray-200 dark:border-gray-800 px-4 py-3 flex-row items-center" style={{ borderTopColor: colors.surfaceVariant }}>
+      <View className="border-t border-gray-200 dark:border-gray-800 px-4 py-3 flex-row items-center" style={{ borderTopColor: colors.border }}>
         <TouchableOpacity className="mr-3">
           <MaterialIcons name="emoji-emotions" size={24} color={colors.icon} />
         </TouchableOpacity>
@@ -68,7 +68,7 @@ export default function ChatThread() {
             value={messageText}
             onChangeText={text => setMessageText(text)}
             placeholder="Tin nhắn"
-            placeholderTextColor={scheme === 'dark' ? '#9CA3AF' : '#9CA3AF'}
+            placeholderTextColor={colors.textSecondary}
             onFocus={() => setComposerVisible(false)}
           />
         </View>
@@ -77,12 +77,12 @@ export default function ChatThread() {
         <View className="flex-row items-center">
           {messageText.trim().length > 0 ? (
             <TouchableOpacity onPress={() => { console.log('Send:', messageText); setMessageText(''); inputRef.current?.blur?.(); Keyboard.dismiss(); }}>
-              <MaterialIcons name="send" size={28} color="#2563EB" />
+              <MaterialIcons name="send" size={28} color={colors.tint} />
             </TouchableOpacity>
           ) : (
             <>
               <TouchableOpacity className="mr-4" onPress={() => { inputRef.current?.blur?.(); Keyboard.dismiss(); setComposerVisible(v => !v); }}>
-                <MaterialIcons name="more-horiz" size={20} color={composerVisible ? '#2563EB' : colors.icon} />
+                <MaterialIcons name="more-horiz" size={20} color={composerVisible ? colors.tint : colors.icon} />
               </TouchableOpacity>
 
               <TouchableOpacity className="mr-4" onPress={() => console.log('Mic pressed')}>

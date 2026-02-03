@@ -14,8 +14,8 @@ type Props = {
 
 export function ContactRow({ contact, onPress, onCall, onVideo }: Props) {
   const insets = useSafeAreaInsets();
-  const { scheme } = useTheme();
-  const iconColor = scheme === 'dark' ? '#E5E7EB' : '#0F172A';
+  const { colors } = useTheme();
+  const iconColor = colors.icon;
   const initials = contact.initials ?? contact.name.split(' ').map(n => n[0]).slice(0, 2).join('');
 
   return (
@@ -28,9 +28,9 @@ export function ContactRow({ contact, onPress, onCall, onVideo }: Props) {
         </View>
 
         <View style={{ marginLeft: 12, flex: 1 }}>
-          <Text style={{ color: scheme === 'dark' ? '#E5E7EB' : '#0F172A', fontSize: 16 }}>{contact.name}</Text>
+          <Text style={{ color: colors.text, fontSize: 16 }}>{contact.name}</Text>
           {contact.phone ? (
-            <Text style={{ color: scheme === 'dark' ? '#9CA3AF' : '#6B7280', marginTop: 4 }}>{contact.phone}</Text>
+            <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{contact.phone}</Text>
           ) : null}
         </View>
       </View>

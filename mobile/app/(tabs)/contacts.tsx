@@ -32,8 +32,8 @@ export default function Contacts() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ContactRow contact={item} onPress={() => {}} />}
         renderSectionHeader={({ section: { title } }) => (
-          <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: scheme === 'dark' ? colors.surface : '#FFFFFF' }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: scheme === 'dark' ? '#E5E7EB' : '#0F172A' }}>{title}</Text>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>{title}</Text>
           </View>
         )}
         contentContainerStyle={{ paddingVertical: 8, paddingRight: insets.right + 8 }}

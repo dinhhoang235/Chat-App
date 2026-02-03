@@ -27,31 +27,15 @@ export default function MessageBubble({ message }: { message: ChatMessage }) {
   }
 
   const isOutgoing = !!message.fromMe;
-  let bubbleBg = '#fff';
-  let borderColor = 'transparent';
+  let bubbleBg = colors.surface;
+  let borderColor = colors.surfaceVariant;
   let textColor = colors.text;
-  const timeColor = scheme === 'dark' ? '#9CA3AF' : '#9CA3AF';
+  const timeColor = colors.textSecondary;
 
   if (isOutgoing) {
-    if (scheme === 'dark') {
-      bubbleBg = '#2563EB';
-      borderColor = '#1E40AF';
-      textColor = '#fff';
-    } else {
-      bubbleBg = '#2563EB'; 
-      borderColor = '#1E40AF';
-      textColor = '#fff';
-    }
-  } else {
-    if (scheme === 'dark') {
-      bubbleBg = colors.surface;
-      borderColor = colors.surfaceVariant;
-      textColor = colors.text;
-    } else {
-      bubbleBg = colors.surface;
-      borderColor = colors.surfaceVariant;
-      textColor = colors.text;
-    }
+    bubbleBg = colors.tint;
+    borderColor = colors.tint;
+    textColor = '#fff';
   }
 
   // Contact card style

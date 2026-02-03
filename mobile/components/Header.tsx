@@ -41,7 +41,8 @@ export const Header: React.FC<HeaderProps> = ({
     router.back();
   };
 
-  const iconColor = isDark ? "#fff" : "#666";
+  const { colors } = theme;
+  const iconColor = colors.icon;
   const titleClass = isDark ? "text-2xl font-bold text-white" : "text-2xl font-bold text-gray-900";
 
   return (
@@ -99,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <TextInput
                   className={`${isDark ? "flex-1 ml-3 text-white text-sm" : "flex-1 ml-3 text-gray-900 text-sm"}`}
                   placeholder="Tìm kiếm..."
-                  placeholderTextColor={isDark ? "#ccc" : "#999"}
+                  placeholderTextColor={colors.textSecondary}
                   onChangeText={onSearch}
                 />
                 {rightActions && rightActions.map((a, idx) => (

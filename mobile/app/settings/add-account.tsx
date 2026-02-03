@@ -7,7 +7,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../../context/authContext";
 
 export default function AddAccount() {
-  const { scheme } = useTheme();
+  const { scheme, colors } = useTheme();
   const router = useRouter();
   const { login } = useAuth();
 
@@ -29,44 +29,46 @@ export default function AddAccount() {
   };
 
   return (
-    <SafeAreaView className={`${scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header title="Thêm tài khoản" showBack={true} showSearch={false} />
 
       <View className="px-6 py-8">
-        <View className="mb-3">
-          <Text className={`${scheme === 'dark' ? 'text-white' : 'text-2xl font-bold text-gray-900'} mb-2`}>Thêm tài khoản</Text>
-          <Text className={`${scheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Bạn có thể đăng nhập bằng số điện thoại hoặc username</Text>
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700', marginBottom: 8 }}>Thêm tài khoản</Text>
+          <Text style={{ color: colors.textSecondary }}>Bạn có thể đăng nhập bằng số điện thoại hoặc username</Text>
         </View>
 
         <View className="mt-6">
-          <Text className="text-gray-700 dark:text-gray-300 font-semibold mb-2">Số điện thoại</Text>
+          <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 8 }}>Số điện thoại</Text>
           <TextInput
-            className="border border-gray-300 rounded-lg px-4 py-3 bg-background dark:bg-background-dark mb-4"
+            style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: colors.input, color: colors.text, marginBottom: 12 }}
             placeholder="Nhập số điện thoại"
+            placeholderTextColor={colors.textSecondary}
             keyboardType="phone-pad"
             value={phone}
             onChangeText={setPhone}
           />
 
-          <Text className="text-gray-700 dark:text-gray-300 font-semibold mb-2">Mật khẩu</Text>
+          <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 8 }}>Mật khẩu</Text>
           <TextInput
-            className="border border-gray-300 rounded-lg px-4 py-3 bg-background dark:bg-background-dark mb-2"
+            style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: colors.input, color: colors.text, marginBottom: 12 }}
             placeholder="Nhập mật khẩu"
+            placeholderTextColor={colors.textSecondary}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
           />
 
-          <TouchableOpacity className="mb-6">
-            <Text className="text-blue-500">Lấy lại mật khẩu</Text>
+          <TouchableOpacity style={{ marginBottom: 16 }}>
+            <Text style={{ color: colors.tint }}>Lấy lại mật khẩu</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            className={`${phone && password ? 'bg-blue-500' : 'bg-gray-600 opacity-70'} rounded-full py-3 mb-4`}
+            style={{ backgroundColor: phone && password ? colors.tint : colors.surfaceVariant, opacity: phone && password ? 1 : 0.8, borderRadius: 999, paddingVertical: 12, marginBottom: 16 }}
             disabled={!phone || !password}
             onPress={handleAdd}
           >
-            <Text className="text-white text-center font-semibold text-lg">Thêm tài khoản</Text>
+            <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 16 }}>Thêm tài khoản</Text>
           </TouchableOpacity>
         </View>
       </View>

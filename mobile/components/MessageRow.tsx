@@ -35,7 +35,7 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
     { key: 'select', label: 'Chọn nhiều', icon: 'check-circle' },
   ];
 
-  const { scheme, colors } = useTheme();
+  const { colors } = useTheme();
 
   const handleAction = (action: string) => {
     setMenuVisible(false);
@@ -98,7 +98,7 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
             className="w-12 h-12 rounded-full items-center justify-center"
             style={{ backgroundColor: message.color || '#6B7280' }}
           >
-            <Text className="text-white font-bold">{initials}</Text>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
           </View>
         )}
 
@@ -110,8 +110,8 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{message.time}</Text>
           {message.unread && message.unread > 0 ? (
-            <View className="bg-red-500 rounded-full px-2 py-0.5 mt-2">
-              <Text className="text-white text-xs font-bold">{message.unread}</Text>
+            <View style={{ backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, marginTop: 8 }}>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{message.unread}</Text>
             </View>
           ) : null}
         </View>

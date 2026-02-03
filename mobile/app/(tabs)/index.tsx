@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 
 export default function Messages() {
-  const { scheme } = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
   const [data, setData] = useState(initialMessages);
   const { selectionMode, setSelectionMode } = useSelection();
@@ -67,7 +67,7 @@ export default function Messages() {
 
 
   return (
-    <SafeAreaView className={`${scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       {selectionMode ? (
         <SelectionHeader count={selectedIds.length} onCancel={handleCancelSelection} onSelectAll={handleSelectAll} />
       ) : (

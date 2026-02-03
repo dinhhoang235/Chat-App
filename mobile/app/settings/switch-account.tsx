@@ -8,12 +8,12 @@ import { useAuth } from "../../context/authContext";
 import { useRouter } from "expo-router";
 
 export default function SwitchAccount() {
-  const { scheme } = useTheme();
+  const { scheme, colors } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
 
   return (
-    <SafeAreaView className={`${scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header title="Chuyển tài khoản" showBack={true} showSearch={false} />
 
       <View className="px-4 pt-4">
@@ -23,37 +23,39 @@ export default function SwitchAccount() {
           {user && (
             <TouchableOpacity
               activeOpacity={0.8}
-              className={`${scheme === 'dark' ? 'bg-background-dark' : 'bg-background'} px-4 py-3 rounded-lg flex-row items-center justify-between border ${scheme === 'dark' ? 'border-gray-800' : 'border-gray-200'}`}
+              className="px-4 py-3 rounded-lg flex-row items-center justify-between"
+              style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}
               onPress={() => { /* future: switch account */ }}
             >
               <View className="flex-row items-center">
                 <View style={{ position: 'relative' }} className="mr-4">
-                  <View className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-800 items-center justify-center overflow-hidden">
-                    <Text className="text-gray-900 dark:text-white font-bold text-lg">{user.fullName.charAt(0).toUpperCase()}</Text>
+                  <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.surface }}>
+                    <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{user.fullName.charAt(0).toUpperCase()}</Text>
                   </View>
-                  <View style={{ position: 'absolute', right: -6, top: -6 }} className="w-6 h-6 rounded-full bg-green-500 items-center justify-center border-2 border-white">
+                  <View style={{ position: 'absolute', right: -6, top: -6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success, borderWidth: 2, borderColor: '#fff' }}>
                     <MaterialIcons name="check" size={14} color="#fff" />
                   </View>
                 </View>
 
                 <View>
-                  <Text className={`${scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-medium`}>{user.fullName}</Text>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>{user.fullName}</Text>
                 </View>
               </View>
 
-              <Text className={`${scheme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>Đã đăng nhập</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Đã đăng nhập</Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity
-            className={`${scheme === 'dark' ? 'bg-background-dark' : 'bg-background'} flex-row items-center px-4 py-4 rounded-lg border ${scheme === 'dark' ? 'border-gray-800' : 'border-gray-200'}`}
+            className="flex-row items-center px-4 py-4 rounded-lg"
+            style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
             onPress={() => router.push('/settings/add-account')}
           >
-            <View className={`w-12 h-12 rounded-full items-center justify-center mr-4 ${scheme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
-              <MaterialIcons name="add" size={28} color={scheme === 'dark' ? '#9CA3AF' : '#4F46E5'} />
+            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: 16, backgroundColor: colors.surface }}>
+              <MaterialIcons name="add" size={28} color={colors.tint} />
             </View>
             <View>
-              <Text className={`${scheme === 'dark' ? 'text-white' : 'text-blue-500'} font-medium`}>Thêm tài khoản</Text>
+              <Text style={{ color: colors.tint, fontWeight: '600' }}>Thêm tài khoản</Text>
             </View>
           </TouchableOpacity>
         </View>

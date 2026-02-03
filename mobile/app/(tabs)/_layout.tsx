@@ -13,8 +13,8 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.tint,
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarActiveTintColor: colors.tabIconSelected,
+        tabBarInactiveTintColor: colors.tabIconDefault,
         tabBarStyle: selectionMode ? { display: 'none' as any } : { backgroundColor: colors.surface, borderTopColor: colors.border },
       }}
     >

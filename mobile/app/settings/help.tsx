@@ -4,15 +4,15 @@ import { Header } from "../../components/Header";
 import { useTheme } from "../../context/themeContext";
 
 export default function HelpSettings() {
-  const theme = useTheme();
+  const { colors } = useTheme();
 
   return (
-    <SafeAreaView className={`${theme.scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header title="Trợ giúp" showBack={true} showSearch={false} />
       <View className="px-4 pt-4">
-        <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-medium mb-2`}>Trợ giúp & Hỗ trợ</Text>
-        <Text className={`${theme.scheme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Hướng dẫn sử dụng, câu hỏi thường gặp và liên hệ hỗ trợ.</Text>
+        <Text style={{ color: colors.text, fontWeight: '600', marginBottom: 8 }}>Trợ giúp & Hỗ trợ</Text>
+        <Text style={{ color: colors.textSecondary }}>Hướng dẫn sử dụng, câu hỏi thường gặp và liên hệ hỗ trợ.</Text>
       </View>
-    </SafeAreaView>
+    </SafeAreaView> 
   );
 }

@@ -21,7 +21,7 @@ export default function Profile() {
   const { scheme, colors } = useTheme();
 
   return (
-    <SafeAreaView className={`${scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header 
         title="Cá nhân" 
         subtitle="Thông tin tài khoản"
@@ -34,25 +34,25 @@ export default function Profile() {
       <View className="px-4">
         {user && (
           <View className="flex-row items-center py-4">
-            <View className="w-14 h-14 bg-blue-500 rounded-full items-center justify-center mr-4">
-              <Text className="text-xl font-bold text-white">{user.fullName.charAt(0).toUpperCase()}</Text>
+            <View style={{ width: 56, height: 56, backgroundColor: colors.tint, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+              <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>{user.fullName.charAt(0).toUpperCase()}</Text>
             </View>
             <View>
-              <Text className={`${scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-semibold`}>{user.fullName}</Text>
-              <Text className={`${scheme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>{user.phone}</Text>
+              <Text style={{ color: colors.text, fontWeight: '600' }}>{user.fullName}</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{user.phone}</Text> 
             </View>
           </View>
         )}
-        <View className={`${scheme === 'dark' ? 'mt-2 rounded-lg overflow-hidden bg-background-dark border border-gray-800' : 'mt-2 rounded-lg overflow-hidden bg-background border border-gray-100'}`}>
+        <View style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
           {items.map((it) => (
             <Link key={it.title} href={it.href as any} asChild>
-              <TouchableOpacity className={`${scheme === 'dark' ? 'flex-row items-center py-3 border-t border-gray-800 bg-background-dark' : 'flex-row items-center py-3 border-t border-gray-100 bg-background'}`}>
-                <View className={`${scheme === 'dark' ? 'w-10 h-10 rounded-full bg-gray-800 items-center justify-center mr-3' : 'w-10 h-10 rounded-full bg-gray-100 items-center justify-center mr-3'}`}>
+              <TouchableOpacity className="flex-row items-center py-3" style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
+                <View style={{ width: 40, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.surface }}>
                   <MaterialIcons name={it.icon as any} size={20} color={colors.tint} />
                 </View>
                 <View className="flex-1">
-                  <Text className={`${scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-medium`}>{it.title}</Text>
-                  <Text className={`${scheme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>{it.subtitle}</Text>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>{it.title}</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{it.subtitle}</Text>
                 </View>
                 <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
               </TouchableOpacity>

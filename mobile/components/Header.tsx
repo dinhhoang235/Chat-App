@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, TextStyle } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "../context/themeContext";
@@ -34,7 +34,6 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const router = useRouter();
   const theme = useTheme();
-  const isDark = variant === "dark" ? true : variant === "light" ? false : theme.scheme === "dark";
 
   const handleBack = () => {
     if (onBackPress) return onBackPress();
@@ -43,10 +42,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   const { colors } = theme;
   const iconColor = colors.icon;
-  const titleClass = isDark ? "text-2xl font-bold text-white" : "text-2xl font-bold text-gray-900";
+  const titleStyle: TextStyle = { color: colors.text, fontSize: 24, fontWeight: '700' };
 
   return (
-    <View className={`${theme.scheme === 'dark' ? 'bg-background-dark border-b border-gray-800' : 'bg-background border-b border-gray-100'} px-6`}>
+    <View style={{ backgroundColor: colors.header, borderBottomWidth: 1, borderBottomColor: colors.border }} className="px-6">
       <View>
         {!showSearch ? (
           <View className="flex-row items-center justify-between">
@@ -56,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <MaterialIcons name="arrow-back" color={iconColor} size={28} />
                 </TouchableOpacity>
               )}
-              <Text className={titleClass}>{title}</Text>
+              <Text style={titleStyle}>{title}</Text>
             </View>
             <View className="flex-row items-center gap-4">
               {onFilterPress && (
@@ -95,12 +94,13 @@ export const Header: React.FC<HeaderProps> = ({
                 </TouchableOpacity>
               )}
 
-              <View style={{ marginHorizontal: -24, elevation: 1 }} className={`${theme.scheme === 'dark' ? 'bg-background-dark' : 'bg-background'} flex-row items-center rounded-lg px-3 py-2 flex-1`}>
+              <View style={{ marginHorizontal: -24, elevation: 1, backgroundColor: colors.surface }} className="flex-row items-center rounded-lg px-3 py-2 flex-1">
                 <MaterialIcons name="search" color={iconColor} size={24} />
                 <TextInput
-                  className={`${isDark ? "flex-1 ml-3 text-white text-sm" : "flex-1 ml-3 text-gray-900 text-sm"}`}
+                  className="flex-1 ml-3 text-sm"
                   placeholder="Tìm kiếm..."
                   placeholderTextColor={colors.textSecondary}
+                  style={{ color: colors.text }}
                   onChangeText={onSearch}
                 />
                 {rightActions && rightActions.map((a, idx) => (

@@ -19,7 +19,7 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { scheme, colors } = useTheme();
   const overlayColor = scheme === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.55)';
-  const rowBg = scheme === 'dark' ? colors.surface : '#fff';
+  const rowBg = colors.surface;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -49,18 +49,18 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
             </View>
 
             <View style={{ marginLeft: 12, flex: 1 }}>
-              <Text style={{ color: scheme === 'dark' ? '#fff' : '#0F172A', fontSize: 16 }}>{message.name}</Text>
-              <Text style={{ color: scheme === 'dark' ? '#9CA3AF' : '#6B7280', fontSize: 12 }}>{message.lastMessage}</Text>
+              <Text style={{ color: colors.text, fontSize: 16 }}>{message.name}</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{message.lastMessage}</Text>
             </View>
 
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ color: scheme === 'dark' ? '#9CA3AF' : '#9CA3AF', fontSize: 12 }}>{message.time}</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{message.time}</Text>
               {message.unread && message.unread > 0 ? (
-                <View style={{ backgroundColor: '#EF4444', borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2, marginTop: 6 }}>
+                <View style={{ backgroundColor: colors.danger, borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2, marginTop: 6 }}>
                   <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{message.unread}</Text>
                 </View>
               ) : null}
-            </View>
+            </View> 
           </View>
         ) : null}
 
@@ -87,7 +87,7 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
           {items.map((it, idx) => {
             const isSelect = it.key === 'select';
             const isLast = idx === items.length - 1;
-            const borderTopStyle = isSelect ? { borderTopWidth: 1, borderTopColor: scheme === 'dark' ? colors.surface : '#E5E7EB', marginTop: 6, paddingTop: 8 } : {}; 
+            const borderTopStyle = isSelect ? { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 6, paddingTop: 8 } : {}; 
             const bottomRadiusStyle = isLast ? { borderBottomLeftRadius: 8, borderBottomRightRadius: 8 } : {};
 
             return (
@@ -97,9 +97,9 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
                 style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8, ...borderTopStyle, ...bottomRadiusStyle }}
               >
                 <View style={{ width: 28, alignItems: 'center', justifyContent: 'center' }}>
-                  <MaterialIcons name={it.icon as any} size={16} color={it.destructive ? '#DC2626' : (scheme === 'dark' ? '#E5E7EB' : '#111827')} />
+                  <MaterialIcons name={it.icon as any} size={16} color={it.destructive ? colors.danger : colors.text} />
                 </View>
-                <Text style={{ marginLeft: 10, flex: 1, color: it.destructive ? '#DC2626' : (scheme === 'dark' ? '#E5E7EB' : '#111827'), fontSize: 13 }}>{it.label}</Text>
+                <Text style={{ marginLeft: 10, flex: 1, color: it.destructive ? colors.danger : colors.text, fontSize: 13 }}>{it.label}</Text>
               </TouchableOpacity>
             );
           })}

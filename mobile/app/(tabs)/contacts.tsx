@@ -8,7 +8,7 @@ import { buildContactSections } from '../../utils/contacts';
 import { ContactRow } from '../../components/ContactRow';
 
 export default function Contacts() {
-  const { scheme, colors } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   const handleSearch = (text: string) => {
@@ -18,7 +18,7 @@ export default function Contacts() {
   const sections = React.useMemo(() => buildContactSections(contacts), []);
 
   return (
-    <SafeAreaView className={`${scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header 
         title="Danh bạ" 
         subtitle="Những người liên hệ của bạn"

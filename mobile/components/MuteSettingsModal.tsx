@@ -15,7 +15,7 @@ export default function MuteSettingsModal({ visible, onClose, initialOption = 'T
   const [selected, setSelected] = useState<string>(initialOption);
   const [excludeReminders, setExcludeReminders] = useState<boolean>(initialExclude);
   const { scheme, colors } = useTheme();
-  const rowBg = scheme === 'dark' ? colors.surface : '#fff';
+  const rowBg = colors.surface;
 
   // Sync when reopened
   React.useEffect(() => {
@@ -32,39 +32,39 @@ export default function MuteSettingsModal({ visible, onClose, initialOption = 'T
       <View style={{ flex: 1, backgroundColor: scheme === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.55)' }}>
         <SafeAreaView style={{ flex: 1 }}>
           <View style={{ flex: 1, backgroundColor: rowBg }}>
-            <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: scheme === 'dark' ? colors.surface : '#E5E7EB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <TouchableOpacity onPress={onClose}>
-                <MaterialIcons name="close" size={24} color={scheme === 'dark' ? '#fff' : '#111827'} />
+                <MaterialIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
 
-              <Text style={{ fontSize: 16, fontWeight: '700', color: scheme === 'dark' ? '#fff' : '#111827' }}>Tắt thông báo tin nhắn</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>Tắt thông báo tin nhắn</Text>
 
               <View style={{ width: 24 }} />
             </View>
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-              <TouchableOpacity onPress={() => setExcludeReminders(prev => !prev)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: scheme === 'dark' ? colors.surface : '#E5E7EB' }}>
-                <Text style={{ color: scheme === 'dark' ? '#E5E7EB' : '#111827' }}>Nhắc hẹn</Text>
-                {excludeReminders ? <MaterialIcons name="check" size={20} color="#2563EB" /> : <View style={{ width: 20 }} />}
+              <TouchableOpacity onPress={() => setExcludeReminders(prev => !prev)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <Text style={{ color: colors.text }}>Nhắc hẹn</Text>
+                {excludeReminders ? <MaterialIcons name="check" size={20} color={colors.tint} /> : <View style={{ width: 20 }} />}
               </TouchableOpacity>
 
-              <Text style={{ color: scheme === 'dark' ? '#9CA3AF' : '#6B7280', marginTop: 12, marginBottom: 8 }}>Khoảng thời gian</Text>
+              <Text style={{ color: colors.textSecondary, marginTop: 12, marginBottom: 8 }}>Khoảng thời gian</Text>
 
               {opts.map((opt, idx) => {
                 const is = selected === opt;
                 const isLast = idx === opts.length - 1;
                 return (
-                  <TouchableOpacity key={opt} onPress={() => setSelected(opt)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: isLast ? 'transparent' : (scheme === 'dark' ? colors.surfaceVariant : '#E5E7EB') }}>
-                    <Text style={{ color: scheme === 'dark' ? '#E5E7EB' : '#111827' }}>{opt}</Text>
-                    <MaterialIcons name={is ? 'radio-button-checked' : 'radio-button-unchecked'} size={20} color={is ? '#2563EB' : (scheme === 'dark' ? '#9CA3AF' : '#9CA3AF')} />
+                  <TouchableOpacity key={opt} onPress={() => setSelected(opt)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: isLast ? 'transparent' : colors.border }}>
+                    <Text style={{ color: colors.text }}>{opt}</Text>
+                    <MaterialIcons name={is ? 'radio-button-checked' : 'radio-button-unchecked'} size={20} color={is ? colors.tint : colors.textSecondary} />
                   </TouchableOpacity>
                 );
               })} 
 
             </ScrollView>
 
-            <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: scheme === 'dark' ? colors.surface : '#E5E7EB' }}>
-              <TouchableOpacity onPress={() => { onSave(selected, excludeReminders); onClose(); }} style={{ backgroundColor: '#2563EB', borderRadius: 999, paddingVertical: 14, alignItems: 'center' }}>
+            <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <TouchableOpacity onPress={() => { onSave(selected, excludeReminders); onClose(); }} style={{ backgroundColor: colors.tint, borderRadius: 999, paddingVertical: 14, alignItems: 'center' }}>
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Xong</Text>
               </TouchableOpacity>
             </View>

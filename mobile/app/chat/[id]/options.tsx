@@ -9,9 +9,9 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 function Row({ icon, title, subtitle, rightNode, onPress, showChevron = false }: any) {
-  const { scheme, colors } = useTheme();
+  const { colors } = useTheme();
   return (
-    <TouchableOpacity onPress={onPress} className={`${scheme === 'dark' ? 'border-b border-gray-800' : 'border-b border-gray-200'} px-4 py-4 flex-row items-center justify-between`}>
+    <TouchableOpacity onPress={onPress} className="px-4 py-4 flex-row items-center justify-between" style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
       <View className="flex-row items-center">
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.surfaceVariant }}>
           <MaterialIcons name={icon as any} size={20} color={colors.textSecondary} />
@@ -33,7 +33,7 @@ function Row({ icon, title, subtitle, rightNode, onPress, showChevron = false }:
 }
 
 export default function ChatOptions() {
-  const { scheme, colors } = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
   const [pinned, setPinned] = useState(false);
@@ -45,7 +45,7 @@ export default function ChatOptions() {
   const isMuted = selectedMuteOption !== 'Không tắt';
 
   return (
-    <SafeAreaView className={`${scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header title="Tùy chọn" showBack onBackPress={() => router.back()} />
 
       <View className="items-center px-4 py-3 border-b" style={{ borderBottomColor: colors.border }}>
@@ -101,7 +101,7 @@ export default function ChatOptions() {
           <Row icon="people" title="Xem nhóm chung" subtitle="(1)" onPress={() => {}} />
         </View>
 
-        <View className="mt-4 border-t" style={{ borderTopColor: scheme === 'dark' ? '#111827' : '#F3F4F6' }}>
+        <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
           <Row icon="push-pin" title="Ghim trò chuyện" rightNode={<Switch value={pinned} onValueChange={setPinned} />} onPress={() => setPinned(v => !v)} />
           <Row icon="notifications" title="Báo cuộc gọi đến" rightNode={<Switch value={true} />} onPress={() => {}} />
         </View>

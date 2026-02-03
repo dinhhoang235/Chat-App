@@ -24,7 +24,7 @@ const sampleMessages = [
 ];
 
 export default function ChatThread() {
-  const { scheme, colors } = useTheme();
+  const { colors } = useTheme();
   const params = useLocalSearchParams();
   const router = useRouter();
   const [composerVisible, setComposerVisible] = useState(false);
@@ -36,7 +36,7 @@ export default function ChatThread() {
   );
 
   return (
-    <SafeAreaView className={`${scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header 
         title={(params as any).id || 'Chat'} 
         showBack 
@@ -57,18 +57,19 @@ export default function ChatThread() {
 
 
 
-      <View className="border-t border-gray-200 dark:border-gray-800 px-4 py-3 flex-row items-center" style={{ borderTopColor: colors.border }}>
+      <View className="px-4 py-3 flex-row items-center" style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
         <TouchableOpacity className="mr-3">
           <MaterialIcons name="emoji-emotions" size={24} color={colors.icon} />
         </TouchableOpacity>
 
-        <View className="flex-1 px-2 py-2 mr-3" style={{ backgroundColor: 'transparent' }}>
+        <View className="flex-1 px-2 py-2 mr-3" style={{ backgroundColor: 'transparent', borderRadius: 8 }}>
           <TextInput
             ref={inputRef}
             value={messageText}
             onChangeText={text => setMessageText(text)}
             placeholder="Tin nhắn"
             placeholderTextColor={colors.textSecondary}
+            style={{ color: colors.text }}
             onFocus={() => setComposerVisible(false)}
           />
         </View>

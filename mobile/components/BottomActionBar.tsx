@@ -20,8 +20,8 @@ export default function BottomActionBar({ onMarkRead, onDelete }: Props) {
       right: 0,
       bottom: 0,
       borderTopWidth: 1,
-      borderTopColor: scheme === 'dark' ? colors.surface : '#E5E7EB',
-      backgroundColor: scheme === 'dark' ? colors.surface : '#fff',
+      borderTopColor: colors.border,
+      backgroundColor: colors.surface,
       paddingTop: 10,
       paddingBottom: 10 + insets.bottom,
       paddingHorizontal: 12,
@@ -34,8 +34,8 @@ export default function BottomActionBar({ onMarkRead, onDelete }: Props) {
         style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <MaterialIcons name="drafts" size={20} color={scheme === 'dark' ? '#E5E7EB' : '#111827'} />
-        <Text style={{ fontSize: 12, color: scheme === 'dark' ? '#E5E7EB' : '#111827', marginTop: 6 }}>Đánh dấu đã đọc</Text>
+        <MaterialIcons name="drafts" size={20} color={colors.text} />
+        <Text style={{ fontSize: 12, color: colors.text, marginTop: 6 }}>Đánh dấu đã đọc</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -43,8 +43,8 @@ export default function BottomActionBar({ onMarkRead, onDelete }: Props) {
         style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <MaterialIcons name="delete" size={20} color="#DC2626" />
-        <Text style={{ fontSize: 12, color: '#DC2626', marginTop: 6 }}>Xóa</Text>
+        <MaterialIcons name="delete" size={20} color={colors.danger} />
+        <Text style={{ fontSize: 12, color: colors.danger, marginTop: 6 }}>Xóa</Text>
       </TouchableOpacity>
     </View>
   );

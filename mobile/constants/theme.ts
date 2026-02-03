@@ -1,16 +1,16 @@
 /**
  * Modern mobile color system
- * Optimized for React Native + chat app
- * Based on Material Design dark mode (no pure black)
+ * Tuned specifically for Chat App (Discord / Telegram style)
+ * Dark mode uses layered greys (NOT pure black)
  */
 
 import { Platform } from 'react-native';
 
 /* ===============================
-   Brand color
+   Brand
 ================================ */
-const tintColorLight = '#3B82F6'; // blue-500
-const tintColorDark = '#60A5FA';
+const tintColorLight = '#3B82F6';
+const tintColorDark = '#3B82F6';
 
 /* ===============================
    Colors
@@ -18,24 +18,32 @@ const tintColorDark = '#60A5FA';
 export const Colors = {
   light: {
     /* text */
-    text: '#11181C',
-    textSecondary: '#6B7280',
+    text: '#0F172A',
+    textSecondary: '#64748B',
 
     /* backgrounds */
     background: '#FFFFFF',
-    surface: '#F9FAFB',
+    header: '#FFFFFF',
+    surface: '#F8FAFC',
     card: '#FFFFFF',
 
+    /* chat */
+    input: '#F1F5F9',
+    bubbleMe: tintColorLight,
+    bubbleOther: '#F1F5F9',
+    bubbleMeText: '#FFFFFF',
+    bubbleOtherText: '#0F172A',
+
     /* ui */
-    border: '#E5E7EB',
-    surfaceVariant: '#E5E7EB',
+    border: '#E2E8F0',
+    surfaceVariant: '#E2E8F0',
 
     /* brand */
     tint: tintColorLight,
 
     /* icons / tabs */
-    icon: '#687076',
-    tabIconDefault: '#687076',
+    icon: '#64748B',
+    tabIconDefault: '#64748B',
     tabIconSelected: tintColorLight,
 
     /* states */
@@ -45,24 +53,32 @@ export const Colors = {
 
   dark: {
     /* text */
-    text: 'rgba(255,255,255,0.87)',
-    textSecondary: 'rgba(255,255,255,0.6)',
+    text: 'rgba(255,255,255,0.88)',
+    textSecondary: 'rgba(255,255,255,0.55)',
 
-    /* backgrounds (layered for depth) */
-    background: '#121212', // main bg
-    surface: '#1E1E1E',    // input / header
-    card: '#2A2A2A',       // card / message bubble
+    /* layered backgrounds (depth) */
+    background: '#121212', // page
+    header: '#1B1B1B',     // header bar
+    surface: '#1E1E1E',    // input / toolbar
+    card: '#262626',       // bubble other / cards
+
+    /* chat */
+    input: '#202020',
+    bubbleMe: tintColorDark,     // brand blue
+    bubbleOther: '#262626',
+    bubbleMeText: '#FFFFFF',
+    bubbleOtherText: 'rgba(255,255,255,0.88)',
 
     /* ui */
-    border: 'rgba(255,255,255,0.12)',
+    border: 'rgba(255,255,255,0.10)',
     surfaceVariant: '#2F2F2F',
 
     /* brand */
     tint: tintColorDark,
 
     /* icons / tabs */
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
+    icon: '#9CA3AF',
+    tabIconDefault: '#9CA3AF',
     tabIconSelected: tintColorDark,
 
     /* states */

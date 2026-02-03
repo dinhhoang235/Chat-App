@@ -8,8 +8,8 @@ import { useSelection } from "../../context/selectionContext";
 import { messages as initialMessages } from '../../constants/mockData';
 import { MessageRow } from '../../components/MessageRow';
 import { useRouter } from 'expo-router';
-
 import { useState } from 'react';
+import { useAddMenu } from '../../context/addMenuContext';
 
 export default function Messages() {
   const { colors } = useTheme();
@@ -17,6 +17,7 @@ export default function Messages() {
   const [data, setData] = useState(initialMessages);
   const { selectionMode, setSelectionMode } = useSelection();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { toggle, setAddLayout, setHeaderLayout } = useAddMenu();
   const insets = useSafeAreaInsets();
 
   const handleSearch = (text: string) => {
@@ -28,7 +29,7 @@ export default function Messages() {
   };
 
   const handleAdd = () => {
-    console.log("Add pressed");
+    toggle();
   };
 
   const toggleSelect = (id: string) => {
@@ -78,8 +79,12 @@ export default function Messages() {
           onSearch={handleSearch}
           onFilterPress={handleFilter}
           onAddPress={handleAdd}
+          onAddLayout={(layout) => setAddLayout?.(layout)}
+          onHeaderLayout={(layout) => setHeaderLayout?.(layout)}
         />
       )}
+
+
 
       <FlatList
         data={data}

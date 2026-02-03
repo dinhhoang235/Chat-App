@@ -10,7 +10,7 @@ type Props = {
 };
 
 export default function SelectionHeader({ count, onCancel, onSelectAll }: Props) {
-  const { scheme, colors } = useTheme();
+  const { colors } = useTheme();
 
   return (
     <View style={{ paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border }}>

@@ -7,7 +7,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../../context/authContext";
 
 export default function AddAccount() {
-  const { scheme, colors } = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
   const { login } = useAuth();
 

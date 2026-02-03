@@ -42,20 +42,20 @@ export const Header: React.FC<HeaderProps> = ({
 
   const { colors } = theme;
   const iconColor = colors.icon;
-  const titleStyle: TextStyle = { color: colors.text, fontSize: 24, fontWeight: '700' };
+  const titleStyle: TextStyle = { color: colors.text, fontSize: 20, fontWeight: '700', lineHeight: 24, marginTop: 6 };
 
   return (
-    <View style={{ backgroundColor: colors.header, borderBottomWidth: 1, borderBottomColor: colors.border }} className="px-6">
-      <View>
+    <View style={{ backgroundColor: colors.header, borderBottomWidth: showSearch ? 0 : 1, borderBottomColor: colors.border, paddingVertical: 8, minHeight: 56 }} className="px-6">
+      <View style={{ justifyContent: 'center' }}>
         {!showSearch ? (
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center">
               {showBack && (
-                <TouchableOpacity className="mr-3" onPress={handleBack}>
+                <TouchableOpacity className="mr-3 mt-2" onPress={handleBack}>
                   <MaterialIcons name="arrow-back" color={iconColor} size={28} />
                 </TouchableOpacity>
               )}
-              <Text style={titleStyle}>{title}</Text>
+              <Text style={titleStyle} numberOfLines={1}>{title}</Text>
             </View>
             <View className="flex-row items-center gap-4">
               {onFilterPress && (
@@ -94,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </TouchableOpacity>
               )}
 
-              <View style={{ marginHorizontal: -24, elevation: 1, backgroundColor: colors.surface }} className="flex-row items-center rounded-lg px-3 py-2 flex-1">
+              <View style={{ marginHorizontal: -24, elevation: 1, backgroundColor: colors.header, height: 40, alignItems: 'center' }} className="flex-row items-center rounded-lg px-3 flex-1">
                 <MaterialIcons name="search" color={iconColor} size={24} />
                 <TextInput
                   className="flex-1 ml-3 text-sm"

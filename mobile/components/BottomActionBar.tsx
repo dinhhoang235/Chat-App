@@ -11,7 +11,7 @@ type Props = {
 
 export default function BottomActionBar({ onMarkRead, onDelete }: Props) {
   const insets = useSafeAreaInsets();
-  const { scheme, colors } = useTheme();
+  const { colors } = useTheme();
 
   return (
     <View style={{

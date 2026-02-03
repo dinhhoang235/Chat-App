@@ -18,7 +18,7 @@ export default function Profile() {
     console.log("Search:", text);
   };
 
-  const { scheme, colors } = useTheme();
+  const { colors } = useTheme();
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>

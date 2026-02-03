@@ -4,8 +4,7 @@ import { useTheme } from "../../context/themeContext";
 import { useSelection } from "../../context/selectionContext";
 
 export default function TabsLayout() {
-  const { scheme, colors } = useTheme();
-  const isDark = scheme === 'dark';
+  const { colors } = useTheme();
 
   const { selectionMode } = useSelection();
 

@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, TextStyle } from "react-native";
+import { View, Text, TouchableOpacity, TextStyle } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "../context/themeContext";
@@ -118,13 +118,13 @@ export const Header: React.FC<HeaderProps> = ({
 
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: 34 }} className="flex-row items-center">
                 <MaterialIcons name="search" color={iconColor} size={28} />
-                <TextInput
-                  className="flex-1 ml-3 text-sm"
-                  placeholder="Tìm kiếm..."
-                  placeholderTextColor={colors.textSecondary}
-                  style={{ color: colors.text }}
-                  onChangeText={onSearch}
-                />
+                {/* Make the header search navigate to a full-screen /search route so the keyboard autofocuses there */}
+                <TouchableOpacity onPress={() => router.push('/search')} style={{ flex: 1, marginLeft: 12 }}>
+                  <View style={{ height: 34, borderRadius: 18, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: colors.surface }}>
+                    <Text style={{ color: colors.textSecondary }}>Tìm kiếm...</Text>
+                  </View>
+                </TouchableOpacity>
+
                 {rightActions && rightActions.map((a, idx) => (
                   <TouchableOpacity key={idx} className="px-3" onPress={a.onPress}>
                     <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 28} />

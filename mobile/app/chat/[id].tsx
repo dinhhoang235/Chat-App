@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { View, FlatList, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, FlatList, TextInput, TouchableOpacity, Keyboard } from 'react-native';
+import Animated, { useSharedValue } from 'react-native-reanimated';
+import { useKeyboardHandler } from 'react-native-keyboard-controller';
 import { Header } from '../../components/Header';
 import InThreadSearch from '../../components/InThreadSearch';
 import MessageBubble from '../../components/MessageBubble';
@@ -9,7 +11,7 @@ import { useTheme } from '../../context/themeContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSearch } from '../../context/searchContext';
 import { useIsFocused } from '@react-navigation/native';
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 
 const sampleMessages = [
@@ -44,6 +46,26 @@ export default function ChatThread() {
   const [composerVisible, setComposerVisible] = useState(false);
   const inputRef = useRef<any>(null);
   const [messageText, setMessageText] = useState('');
+
+  const insets = useSafeAreaInsets();
+
+  // Keyboard height tracking using useKeyboardHandler (Expo recommended)
+  const keyboardHeight = useSharedValue(0);
+
+  useKeyboardHandler(
+    {
+      onMove: (event) => {
+        'worklet';
+        keyboardHeight.value = Math.max(event.height, 0);
+      },
+    },
+    []
+  );
+
+  const composerHeight = 64; // reserve space for composer
+
+  // Static padding - animated spacer handles pushing content up
+  const listPaddingBottom = 12 + composerHeight + insets.bottom;
 
   React.useEffect(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -94,9 +116,9 @@ export default function ChatThread() {
   }, [searchMode, openFor, params, close]);
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.surface }}>
+    <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: colors.surface }}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
+        <View style={{ flex: 1 }} >
           {searchMode ? (
             // header replaced by search header
             <InThreadSearch
@@ -127,67 +149,153 @@ export default function ChatThread() {
             data={sampleMessages}
             keyExtractor={(i) => i.id}
             renderItem={({ item, index }: any) => (
-              <MessageBubble message={item} highlightQuery={searchQuery} onPress={() => { if (composerVisible) setComposerVisible(false); }} />
+              <MessageBubble 
+                message={item} 
+                highlightQuery={searchQuery} 
+                onPress={() => { if (composerVisible) setComposerVisible(false); }} 
+              />
             )}
-            contentContainerStyle={{ paddingVertical: 12 }}
+            contentContainerStyle={{ 
+              paddingVertical: 12, 
+              paddingBottom: listPaddingBottom
+            }}
           />
 
           {/* Bottom search bar: replace composer when in searchMode */}
           {searchMode ? (
-            <InThreadSearch
-              messages={sampleMessages as any}
-              query={searchQuery}
-              onQueryChange={setSearchQuery}
-              resultIndices={resultIndices}
-              currentResultIndex={currentResultIndex}
-              onSetCurrentResultIndex={setCurrentResultIndex}
-              onClose={() => setSearchMode(false)}
-              onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
-              renderMode="bottom"
-            />
+            <View
+              style={{
+                borderTopWidth: 1,
+                borderTopColor: colors.surfaceVariant,
+                backgroundColor: colors.surface,
+              }}
+            >
+              <InThreadSearch
+                messages={sampleMessages as any}
+                query={searchQuery}
+                onQueryChange={setSearchQuery}
+                resultIndices={resultIndices}
+                currentResultIndex={currentResultIndex}
+                onSetCurrentResultIndex={setCurrentResultIndex}
+                onClose={() => setSearchMode(false)}
+                onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
+                renderMode="bottom"
+              />
+
+              {/* Animated spacer for search mode - same as composer */}
+              <Animated.View
+                style={[
+                  { 
+                    backgroundColor: colors.surface,
+                    height: keyboardHeight,
+                    paddingBottom: insets.bottom,
+                  },
+                ]}
+              />
+            </View>
           ) : null}
 
           {/* Composer: hidden when search mode is active */}
           {!searchMode && (
-            <View className="px-4 flex-row items-center" style={{ borderTopWidth: 1, borderTopColor: colors.surfaceVariant, backgroundColor: colors.surface }}>
-              <TouchableOpacity className="mr-3">
-                <MaterialIcons name="emoji-emotions" size={26} color={colors.icon} />
-              </TouchableOpacity>
+            <View
+              style={{
+                borderTopWidth: 1,
+                borderTopColor: colors.surfaceVariant,
+                backgroundColor: colors.surface,
+              }}
+            >
+              <View 
+                className="px-4 flex-row items-center" 
+                style={{
+                  paddingBottom: 6,
+                  paddingTop: 6,
+                }}
+              >
+                <TouchableOpacity className="mr-3">
+                  <MaterialIcons name="emoji-emotions" size={26} color={colors.icon} />
+                </TouchableOpacity>
 
-              <View className="flex-1 px-2 py-2 mr-3" style={{ backgroundColor: colors.surface, borderRadius: 10, minHeight: 48, justifyContent: 'center' }}>
-                <TextInput
-                  ref={inputRef}
-                  value={messageText}
-                  onChangeText={text => setMessageText(text)}
-                  placeholder="Tin nhắn"
-                  placeholderTextColor={colors.textSecondary}
-                  style={{ color: colors.text, fontSize: 16, paddingVertical: 6 }}
-                  onFocus={() => setComposerVisible(false)}
-                />
+                <View 
+                  className="flex-1 px-2 py-2 mr-3" 
+                  style={{ 
+                    backgroundColor: colors.surface, 
+                    borderRadius: 10, 
+                    minHeight: 48, 
+                    justifyContent: 'center' 
+                  }}
+                >
+                  <TextInput
+                    ref={inputRef}
+                    value={messageText}
+                    onChangeText={text => setMessageText(text)}
+                    placeholder="Tin nhắn"
+                    placeholderTextColor={colors.textSecondary}
+                    style={{ color: colors.text, fontSize: 16, paddingVertical: 6 }}
+                    onFocus={() => setComposerVisible(false)}
+                  />
+                </View>
+
+                {/* Right action icons: show send when typing, otherwise more/mic/image */}
+                <View className="flex-row items-center">
+                  {messageText.trim().length > 0 ? (
+                    <TouchableOpacity 
+                      onPress={() => { 
+                        console.log('Send:', messageText); 
+                        setMessageText(''); 
+                        inputRef.current?.blur?.(); 
+                        Keyboard.dismiss(); 
+                      }} 
+                      style={{ padding: 6 }}
+                    >
+                      <MaterialIcons name="send" size={34} color={colors.tint} />
+                    </TouchableOpacity>
+                  ) : (
+                    <>
+                      <TouchableOpacity 
+                        className="mr-4" 
+                        onPress={() => { 
+                          inputRef.current?.blur?.(); 
+                          Keyboard.dismiss(); 
+                          setComposerVisible(v => !v); 
+                        }} 
+                        style={{ padding: 6 }}
+                      >
+                        <MaterialIcons 
+                          name="more-horiz" 
+                          size={24} 
+                          color={composerVisible ? colors.tint : colors.icon} 
+                        />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        className="mr-4" 
+                        onPress={() => console.log('Mic pressed')} 
+                        style={{ padding: 6 }}
+                      >
+                        <MaterialIcons name="mic" size={28} color={colors.icon} />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        onPress={() => console.log('Image pressed')} 
+                        style={{ padding: 6 }}
+                      >
+                        <MaterialIcons name="image" size={26} color={colors.icon} />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               </View>
 
-              {/* Right action icons: show send when typing, otherwise more/mic/image */}
-              <View className="flex-row items-center">
-                {messageText.trim().length > 0 ? (
-                  <TouchableOpacity onPress={() => { console.log('Send:', messageText); setMessageText(''); inputRef.current?.blur?.(); Keyboard.dismiss(); }} style={{ padding: 6 }}>
-                    <MaterialIcons name="send" size={34} color={colors.tint} />
-                  </TouchableOpacity>
-                ) : (
-                  <>
-                    <TouchableOpacity className="mr-4" onPress={() => { inputRef.current?.blur?.(); Keyboard.dismiss(); setComposerVisible(v => !v); }} style={{ padding: 6 }}>
-                      <MaterialIcons name="more-horiz" size={24} color={composerVisible ? colors.tint : colors.icon} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity className="mr-4" onPress={() => console.log('Mic pressed')} style={{ padding: 6 }}>
-                      <MaterialIcons name="mic" size={28} color={colors.icon} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => console.log('Image pressed')} style={{ padding: 6 }}>
-                      <MaterialIcons name="image" size={26} color={colors.icon} />
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
+              {/* Animated spacer that grows with keyboard height - pushes content up naturally */}
+              <Animated.View
+                style={[
+                  { 
+                    backgroundColor: colors.surface,
+                    height: keyboardHeight,
+                    paddingBottom: insets.bottom,
+                  },
+                ]}
+              />
             </View>
           )}
 
@@ -196,11 +304,15 @@ export default function ChatThread() {
               inline
               visible={composerVisible}
               onClose={() => setComposerVisible(false)}
-              onAction={(key) => { console.log('Composer action:', key); setComposerVisible(false); }}
+              onAction={(key) => { 
+                console.log('Composer action:', key); 
+                setComposerVisible(false); 
+              }}
             />
           )}
 
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </SafeAreaView>
-  );}
+  );
+}

@@ -20,11 +20,12 @@ type Props = {
   query: string;
   sentRequests: string[];
   onOpenChat: (id: string) => void;
+  onOpenProfile?: (id: string) => void;
   onSendFriendRequest: (phone: string) => void;
   colors: any;
 };
 
-export default function ResultsList({ contactResults, messageResults, query, sentRequests, onOpenChat, onSendFriendRequest, colors }: Props) {
+export default function ResultsList({ contactResults, messageResults, query, sentRequests, onOpenChat, onOpenProfile, onSendFriendRequest, colors }: Props) {
   const normalizedDigits = query.replace(/\D/g, '');
   const isPhoneQuery = normalizedDigits.length >= 3;
   const noContactMatch = isPhoneQuery && contactResults.length === 0;
@@ -35,7 +36,7 @@ export default function ResultsList({ contactResults, messageResults, query, sen
         <View style={{ marginBottom: 16 }}>
           <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Liên hệ</Text>
           {contactResults.map((c) => (
-            <TouchableOpacity key={c.id} style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }} onPress={() => onOpenChat(c.id)}>
+            <TouchableOpacity key={c.id} style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }} onPress={() => (typeof onOpenProfile === 'function' ? onOpenProfile(c.id) : onOpenChat(c.id))}>
               <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{c.name.charAt(0).toUpperCase()}</Text>
               </View>
@@ -53,7 +54,7 @@ export default function ResultsList({ contactResults, messageResults, query, sen
         <View style={{ marginBottom: 16 }}>
           <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Tìm bạn qua số điện thoại</Text>
 
-          <View style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12 }}>
+          <TouchableOpacity onPress={() => onOpenProfile?.(normalizedDigits)} style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{query.charAt(query.length - 1)}</Text>
@@ -65,23 +66,21 @@ export default function ResultsList({ contactResults, messageResults, query, sen
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity onPress={() => onOpenChat(normalizedDigits)} style={{ paddingHorizontal: 8 }}>
-                <MaterialIcons name="chat" size={20} color={colors.tint} />
-              </TouchableOpacity>
-
               {sentRequests.includes(normalizedDigits) ? (
                 <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
                   <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Đã gửi</Text>
                 </View>
               ) : (
-                <TouchableOpacity onPress={() => onSendFriendRequest(query)} style={{ paddingHorizontal: 8 }}>
-                  <View style={{ backgroundColor: '#2563EB', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>Kết bạn</Text>
-                  </View>
-                </TouchableOpacity>
+                <View onStartShouldSetResponder={() => true} style={{ paddingHorizontal: 8 }}>
+                  <TouchableOpacity onPress={() => onSendFriendRequest(query)}>
+                    <View style={{ backgroundColor: '#2563EB', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>Kết bạn</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
       )}
 

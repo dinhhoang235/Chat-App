@@ -2,10 +2,11 @@ import React, { createContext, useState, useContext } from "react";
 
 interface AuthContextType {
   isLoggedIn: boolean;
-  user: { phone: string; fullName: string } | null;
+  user: { phone: string; fullName: string; gender?: string; dob?: string; bio?: string } | null;
   login: (phone: string, password: string) => boolean;
   signup: (phone: string, fullName: string, password: string) => boolean;
   logout: () => void;
+  updateProfile: (data: Partial<{ phone: string; fullName: string; gender?: string; dob?: string; bio?: string }>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,13 +64,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return true;
   };
 
+  const updateProfile = (data: Partial<{ phone: string; fullName: string; gender?: string; dob?: string }>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...data } as typeof prev;
+      return next;
+    });
+  };
+
   const logout = () => {
     setIsLoggedIn(false);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, login, signup, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, user, login, signup, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

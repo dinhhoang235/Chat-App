@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Modal, View, TouchableOpacity, Text, SafeAreaView, ScrollView } from 'react-native';
+import { Modal, View, TouchableOpacity, Text, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/themeContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = {
   visible: boolean;

@@ -4,7 +4,7 @@ import { Link, useRouter } from "expo-router";
 import { useTheme } from "../context/themeContext";
 
 interface HeaderProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   showSearch?: boolean;
   onSearch?: (text: string) => void;
@@ -22,6 +22,10 @@ interface HeaderProps {
   showBack?: boolean;
   onBackPress?: () => void;
   variant?: "light" | "dark";
+  /** Render header transparent (no background/border). Useful to overlay over cover images. */
+  transparent?: boolean;
+  /** Position header absolutely on top of content (overlay). Use with `transparent` typically. */
+  overlay?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -40,6 +44,8 @@ export const Header: React.FC<HeaderProps> = ({
   showBack = false,
   onBackPress,
   variant,
+  transparent = false,
+  overlay = false,
 }) => {
   const router = useRouter();
   const theme = useTheme();
@@ -50,11 +56,28 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const { colors } = theme;
-  const iconColor = colors.icon;
-  const titleStyle: TextStyle = { color: colors.text, fontSize: 20, fontWeight: '700', lineHeight: 24, marginTop: 6 };
+  const iconColor = transparent ? '#fff' : colors.icon;
+  const titleStyle: TextStyle = { color: transparent ? '#fff' : colors.text, fontSize: 20, fontWeight: '700', lineHeight: 24, marginTop: 6 };
+
+  // container styling: allow transparent + overlay
+  const containerStyle: any = {
+    backgroundColor: transparent ? 'transparent' : colors.header,
+    borderBottomWidth: transparent ? 0 : 1,
+    borderBottomColor: transparent ? 'transparent' : colors.border,
+    paddingVertical: 8,
+    minHeight: 56,
+  };
+
+  if (overlay) {
+    containerStyle.position = 'absolute';
+    containerStyle.top = 0;
+    containerStyle.left = 0;
+    containerStyle.right = 0;
+    containerStyle.zIndex = 50;
+  }
 
   return (
-    <View onLayout={(e) => onHeaderLayout && onHeaderLayout(e.nativeEvent.layout)} style={{ backgroundColor: colors.header, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, minHeight: 56 }} className="px-6">
+    <View onLayout={(e) => onHeaderLayout && onHeaderLayout(e.nativeEvent.layout)} style={containerStyle} className="px-6">
       <View style={{ justifyContent: 'center' }}>
         {!showSearch ? (
           <View className="flex-row items-center justify-between">
@@ -65,7 +88,9 @@ export const Header: React.FC<HeaderProps> = ({
                 </TouchableOpacity>
               )}
               <View>
-                <Text style={titleStyle} numberOfLines={1}>{title}</Text>
+                {title ? (
+                  <Text style={titleStyle} numberOfLines={1}>{title}</Text>
+                ) : null}
                 {subtitle ? (
                   <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{subtitle}</Text>
                 ) : null}

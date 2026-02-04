@@ -168,6 +168,7 @@ export default function GlobalSearch() {
                         query={query}
                         sentRequests={sentRequests}
                         onOpenChat={(id) => router.push(`/chat/${id}`)}
+                        onOpenProfile={(id) => router.push(`/profile/${id}`)}
                         onSendFriendRequest={(phone) => sendFriendRequest(phone)}
                         colors={colors}
                     />

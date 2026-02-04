@@ -50,7 +50,7 @@ export default function Contacts() {
             </TouchableOpacity>
           );
         }}
-        renderItem={({ item }) => <ContactRow contact={item} onPress={() => {}} />}
+        renderItem={({ item }) => <ContactRow contact={item} onPress={() => router.push(`/profile/${item.id}`)} />}
         renderSectionHeader={({ section: { title } }) => (
           <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface }}>
             <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>{title}</Text>

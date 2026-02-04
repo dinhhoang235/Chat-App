@@ -5,10 +5,11 @@ export interface Contact {
   initials?: string;
   color?: string;
   online?: boolean;
+  bio?: string;
 }
 
 export const contacts: Contact[] = [
-  { id: '1', name: 'Nguyễn Văn An', initials: 'VA', color: '#34D399', online: true, phone: '0905123456' },
+  { id: '1', name: 'Nguyễn Văn An', initials: 'VA', color: '#34D399', online: true, phone: '0905123456', bio: 'Lập trình viên React Native, thích cà phê và leo núi.' },
   { id: '2', name: 'Lê Thị Mai', initials: 'LM', color: '#60A5FA', online: false, phone: '0916789012' },
   { id: '3', name: 'Trần Minh Hoàng', initials: 'TH', color: '#F472B6', online: true, phone: '0932109876' },
   { id: '4', name: 'Hoàng Dương', initials: 'HD', color: '#F59E0B', online: false, phone: '0945566778' },

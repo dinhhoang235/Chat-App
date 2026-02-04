@@ -3,6 +3,7 @@ import { SectionList, View, Text, TouchableOpacity } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Header } from "../../components/Header";
 import { useTheme } from "../../context/themeContext";
+import { useTabBar } from '../../context/tabBarContext';
 import { useRouter } from 'expo-router';
 import { contacts } from '../../constants/mockData';
 import { buildContactSections } from '../../utils/contacts';
@@ -12,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 export default function Contacts() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { tabBarHeight } = useTabBar();
   const router = useRouter();
 
   const handleSearch = (text: string) => {
@@ -54,7 +56,7 @@ export default function Contacts() {
             <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>{title}</Text>
           </View>
         )}
-        contentContainerStyle={{ paddingVertical: 8, paddingRight: insets.right + 8 }}
+        contentContainerStyle={{ paddingVertical: 8, paddingRight: insets.right + 8, paddingBottom: tabBarHeight + 8 }}
         stickySectionHeadersEnabled
       />
     </SafeAreaView>

@@ -7,14 +7,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddMenuProvider, useAddMenu } from '../../context/addMenuContext';
 import { AddMenu } from '../../components/AddMenu';
 
+import { TabBarProvider } from '../../context/tabBarContext';
+
 export default function TabsLayout() {
   const { colors } = useTheme();
 
   const { selectionMode } = useSelection();
   const insets = useSafeAreaInsets();
 
+  const tabBarHeight = 56 + insets.bottom; // compute in one place and provide to children
+
   return (
     <AddMenuProvider>
+      <TabBarProvider height={tabBarHeight}>
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -27,7 +32,7 @@ export default function TabsLayout() {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                height: 56 + insets.bottom, // increased height
+                height: tabBarHeight, // use computed value
                 paddingBottom: insets.bottom + 6,
                 paddingTop: 6,
                 backgroundColor: colors.surface,
@@ -69,6 +74,7 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+      </TabBarProvider>
 
       {/* place AddMenu at layout level so overlay covers tab bar */}
       <AddMenuWrapper />

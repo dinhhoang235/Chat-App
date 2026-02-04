@@ -3,12 +3,14 @@ import { View, Text, SectionList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '../components/Header';
 import { useTheme } from '../context/themeContext';
+import { useTabBar } from '../context/tabBarContext';
 import { friendRequests, friendRequestsSent } from '../constants/mockData';
 import { FriendRequestRow } from '../components/FriendRequestRow';
 
 export default function FriendRequests() {
   const { colors } = useTheme();
   const [tab, setTab] = React.useState<'received' | 'sent'>('received');
+  const { tabBarHeight } = useTabBar();
 
   const sections = React.useMemo(() => {
     if (tab === 'sent') return [{ title: 'Đã gửi', data: friendRequestsSent }];
@@ -55,7 +57,7 @@ export default function FriendRequests() {
 
       <SectionList
         sections={sections}
-        contentContainerStyle={{ paddingTop: 0, paddingBottom: 12 }}
+        contentContainerStyle={{ paddingTop: 0, paddingBottom: tabBarHeight + 8 }}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <FriendRequestRow

@@ -207,8 +207,8 @@ export default function ChatThread() {
               <View 
                 className="px-4 flex-row items-center" 
                 style={{
-                  paddingBottom: 6,
-                  paddingTop: 6,
+                  paddingBottom: 4,
+                  paddingTop: 4,
                 }}
               >
                 <TouchableOpacity className="mr-3">

@@ -7,14 +7,16 @@ import { useTheme } from '../context/themeContext';
 type Props = {
   onMarkRead: () => void;
   onDelete: () => void;
+  /** Optional callback to report measured height (including safe area) */
+  onLayout?: (height: number) => void;
 };
 
-export default function BottomActionBar({ onMarkRead, onDelete }: Props) {
+export default function BottomActionBar({ onMarkRead, onDelete, onLayout }: Props) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
   return (
-    <View style={{
+    <View onLayout={(e) => onLayout && onLayout(e.nativeEvent.layout.height)} style={{
       position: 'absolute',
       left: 0,
       right: 0,

@@ -13,6 +13,8 @@ interface HeaderProps {
   onAddPress?: () => void;
   addIconName?: string;
   addHref?: string;
+  /** Action button to show left of the add button (e.g., QR icon) */
+  leftAddAction?: { icon: string; onPress?: () => void; size?: number };
   /** Callback to receive layout of the add button (x, y, width, height) */
   onAddLayout?: (layout: { x: number; y: number; width: number; height: number }) => void;
   /** Callback to receive layout of the header (x, y, width, height) */
@@ -32,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
   onAddPress,
   addIconName = "add",
   addHref,
+  leftAddAction,
   onAddLayout,
   onHeaderLayout,
   showBack = false,
@@ -81,6 +84,12 @@ export const Header: React.FC<HeaderProps> = ({
                 </TouchableOpacity>
               ))}
 
+              {leftAddAction && (
+                <TouchableOpacity onPress={leftAddAction.onPress} className="mr-2">
+                  <MaterialIcons name={leftAddAction.icon as any} color={iconColor} size={leftAddAction.size ?? 24} />
+                </TouchableOpacity>
+              )}
+
               <View onLayout={(e) => onAddLayout && onAddLayout(e.nativeEvent.layout)}>
                 {addHref ? (
                   <Link href={addHref as any} asChild>
@@ -121,6 +130,12 @@ export const Header: React.FC<HeaderProps> = ({
                     <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 28} />
                   </TouchableOpacity>
                 ))}
+
+                {leftAddAction && (
+                  <TouchableOpacity onPress={leftAddAction.onPress} className="px-2">
+                    <MaterialIcons name={leftAddAction.icon as any} color={iconColor} size={leftAddAction.size ?? 28} />
+                  </TouchableOpacity>
+                )}
 
                 <View onLayout={(e) => onAddLayout && onAddLayout(e.nativeEvent.layout)}>
                   {addHref ? (

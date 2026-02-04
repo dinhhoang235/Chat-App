@@ -1,5 +1,5 @@
 import { FlatList } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Header } from "../../components/Header";
 import SelectionHeader from "../../components/SelectionHeader";
 import BottomActionBar from "../../components/BottomActionBar";
@@ -10,6 +10,7 @@ import { MessageRow } from '../../components/MessageRow';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useAddMenu } from '../../context/addMenuContext';
+import { useTabBar } from '../../context/tabBarContext';
 
 export default function Messages() {
   const { colors } = useTheme();
@@ -18,7 +19,8 @@ export default function Messages() {
   const { selectionMode, setSelectionMode } = useSelection();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { toggle, setAddLayout, setHeaderLayout } = useAddMenu();
-  const insets = useSafeAreaInsets();
+  const { tabBarHeight } = useTabBar();
+  const [bottomBarHeight, setBottomBarHeight] = useState<number>(0);
 
   const handleSearch = (text: string) => {
     console.log("Search:", text);
@@ -79,6 +81,7 @@ export default function Messages() {
           onSearch={handleSearch}
           onFilterPress={handleFilter}
           onAddPress={handleAdd}
+          leftAddAction={{ icon: 'qr-code-scanner', onPress: () => console.log('QR pressed'), size: 24 }}
           onAddLayout={(layout) => setAddLayout?.(layout)}
           onHeaderLayout={(layout) => setHeaderLayout?.(layout)}
         />
@@ -99,11 +102,12 @@ export default function Messages() {
             onToggleSelect={(id) => toggleSelect(id)}
           />
         )}
-        contentContainerStyle={{ paddingVertical: 8, paddingBottom: selectionMode ? 92 + insets.bottom : 8 }}
+        // padding bottom is dynamic: when selection mode, use measured bottom bar height; otherwise use tab bar height
+        contentContainerStyle={{ paddingVertical: 8, paddingBottom: selectionMode ? (Math.max(bottomBarHeight, 56) + 8) : (tabBarHeight + 8) }}
       />
 
       {selectionMode ? (
-        <BottomActionBar onMarkRead={handleMarkRead} onDelete={handleDeleteSelected} />
+        <BottomActionBar onMarkRead={handleMarkRead} onDelete={handleDeleteSelected} onLayout={(h) => setBottomBarHeight(h)} />
       ) : null}
     </SafeAreaView>
   );

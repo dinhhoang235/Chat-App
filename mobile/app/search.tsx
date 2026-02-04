@@ -1,11 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { View, Text, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../context/themeContext';
 import { contacts, messages } from '../constants/mockData';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SearchBar from '../components/SearchBar';
+import SearchHistory from '../components/SearchHistory';
+import ResultsList from '../components/ResultsList';
 
 export default function GlobalSearch() {
     const { colors } = useTheme();
@@ -135,155 +137,39 @@ export default function GlobalSearch() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-            <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 12, paddingVertical: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity onPress={() => router.back()} style={{ paddingRight: 8 }}>
-                        <MaterialIcons name="arrow-back" color={colors.text} size={24} />
-                    </TouchableOpacity>
-
-                    <View style={{ flex: 1, marginLeft: 4 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 20, paddingHorizontal: 12, height: 40 }}>
-                            <MaterialIcons name="search" color={colors.textSecondary} size={20} />
-
-                            <TextInput
-                                placeholder="Tìm kiếm..."
-                                placeholderTextColor={colors.textSecondary}
-                                value={query}
-                                onChangeText={setQuery}
-                                onSubmitEditing={() => addToHistory(query)}
-                                style={{ flex: 1, color: colors.text, fontSize: 14, marginLeft: 10 }}
-                                autoFocus
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                spellCheck={false}
-                            />
-
-
-                        </View>
-                    </View>
-                    <TouchableOpacity onPress={() => Alert.alert('Quét mã QR', 'Chức năng quét mã QR chưa được triển khai.')} style={{ paddingLeft: 8 }}>
-                        <MaterialIcons name="qr-code-scanner" color={colors.textSecondary} size={24} />
-                    </TouchableOpacity>
-                </View>
-            </View>
+            <SearchBar
+                value={query}
+                onChange={setQuery}
+                onSubmit={() => addToHistory(query)}
+                onBack={() => router.back()}
+                onQR={() => Alert.alert('Quét mã QR', 'Chức năng quét mã QR chưa được triển khai.')}
+                colors={colors}
+            />
 
             <View style={{ flex: 1, padding: 12 }}>
                 {query.trim().length === 0 ? (
                     history.length > 0 ? (
-                        <View>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <Text style={{ color: colors.text, fontWeight: '700' }}>Lịch sử tìm kiếm</Text>
-                                <TouchableOpacity onPress={clearHistory} style={{ padding: 8 }}>
-                                    <MaterialIcons name="delete" size={20} color={colors.textSecondary} />
-                                </TouchableOpacity>
-                            </View>
-
-                            {history.map((h) => (
-                                <View key={h} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 }}>
-                                    <TouchableOpacity style={{ flex: 1 }} onPress={() => { setQuery(h); addToHistory(h); }}>
-                                        <Text style={{ color: colors.text }}>{h}</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity onPress={() => removeHistoryItem(h)} style={{ paddingLeft: 12 }}>
-                                        <MaterialIcons name="close" size={18} color={colors.textSecondary} />
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
-                        </View>
+                        <SearchHistory
+                            history={history}
+                            onSelect={(h) => { setQuery(h); addToHistory(h); }}
+                            onRemove={removeHistoryItem}
+                            onClear={clearHistory}
+                            colors={colors}
+                        />
                     ) : (
                         <View style={{ alignItems: 'center', marginTop: 40 }}>
                             <Text style={{ color: colors.textSecondary }}>Bắt đầu nhập để tìm kiếm trong danh bạ và tin nhắn</Text>
                         </View>
                     )
                 ) : (
-                    <FlatList
-                        data={[{ title: 'Contacts', data: contactResults }, { title: 'Messages', data: messageResults }]}
-                        keyExtractor={(item, idx) => item.title ? item.title : String(idx)}
-                        renderItem={({ item }) => null}
-                        ListHeaderComponent={() => (
-                            <>
-                                {contactResults.length > 0 && (
-                                    <View style={{ marginBottom: 16 }}>
-                                        <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Liên hệ</Text>
-                                        {contactResults.map((c) => (
-                                            <TouchableOpacity key={c.id} style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }} onPress={() => router.push(`/chat/${c.id}`)}>
-                                                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                                                    <Text style={{ color: '#fff', fontWeight: '700' }}>{c.name.charAt(0).toUpperCase()}</Text>
-                                                </View>
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={{ color: colors.text, fontWeight: '600' }}>{c.name}</Text>
-                                                    <Text style={{ color: colors.textSecondary }}>{c.phone}</Text>
-                                                </View>
-                                                <MaterialIcons name="call" size={20} color={colors.tint} />
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                )}
-
-                                {/* If the user typed a phone-like query and no contact matched, offer to chat or add contact */}
-                                {(() => {
-                                    const normalizedDigits = query.replace(/\D/g, '');
-                                    const isPhoneQuery = normalizedDigits.length >= 3;
-                                    const noContactMatch = isPhoneQuery && contactResults.length === 0;
-                                    if (noContactMatch) {
-                                        return (
-                                            <View style={{ marginBottom: 16 }}>
-                                                <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Tìm bạn qua số điện thoại</Text>
-
-                                                <View style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12 }}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                                                            <Text style={{ color: '#fff', fontWeight: '700' }}>{query.charAt(query.length - 1)}</Text>
-                                                        </View>
-                                                        <View style={{ maxWidth: 200 }}>
-                                                            <Text style={{ color: colors.text, fontWeight: '600' }}>{/* unknown name */}Người dùng</Text>
-                                                            <Text style={{ color: colors.textSecondary }}>Số điện thoại: {query}</Text>
-                                                        </View>
-                                                    </View>
-
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                        <TouchableOpacity onPress={() => router.push(`/chat/${normalizedDigits}`)} style={{ paddingHorizontal: 8 }}>
-                                                            <MaterialIcons name="chat" size={20} color={colors.tint} />
-                                                        </TouchableOpacity>
-
-                                                        {sentRequests.includes(normalizedDigits) ? (
-                                                            <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
-                                                                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Đã gửi</Text>
-                                                            </View>
-                                                        ) : (
-                                                            <TouchableOpacity onPress={async () => { try { await sendFriendRequest(query); } catch (e) { console.warn(e); } }} style={{ paddingHorizontal: 8 }}>
-                                                                <View style={{ backgroundColor: '#2563EB', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                                                                    <Text style={{ color: '#fff', fontWeight: '700' }}>Kết bạn</Text>
-                                                                </View>
-                                                            </TouchableOpacity>
-                                                        )}
-                                                    </View>
-                                                </View>
-                                            </View>
-                                        );
-                                    }
-                                    return null;
-                                })()}
-
-                                {messageResults.length > 0 && (
-                                    <View>
-                                        <Text style={{ color: colors.text, fontWeight: '700', marginBottom: 8 }}>Tin nhắn</Text>
-                                        {messageResults.map((m) => (
-                                            <TouchableOpacity key={m.id} style={{ paddingVertical: 10 }} onPress={() => router.push(`/chat/${m.id}`)}>
-                                                <Text style={{ color: colors.text }}>{m.lastMessage}</Text>
-                                                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{m.time}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                )}
-
-                                {contactResults.length === 0 && messageResults.length === 0 && (
-                                    <View style={{ alignItems: 'center', marginTop: 40 }}>
-                                        <Text style={{ color: colors.textSecondary }}>Không tìm thấy kết quả</Text>
-                                    </View>
-                                )}
-                            </>
-                        )}
+                    <ResultsList
+                        contactResults={contactResults}
+                        messageResults={messageResults}
+                        query={query}
+                        sentRequests={sentRequests}
+                        onOpenChat={(id) => router.push(`/chat/${id}`)}
+                        onSendFriendRequest={(phone) => sendFriendRequest(phone)}
+                        colors={colors}
                     />
                 )}
             </View>

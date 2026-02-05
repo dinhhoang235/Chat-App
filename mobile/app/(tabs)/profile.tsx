@@ -36,7 +36,7 @@ export default function Profile() {
 
       <View >
         {/* User card */}
-        <View style={{ overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+        <View style={{ overflow: 'hidden', backgroundColor: colors.card, borderColor: colors.border }}>
           {user && (
             <TouchableOpacity onPress={() => router.push('/profile/me')} className="flex-row items-center" style={{ padding: 12, backgroundColor: colors.card }}>
               <View style={{ width: 56, height: 56, backgroundColor: colors.tint, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>

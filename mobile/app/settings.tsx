@@ -52,7 +52,7 @@ export default function Settings() {
             <TouchableOpacity
               key={it.title}
               className="flex-row items-center px-4 py-3"
-              style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background }}
+              style={{ borderTopColor: colors.border, backgroundColor: colors.background }}
               onPress={() => (it.route ? router.push(it.route) : Alert.alert(it.title))}
             >
               <View className="w-10 h-10 rounded-full items-center justify-center mr-3" style={{ backgroundColor: colors.surface }}>

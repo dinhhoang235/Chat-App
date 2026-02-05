@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from "../context/themeContext";
 import MenuModal from './MenuModal';
+import { contacts } from '../constants/mockData';
 import MuteOptionsSheet from './MuteOptionsSheet';
 import MuteSettingsModal from './MuteSettingsModal';
 import type { Message } from '../constants/mockData';
@@ -25,6 +26,8 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
   const rowRef = useRef<any>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const initials = message.initials ?? message.name.split(' ').map(n => n[0]).slice(0, 2).join('');
+  const contact = contacts.find(c => c.id === message.id);
+  const isGroup = !!contact?.isGroup;
 
   const menuItems = [
     { key: 'mark_unread', label: 'Đánh dấu chưa đọc', icon: 'drafts' },
@@ -103,7 +106,10 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
         )}
 
         <View style={{ marginLeft: 12, flex: 1 }}>
-          <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700' }}>{message.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700', marginRight: isGroup ? 8 : 0 }}>{message.name}</Text>
+            {isGroup ? <MaterialIcons name="groups" size={16} color={colors.textSecondary} /> : null}
+          </View>
           <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{message.lastMessage}</Text>
         </View>
 

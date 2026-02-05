@@ -5,6 +5,12 @@ export interface Contact {
   initials?: string;
   color?: string;
   online?: boolean;
+  isGroup?: boolean;
+  ownerPhone?: string; // phone of the group owner, if applicable
+  members?: string[]; // list of contact ids in the group
+  membersCount?: number;
+  requireApproval?: boolean;
+  pendingMembers?: string[];
   bio?: string;
 }
 
@@ -15,6 +21,8 @@ export const contacts: Contact[] = [
   { id: '4', name: 'Hoàng Dương', initials: 'HD', color: '#F59E0B', online: false, phone: '0945566778' },
   { id: '5', name: 'Phạm Thuỷ', initials: 'PT', color: '#FB7185', online: true, phone: '0956677889' },
   { id: '6', name: 'Team Dev', initials: 'TD', color: '#9CA3AF', online: false, phone: 'N/A' },
+  { id: 'g1', name: 'Nhóm Học', initials: 'NH', color: '#A78BFA', online: false, phone: 'N/A', isGroup: true, membersCount: 12, members: ['1','2','3','4','6'] },
+  { id: 'g2', name: 'Nhóm Trưởng', initials: 'NT', color: '#FB7185', online: false, phone: 'N/A', isGroup: true, ownerPhone: '0123456789', membersCount: 5, members: ['1','3','6','11','16'], requireApproval: true, pendingMembers: ['10','13'] },
   { id: '7', name: 'Quán Cà Phê', initials: 'QC', color: '#A78BFA', online: false, phone: '0967788990' },
   { id: '8', name: 'Bạn học cấp 3', initials: 'BH', color: '#F97316', online: true, phone: '0978899001' },
   { id: '9', name: 'Zalo Shop', initials: 'ZS', color: '#38BDF8', online: false, phone: '0989900112' },
@@ -56,6 +64,8 @@ export const messages: Message[] = [
   { id: 'm2', name: 'Nguyễn Văn An', lastMessage: 'Ok, chiều này gặp quán cũ nhé.', time: '2 giờ', unread: 0, initials: 'VA', color: '#34D399' },
   { id: 'm3', name: 'Lê Thị Mai', lastMessage: 'Gửi file rồi, check giúp em nha.', time: 'Hôm nay', unread: 0, initials: 'LM', color: '#60A5FA' },
   { id: 'm4', name: 'Team Dev', lastMessage: 'Pull request đã merged ✅', time: 'Hôm qua', unread: 0, initials: 'TD', color: '#F59E0B' },
+  { id: 'g1', name: 'Nhóm Học', lastMessage: 'Mình đã upload tài liệu buổi hôm nay.', time: '12:10', unread: 1, initials: 'NH', color: '#A78BFA' },
+  { id: 'g2', name: 'Nhóm Trưởng', lastMessage: 'Cuộc họp lớp trưởng vào thứ 7', time: '1 giờ', unread: 0, initials: 'NT', color: '#FB7185' },
   { id: 'm5', name: 'Quán Cà Phê', lastMessage: 'Sáng nay tụ tập 8h không?', time: '3 giờ', unread: 1, initials: 'QC', color: '#38BDF8' },
   { id: 'm6', name: 'Bạn học cấp 3', lastMessage: 'Xem ảnh du lịch của mình nhé 😍', time: '17 giờ', unread: 0, initials: 'BH', color: '#F472B6' },
   { id: 'm7', name: 'Phạm Thuỷ', lastMessage: 'Bạn ơi, máy em bị lỗi, giúp mình với.', time: '20 giờ', unread: 2, initials: 'PT', color: '#FB7185' },

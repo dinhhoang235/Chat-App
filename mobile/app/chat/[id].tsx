@@ -14,7 +14,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 
-const sampleMessages = [
+const sampleMessagesDefault = [
   { id: 's1', type: 'separator', text: '12:37 24/09/2025' },
   { id: 'm1', type: 'sticker', text: 'sticker', time: '12:37', fromMe: true },
   { id: 'm2', type: 'text', text: 'Linh sinh nhật vui vẻ! Hy vọng hôm nay bạn sẽ có một ngày thật tuyệt vời với nhiều niềm vui, bánh gato, quà cáp và những lời chúc ấm áp từ bạn bè. Chúc mừng sinh nhật nhé 🎉🎂🎈', time: '12:37', fromMe: true },
@@ -28,10 +28,22 @@ const sampleMessages = [
   { id: 'm7', type: 'sticker', text: 'https://via.placeholder.com/320x200.png?text=BIG+STICKER', time: '21:05', fromMe: false },
 ];
 
+const sampleMessagesGroupG1 = [
+  { id: 'g-s1', type: 'separator', text: '12:00 01/02/2026' },
+  { id: 'g-m1', type: 'text', text: 'Chào cả nhóm, mình share tài liệu buổi hôm nay ở đây.', time: '12:01', fromMe: false },
+  { id: 'g-m2', type: 'text', text: 'Mọi người ơi, ai có link slides không?', time: '12:03', fromMe: true },
+  { id: 'g-m3', type: 'text', text: 'Mình có, để mình upload lên.', time: '12:04', fromMe: false },
+  { id: 'g-m4', type: 'text', text: 'Team, mọi người check tiến độ PR nhé.', time: '12:10', fromMe: false },
+];
+
 export default function ChatThread() {
   const { colors } = useTheme();
   const params = useLocalSearchParams();
   const router = useRouter();
+
+  // pick sample messages for this thread (use group messages when id === 'g1')
+  const id = (params as any).id as string;
+  const sampleMessages = id === 'g1' ? sampleMessagesGroupG1 : sampleMessagesDefault;
 
   // Search mode toggled by Options or header
   const initialSearch = !!(params as any).search;
@@ -80,7 +92,7 @@ export default function ChatThread() {
     });
     setResultIndices(idxs);
     setCurrentResultIndex(0);
-  }, [searchQuery]);
+  }, [searchQuery, sampleMessages]);
 
   // Listen to SearchContext open events to avoid navigation flicker
   const { openFor, close } = useSearch();

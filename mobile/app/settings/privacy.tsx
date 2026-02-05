@@ -4,11 +4,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Header } from "../../components/Header";
 import { useTheme } from "../../context/themeContext";
 import { MaterialIcons } from "@expo/vector-icons";
+import PresenceStatusModal from '../../components/PresenceStatusModal';
+import MessagePermissionSheet from '../../components/MessagePermissionSheet';
 
 export default function PrivacySettings() {
   const { colors } = useTheme();
   const [showSeen, setShowSeen] = useState(true);
   const [allowCalls, setAllowCalls] = useState(false);
+
+  const [presenceEnabled, setPresenceEnabled] = useState<boolean>(true);
+  const [presenceModalVisible, setPresenceModalVisible] = useState<boolean>(false);
+
+  const [messagePermission, setMessagePermission] = useState<string>('Mọi người');
+  const [messageModalVisible, setMessageModalVisible] = useState<boolean>(false);
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
@@ -17,14 +25,14 @@ export default function PrivacySettings() {
       <ScrollView className="px-4 pt-4" contentContainerStyle={{ paddingBottom: 32 }}>
         <Text style={{ color: colors.tint, fontWeight: '600', marginBottom: 8 }}>Cá nhân</Text>
 
-        <TouchableOpacity className="flex-row items-center px-4 py-3" style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background }}>
+        <TouchableOpacity onPress={() => setPresenceModalVisible(true)} className="flex-row items-center px-4 py-3" style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background }}>
           <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.surface }}>
             <MaterialIcons name="visibility" size={20} color={colors.tint} />
           </View>
           <View className="flex-1">
             <Text style={{ color: colors.text }}>Hiện trạng thái truy cập</Text>
           </View>
-          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Đang bật</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{presenceEnabled ? 'Đang bật' : 'Tắt'}</Text>
         </TouchableOpacity>
 
         {/* Messages & Calls */}
@@ -41,13 +49,13 @@ export default function PrivacySettings() {
           <Switch value={showSeen} onValueChange={setShowSeen} thumbColor={showSeen ? '#fff' : '#fff'} trackColor={{ false: colors.textSecondary, true: colors.success }} />
         </View>
 
-        <TouchableOpacity className="flex-row items-center px-4 py-3" style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background }}>
+        <TouchableOpacity onPress={() => setMessageModalVisible(true)} className="flex-row items-center px-4 py-3" style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background }}>
           <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.surface }}>
             <MaterialIcons name="chat" size={20} color={colors.tint} />
           </View>
           <View className="flex-1">
             <Text style={{ color: colors.text }}>Cho phép nhắn tin</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Mọi người</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{messagePermission}</Text>
           </View>
           <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
@@ -76,6 +84,11 @@ export default function PrivacySettings() {
           </View>
           <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
+
+      
+        <MessagePermissionSheet visible={messageModalVisible} onClose={() => setMessageModalVisible(false)} options={[ 'Bạn bè', 'Mọi người' ]} selected={messagePermission} onSelect={(opt) => setMessagePermission(opt)} />
+
+        <PresenceStatusModal visible={presenceModalVisible} onClose={() => setPresenceModalVisible(false)} initialEnabled={presenceEnabled} onSave={(v) => setPresenceEnabled(v)} />
 
       </ScrollView>
     </SafeAreaView>

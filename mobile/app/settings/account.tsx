@@ -5,12 +5,16 @@ import { Header } from "../../components/Header";
 import { useTheme } from "../../context/themeContext";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useAuth } from "../../context/authContext";
+import { useRouter } from 'expo-router';
+import MyQrModal from '../../components/MyQrModal';
 
 export default function AccountSettings() {
   const theme = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
 
   const [twoFactor, setTwoFactor] = useState(false);
+  const [qrVisible, setQrVisible] = useState(false);
 
   return (
     <SafeAreaView className={`${theme.scheme === 'dark' ? 'flex-1 bg-background-dark' : 'flex-1 bg-background'}`}>
@@ -19,7 +23,7 @@ export default function AccountSettings() {
       <ScrollView className="px-4 pt-4" contentContainerStyle={{ paddingBottom: 24 }}>
         <Text className={`${theme.scheme === 'dark' ? 'text-blue-400' : 'text-blue-600'} font-semibold mb-2`}>Tài khoản</Text>
         {/* Account card */}
-        <TouchableOpacity className={`${theme.scheme === 'dark' ? 'bg-background-dark' : 'bg-white'} rounded-lg px-4 py-3 flex-row items-center justify-between border ${theme.scheme === 'dark' ? 'border-gray-800' : 'border-gray-200'} mb-4`}>
+        <TouchableOpacity onPress={() => router.push('/profile/me/info')} className={`${theme.scheme === 'dark' ? 'bg-background-dark' : 'bg-white'} rounded-lg px-4 py-3 flex-row items-center justify-between border ${theme.scheme === 'dark' ? 'border-gray-800' : 'border-gray-200'} mb-4`}>
           <View className="flex-row items-center">
             <View className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-800 items-center justify-center mr-4 overflow-hidden">
               <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-bold text-lg`}>{user ? user.fullName.charAt(0).toUpperCase() : 'U'}</Text>
@@ -55,7 +59,7 @@ export default function AccountSettings() {
           <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
         </TouchableOpacity>
 
-        <TouchableOpacity className={`${theme.scheme === 'dark' ? 'flex-row items-center px-4 py-3 border-t border-gray-800' : 'flex-row items-center px-4 py-3 border-t border-gray-100'}`}>
+        <TouchableOpacity onPress={() => setQrVisible(true)} className={`${theme.scheme === 'dark' ? 'flex-row items-center px-4 py-3 border-t border-gray-800' : 'flex-row items-center px-4 py-3 border-t border-gray-100'}`}>
           <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${theme.scheme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
             <MaterialIcons name="qr-code" size={20} color={theme.scheme === 'dark' ? '#9CA3AF' : '#4F46E5'} />
           </View>
@@ -145,6 +149,8 @@ export default function AccountSettings() {
           <Text className="text-red-500 font-medium">Xóa tài khoản</Text>
           <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
         </TouchableOpacity>
+
+        <MyQrModal visible={qrVisible} onClose={() => setQrVisible(false)} name={user?.fullName} phone={user?.phone} data={`chatapp:user:${user?.phone ?? 'me'}`} />
 
       </ScrollView>
     </SafeAreaView>

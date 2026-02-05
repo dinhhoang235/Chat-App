@@ -93,7 +93,7 @@ export default function UserProfile() {
             </View>
           ) : isStranger ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-              <TouchableOpacity style={{ backgroundColor: '#e5e7eb', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 22, marginRight: 12 }}>
+              <TouchableOpacity style={{ backgroundColor: colors.surfaceVariant, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 22, marginRight: 12 }}>
                 <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Nhắn tin</Text>
               </TouchableOpacity>
               <TouchableOpacity style={{ backgroundColor: '#2563EB', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 22 }}>

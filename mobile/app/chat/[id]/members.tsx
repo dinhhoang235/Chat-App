@@ -26,6 +26,8 @@ export default function MembersScreen() {
 
   const getContact = (cid: string) => contacts.find(c => c.id === cid);
 
+  const isDefined = <T,>(v: T | null | undefined): v is T => v != null;
+
   // helper: derive initials from full name (used when showing current user's name)
   const getInitials = (name?: string) => {
     if (!name) return 'U';
@@ -59,9 +61,9 @@ export default function MembersScreen() {
   const ownerContact = contact?.ownerPhone ? contacts.find(c => c.phone === contact.ownerPhone) : undefined;
   const userContact = user?.phone ? contacts.find(c => c.phone === user.phone) : undefined;
   // Put current user at the front of the list (if present), then keep existing members and owner
-  const combinedMemberIds = Array.from(new Set([userContact?.id, ...(members ?? []), ownerContact?.id].filter(Boolean as string[])));
-  const membersResolved = combinedMemberIds.map(m => getContact(m)).filter(Boolean as any);
-  const pendingResolved = Array.from(new Set([...(pending ?? [])])).map(m => getContact(m)).filter(Boolean as any);
+  const combinedMemberIds = Array.from(new Set([userContact?.id, ...(members ?? []), ownerContact?.id].filter(isDefined)));
+  const membersResolved = combinedMemberIds.map(m => getContact(m)).filter(isDefined);
+  const pendingResolved = Array.from(new Set([...(pending ?? [])])).map(m => getContact(m)).filter(isDefined);
 
   const displayed = tab === 'all' ? membersResolved : (tab === 'owners' ? membersResolved.filter(m => m?.phone === contact?.ownerPhone) : (tab === 'invited' ? pendingResolved : []));
 

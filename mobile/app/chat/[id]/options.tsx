@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, Switch, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Switch, ScrollView, Alert, Modal, TextInput, Pressable } from 'react-native';
 import { useTheme } from '../../../context/themeContext';
 import { useSearch } from '../../../context/searchContext';
 import { Header } from '../../../components/Header';
@@ -37,7 +37,8 @@ function Row({ icon, title, subtitle, rightNode, onPress, showChevron = false, t
 }
 
 export default function ChatOptions() {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
+  const overlayColor = scheme === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.55)';
   const router = useRouter();
   const params = useLocalSearchParams();
   const { open } = useSearch();
@@ -48,6 +49,15 @@ export default function ChatOptions() {
   const [selectedMuteOption, setSelectedMuteOption] = useState<string>('Không tắt');
   const [excludeReminders, setExcludeReminders] = useState<boolean>(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
+
+  // report modal state
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportReason, setReportReason] = useState<string | null>(null);
+  const [reportOther, setReportOther] = useState<string>('');
+  // confirm clear chat modal
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  // leave group modal
+  const [leaveVisible, setLeaveVisible] = useState(false);
 
   // resolve id / contact so we can detect groups reliably
   const id = (params as any).id as string;
@@ -61,6 +71,21 @@ export default function ChatOptions() {
   };
 
   const isMuted = selectedMuteOption !== 'Không tắt';
+
+  const confirmClearChat = () => {
+    setConfirmVisible(true);
+  };
+
+  const performClearChat = () => {
+    setConfirmVisible(false);
+    Alert.alert('Đã xóa', 'Lịch sử trò chuyện đã được xóa (mock)');
+  };
+
+  const performLeaveGroup = () => {
+    setLeaveVisible(false);
+    // TODO: call API to leave group
+    Alert.alert('Đã rời nhóm', 'Bạn đã rời nhóm (mock)');
+  };
   const { user } = useAuth();
   const isOwner = !!contact?.ownerPhone && user?.phone === contact?.ownerPhone;
 
@@ -152,12 +177,12 @@ export default function ChatOptions() {
                 )}
                 showChevron
               />
-              <Row icon="push-pin" title="Tin nhắn đã ghim" onPress={() => { }} />
+              <Row icon="push-pin" title="Tin nhắn đã ghim" onPress={() => router.push(`/chat/${id}/pinned`)} showChevron />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="people" title={`Xem thành viên`} subtitle={`(${contact?.membersCount ?? 0})`} onPress={() => router.push(`/chat/${id}/members`)} showChevron />
 
-              <Row icon="link" title="Link nhóm" subtitle="https://zalo.me/g/wftfeh870" onPress={() => console.log('Open group link')} showChevron />
+              <Row icon="link" title="Link nhóm" subtitle="https://zalo.me/g/wftfeh870" onPress={() => router.push(`/chat/${id}/link`)} showChevron />
 
               {isOwner ? (
                 <>
@@ -171,9 +196,9 @@ export default function ChatOptions() {
               <Row icon="visibility-off" title="Ẩn trò chuyện" rightNode={<Switch value={eyeOff} onValueChange={setEyeOff} />} onPress={() => setEyeOff(v => !v)} />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
-              <Row icon="flag" title="Báo xấu" onPress={() => console.log('Report group')} />
-              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => console.log('Clear chat')} />
-              <Row icon="exit-to-app" title="Rời nhóm" onPress={() => console.log('Leave group')} titleColor={colors.danger} />
+              <Row icon="flag" title="Báo xấu" onPress={() => setReportVisible(true)} />
+              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} />
+              <Row icon="exit-to-app" title="Rời nhóm" onPress={() => setLeaveVisible(true)} titleColor={colors.danger} />
             </View>
           </>
         ) : (
@@ -211,13 +236,103 @@ export default function ChatOptions() {
               <Row icon="notifications" title="Báo cuộc gọi đến" rightNode={<Switch value={true} />} onPress={() => { }} />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
-              <Row icon="flag" title="Báo xấu" onPress={() => console.log('Report group')} />
+              <Row icon="flag" title="Báo xấu" onPress={() => setReportVisible(true)} />
               <Row icon="block" title="Quản lý chặn" onPress={() => console.log('Manage block')} />
-              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => console.log('Clear chat')} />
+              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} />
             </View>
           </>
         )}
       </ScrollView>
+
+      <Modal visible={reportVisible} animationType="slide" transparent onRequestClose={() => setReportVisible(false)}>
+        <Pressable style={{ flex: 1 }} onPress={() => setReportVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 }}>
+            <Pressable onPress={() => {}}>
+              <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16 }}>
+                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>Báo xấu</Text>
+                <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Chọn lý do:</Text>
+
+                {['Nội dung nhạy cảm', 'Làm phiền', 'Lừa đảo', 'Khác'].map((r) => (
+                  <TouchableOpacity key={r} className="px-2 py-3 flex-row items-center" onPress={() => setReportReason(r)}>
+                    <MaterialIcons name={reportReason === r ? 'radio-button-checked' : 'radio-button-unchecked'} size={20} color={reportReason === r ? colors.tint : colors.textSecondary} />
+                    <Text style={{ color: colors.text, marginLeft: 12 }}>{r}</Text>
+                  </TouchableOpacity>
+                ))}
+
+                {reportReason === 'Khác' && (
+                  <TextInput
+                    value={reportOther}
+                    onChangeText={setReportOther}
+                    placeholder="Nhập lý do khác"
+                    placeholderTextColor={colors.textSecondary}
+                    style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 8, color: colors.text, marginTop: 8 }}
+                  />
+                )}
+
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <TouchableOpacity onPress={() => { setReportVisible(false); setReportReason(null); setReportOther(''); }} style={{ padding: 10, marginRight: 8 }}>
+                    <Text style={{ color: colors.textSecondary }}>Hủy</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => {
+                    const reason = reportReason === 'Khác' ? reportOther : reportReason;
+                    if (!reason || (reportReason === 'Khác' && reportOther.trim() === '')) {
+                      Alert.alert('Lỗi', 'Vui lòng chọn hoặc nhập lý do.');
+                      return;
+                    }
+                    setReportVisible(false);
+                    setReportReason(null);
+                    setReportOther('');
+                    Alert.alert('Đã báo', `Lý do: ${reason}`);
+                  }} style={{ padding: 10 }}>
+                    <Text style={{ color: colors.tint, fontWeight: '700' }}>Báo cáo</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={confirmVisible} animationType="fade" transparent onRequestClose={() => setConfirmVisible(false)}>
+        <Pressable style={{ flex: 1 }} onPress={() => setConfirmVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 }}>
+            <Pressable onPress={() => {}}>
+              <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16 }}>
+                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>Xóa lịch sử trò chuyện</Text>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <TouchableOpacity onPress={() => setConfirmVisible(false)} style={{ padding: 10, marginRight: 8 }}>
+                    <Text style={{ color: colors.textSecondary }}>Hủy</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => performClearChat()} style={{ padding: 10 }}>
+                    <Text style={{ color: colors.danger, fontWeight: '700' }}>Xóa</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={leaveVisible} animationType="slide" transparent onRequestClose={() => setLeaveVisible(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: overlayColor }} onPress={() => setLeaveVisible(false)}>
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surface, borderTopLeftRadius: 12, borderTopRightRadius: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20 }}>
+            <View style={{ width: 40, height: 4, backgroundColor: colors.surfaceVariant, alignSelf: 'center', borderRadius: 2, marginBottom: 8 }} />
+
+            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18, textAlign: 'center' }}>Rời nhóm và xóa trò chuyện này?</Text>
+
+            <TouchableOpacity onPress={() => { setLeaveVisible(false); performLeaveGroup(); }} style={{ paddingVertical: 16, alignItems: 'center', borderTopWidth: 12, borderTopColor: 'transparent', borderBottomWidth: 1, borderBottomColor: colors.border, marginTop: 12 }}>
+              <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 16 }}>Rời nhóm</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setLeaveVisible(false)} style={{ paddingVertical: 16, alignItems: 'center' }}>
+              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Hủy</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
 
       <AddToGroupModal
         visible={addModalVisible}

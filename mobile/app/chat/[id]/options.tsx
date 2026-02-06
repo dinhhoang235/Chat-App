@@ -1,44 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, Switch, ScrollView, Alert, Modal, TextInput, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Switch, ScrollView, Alert } from 'react-native';
 import { useTheme } from '../../../context/themeContext';
 import { useSearch } from '../../../context/searchContext';
 import { Header } from '../../../components/Header';
 import MuteOptionsSheet from '../../../components/MuteOptionsSheet';
 import MuteSettingsModal from '../../../components/MuteSettingsModal';
 import AddToGroupModal from '../../../components/AddToGroupModal';
+import ChatOptionRow from '../../../components/ChatOptionRow';
+import ReportModal from '../../../components/ReportModal';
+import ConfirmModal from '../../../components/ConfirmModal';
+import LeaveGroupSheet from '../../../components/LeaveGroupSheet';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { contacts } from '../../../constants/mockData';
 import { useAuth } from '../../../context/authContext';
 
-function Row({ icon, title, subtitle, rightNode, onPress, showChevron = false, titleColor }: any) {
-  const { colors } = useTheme();
-  return (
-    <TouchableOpacity onPress={onPress} className="px-4 py-4 flex-row items-center justify-between" style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}>
-      <View className="flex-row items-center">
-        <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.surfaceVariant }}>
-          <MaterialIcons name={icon as any} size={20} color={colors.textSecondary} />
-        </View>
-        <View>
-          <Text style={{ color: titleColor ?? colors.text, fontWeight: '600' }}>{title}</Text>
-          {subtitle ? <Text style={{ color: colors.textSecondary, marginTop: 2 }}>{subtitle}</Text> : null}
-        </View>
-      </View>
-
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {rightNode}
-        {showChevron && (
-          <MaterialIcons name="chevron-right" size={22} color={colors.textSecondary} />
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-}
+const Row = ChatOptionRow;
 
 export default function ChatOptions() {
-  const { colors, scheme } = useTheme();
-  const overlayColor = scheme === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.55)';
+  const { colors } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { open } = useSearch();
@@ -52,8 +33,6 @@ export default function ChatOptions() {
 
   // report modal state
   const [reportVisible, setReportVisible] = useState(false);
-  const [reportReason, setReportReason] = useState<string | null>(null);
-  const [reportOther, setReportOther] = useState<string>('');
   // confirm clear chat modal
   const [confirmVisible, setConfirmVisible] = useState(false);
   // leave group modal
@@ -244,95 +223,25 @@ export default function ChatOptions() {
         )}
       </ScrollView>
 
-      <Modal visible={reportVisible} animationType="slide" transparent onRequestClose={() => setReportVisible(false)}>
-        <Pressable style={{ flex: 1 }} onPress={() => setReportVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 }}>
-            <Pressable onPress={() => {}}>
-              <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16 }}>
-                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>Báo xấu</Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Chọn lý do:</Text>
+      <ReportModal
+        visible={reportVisible}
+        onClose={() => setReportVisible(false)}
+        onReport={(reason) => { setReportVisible(false); Alert.alert('Đã báo', `Lý do: ${reason}`); }}
+      />
 
-                {['Nội dung nhạy cảm', 'Làm phiền', 'Lừa đảo', 'Khác'].map((r) => (
-                  <TouchableOpacity key={r} className="px-2 py-3 flex-row items-center" onPress={() => setReportReason(r)}>
-                    <MaterialIcons name={reportReason === r ? 'radio-button-checked' : 'radio-button-unchecked'} size={20} color={reportReason === r ? colors.tint : colors.textSecondary} />
-                    <Text style={{ color: colors.text, marginLeft: 12 }}>{r}</Text>
-                  </TouchableOpacity>
-                ))}
+      <ConfirmModal
+        visible={confirmVisible}
+        title="Xóa lịch sử trò chuyện"
+        onCancel={() => setConfirmVisible(false)}
+        onConfirm={() => performClearChat()}
+        confirmText="Xóa"
+      />
 
-                {reportReason === 'Khác' && (
-                  <TextInput
-                    value={reportOther}
-                    onChangeText={setReportOther}
-                    placeholder="Nhập lý do khác"
-                    placeholderTextColor={colors.textSecondary}
-                    style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 8, color: colors.text, marginTop: 8 }}
-                  />
-                )}
-
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
-                  <TouchableOpacity onPress={() => { setReportVisible(false); setReportReason(null); setReportOther(''); }} style={{ padding: 10, marginRight: 8 }}>
-                    <Text style={{ color: colors.textSecondary }}>Hủy</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={() => {
-                    const reason = reportReason === 'Khác' ? reportOther : reportReason;
-                    if (!reason || (reportReason === 'Khác' && reportOther.trim() === '')) {
-                      Alert.alert('Lỗi', 'Vui lòng chọn hoặc nhập lý do.');
-                      return;
-                    }
-                    setReportVisible(false);
-                    setReportReason(null);
-                    setReportOther('');
-                    Alert.alert('Đã báo', `Lý do: ${reason}`);
-                  }} style={{ padding: 10 }}>
-                    <Text style={{ color: colors.tint, fontWeight: '700' }}>Báo cáo</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={confirmVisible} animationType="fade" transparent onRequestClose={() => setConfirmVisible(false)}>
-        <Pressable style={{ flex: 1 }} onPress={() => setConfirmVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 }}>
-            <Pressable onPress={() => {}}>
-              <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16 }}>
-                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>Xóa lịch sử trò chuyện</Text>
-
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
-                  <TouchableOpacity onPress={() => setConfirmVisible(false)} style={{ padding: 10, marginRight: 8 }}>
-                    <Text style={{ color: colors.textSecondary }}>Hủy</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={() => performClearChat()} style={{ padding: 10 }}>
-                    <Text style={{ color: colors.danger, fontWeight: '700' }}>Xóa</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={leaveVisible} animationType="slide" transparent onRequestClose={() => setLeaveVisible(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: overlayColor }} onPress={() => setLeaveVisible(false)}>
-          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surface, borderTopLeftRadius: 12, borderTopRightRadius: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20 }}>
-            <View style={{ width: 40, height: 4, backgroundColor: colors.surfaceVariant, alignSelf: 'center', borderRadius: 2, marginBottom: 8 }} />
-
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18, textAlign: 'center' }}>Rời nhóm và xóa trò chuyện này?</Text>
-
-            <TouchableOpacity onPress={() => { setLeaveVisible(false); performLeaveGroup(); }} style={{ paddingVertical: 16, alignItems: 'center', borderTopWidth: 12, borderTopColor: 'transparent', borderBottomWidth: 1, borderBottomColor: colors.border, marginTop: 12 }}>
-              <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 16 }}>Rời nhóm</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => setLeaveVisible(false)} style={{ paddingVertical: 16, alignItems: 'center' }}>
-              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Hủy</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
+      <LeaveGroupSheet
+        visible={leaveVisible}
+        onClose={() => setLeaveVisible(false)}
+        onLeave={() => { setLeaveVisible(false); performLeaveGroup(); }}
+      />
 
       <AddToGroupModal
         visible={addModalVisible}

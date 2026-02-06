@@ -5,6 +5,8 @@ import { useSearch } from '../../../context/searchContext';
 import { Header } from '../../../components/Header';
 import MuteOptionsSheet from '../../../components/MuteOptionsSheet';
 import MuteSettingsModal from '../../../components/MuteSettingsModal';
+import BlockSettingsModal from '../../../components/BlockSettingsModal';
+import EditDisplayNameModal from '../../../components/EditDisplayNameModal';
 import AddToGroupModal from '../../../components/AddToGroupModal';
 import ChatOptionRow from '../../../components/ChatOptionRow';
 import ReportModal from '../../../components/ReportModal';
@@ -30,6 +32,15 @@ export default function ChatOptions() {
   const [selectedMuteOption, setSelectedMuteOption] = useState<string>('Không tắt');
   const [excludeReminders, setExcludeReminders] = useState<boolean>(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
+
+  // block settings
+  const [blockVisible, setBlockVisible] = useState(false);
+  const [blockMessages, setBlockMessages] = useState<boolean>(false);
+  const [blockCalls, setBlockCalls] = useState<boolean>(false);
+
+  // edit display name
+  const [displayNameModalVisible, setDisplayNameModalVisible] = useState(false);
+  const [displayName, setDisplayName] = useState<string | undefined>(undefined);
 
   // report modal state
   const [reportVisible, setReportVisible] = useState(false);
@@ -89,7 +100,7 @@ export default function ChatOptions() {
               </View>
             )}
           </View>
-          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{name}</Text>
+          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{displayName ?? name}</Text>
         </View>
 
         <View className="px-4 py-4 flex-row items-center justify-around">
@@ -154,7 +165,6 @@ export default function ChatOptions() {
                     </View>
                   </View>
                 )}
-                showChevron
               />
               <Row icon="push-pin" title="Tin nhắn đã ghim" onPress={() => router.push(`/chat/${id}/pinned`)} showChevron />
             </View>
@@ -183,7 +193,7 @@ export default function ChatOptions() {
         ) : (
           <>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
-              <Row icon="edit" title="Đổi tên gợi nhớ" onPress={() => { }} />
+              <Row icon="edit" title="Đổi tên gợi nhớ" subtitle={displayName ? displayName : 'Chưa đặt'} onPress={() => setDisplayNameModalVisible(true)} />
             </View>
 
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
@@ -204,10 +214,8 @@ export default function ChatOptions() {
                     </View>
                   </View>
                 )}
-                showChevron
+                
               />
-              <Row icon="group-add" title="Tạo nhóm với người này" onPress={() => { }} />
-              <Row icon="person-add" title="Thêm vào nhóm" onPress={() => { }} />
               <Row icon="people" title="Xem nhóm chung" subtitle="(1)" onPress={() => { }} />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
@@ -216,7 +224,12 @@ export default function ChatOptions() {
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="flag" title="Báo xấu" onPress={() => setReportVisible(true)} />
-              <Row icon="block" title="Quản lý chặn" onPress={() => console.log('Manage block')} />
+              <Row
+                icon="block"
+                title="Quản lý chặn"
+                subtitle={blockMessages && blockCalls ? 'Chặn tin nhắn, cuộc gọi' : blockMessages ? 'Chặn tin nhắn' : blockCalls ? 'Chặn cuộc gọi' : 'Không chặn'}
+                onPress={() => setBlockVisible(true)}
+              />
               <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} />
             </View>
           </>
@@ -273,6 +286,23 @@ export default function ChatOptions() {
         initialOption={selectedMuteOption !== 'Không tắt' ? selectedMuteOption : 'Trong 1 giờ'}
         initialExclude={excludeReminders}
         onSave={(opt, exclude) => { setSelectedMuteOption(opt); setExcludeReminders(exclude); setMuteSettingsVisible(false); }}
+      />
+
+      <BlockSettingsModal
+        visible={blockVisible}
+        onClose={() => setBlockVisible(false)}
+        initialBlockMessages={blockMessages}
+        initialBlockCalls={blockCalls}
+        onSave={(bm, bc) => { setBlockMessages(bm); setBlockCalls(bc); }}
+      />
+
+      <EditDisplayNameModal
+        visible={displayNameModalVisible}
+        onClose={() => setDisplayNameModalVisible(false)}
+        initialName={displayName ?? name}
+        onSave={(newName) => {
+          setDisplayName(newName || undefined);
+        }}
       />
 
     </SafeAreaView>

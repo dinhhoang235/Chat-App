@@ -13,7 +13,7 @@ type ChatMessage = {
   reactions?: { emoji: string; count?: number }[];
 };
 
-export default function MessageBubble({ message, onPress, highlightQuery }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string }) {
+export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void }) {
   const { colors } = useTheme();
 
   if (message.type === 'separator') {
@@ -73,9 +73,9 @@ export default function MessageBubble({ message, onPress, highlightQuery }: { me
         <View className={`flex-row ${message.fromMe ? 'justify-end' : 'justify-start'} px-4 my-2`}> 
           <View style={{ width: 288, backgroundColor: colors.tint, borderRadius: 12, overflow: 'hidden' }}>
             <View style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint, marginRight: 12 }}>
+              <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint, marginRight: 12 }}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{(message.contactName || '').slice(0,2)}</Text>
-              </View>
+              </TouchableOpacity>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{message.contactName}</Text>
               </View>
@@ -105,9 +105,11 @@ export default function MessageBubble({ message, onPress, highlightQuery }: { me
     <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
       <View className={`flex-row ${message.fromMe ? 'justify-end' : 'justify-start'} px-4 my-2`}> 
         {!message.fromMe && (
-          <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant }}>
-            <Text style={{ color: colors.text, fontWeight: '700' }}>A</Text>
-          </View>
+          <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant }}>
+              <Text style={{ color: colors.text, fontWeight: '700' }}>{message.contactName ? message.contactName.slice(0,1) : 'A'}</Text>
+            </View>
+          </TouchableOpacity>
         )}
 
         <View style={{ maxWidth: '72%', marginLeft: isOutgoing ? 'auto' : 12 }} className={`${isOutgoing ? 'items-end' : 'items-start'}`}> 

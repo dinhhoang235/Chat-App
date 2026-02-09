@@ -172,7 +172,8 @@ export default function ChatOptions() {
               <Row icon="people" title={`Xem thành viên`} subtitle={`(${contact?.membersCount ?? 0})`} onPress={() => router.push(`/chat/${id}/members`)} showChevron />
 
               <Row icon="link" title="Link nhóm" subtitle="https://zalo.me/g/wftfeh870" onPress={() => router.push(`/chat/${id}/link`)} showChevron />
-
+            </View>
+            <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               {isOwner ? (
                 <>
                   <Row icon="settings" title="Cài đặt nhóm" onPress={() => router.push(`/chat/${id}/settings`)} showChevron />
@@ -214,7 +215,7 @@ export default function ChatOptions() {
                     </View>
                   </View>
                 )}
-                
+
               />
               <Row icon="people" title="Xem nhóm chung" subtitle="(1)" onPress={() => { }} />
             </View>

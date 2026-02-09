@@ -165,6 +165,18 @@ export default function ChatThread() {
                 message={item} 
                 highlightQuery={searchQuery} 
                 onPress={() => { if (composerVisible) setComposerVisible(false); }} 
+                onAvatarPress={() => {
+                  if (item.fromMe) return router.push('/profile/me');
+
+                  // If this is a 1:1 chat (chat id not starting with 'g'), use chat id as profile id
+                  if (id && !id.startsWith('g')) {
+                    return router.push(`/profile/${id}`);
+                  }
+
+                  // Otherwise try to derive from message (senderId or contactName), fallback to unknown
+                  const senderId = (item as any).senderId ?? (item.contactName ? item.contactName.replace(/\s+/g, '') : 'unknown');
+                  router.push(`/profile/${encodeURIComponent(senderId)}`);
+                }}
               />
             )}
             contentContainerStyle={{ 

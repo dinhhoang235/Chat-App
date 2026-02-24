@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import {
+  login,
+  signup,
+  refreshToken,
   getAllUsers,
   getUserById,
   createUser,
@@ -9,6 +12,12 @@ import {
 
 const router = Router();
 
+// Auth routes
+router.post('/login', login);
+router.post('/signup', signup);
+router.post('/refresh', refreshToken);
+
+// User routes
 router.get('/', getAllUsers);
 router.get('/:id', getUserById);
 router.post('/', createUser);

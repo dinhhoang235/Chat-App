@@ -1,9 +1,96 @@
 import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import prisma from '../db.js';
+import { generateTokens, verifyRefreshToken } from '../utils/jwt.js';
+
+export const login = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { phone, password } = req.body;
+
+    if (!phone || !password) {
+      res.status(400).json({ error: 'Phone and password are required' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { phone }
+    });
+
+    if (!user) {
+      res.status(401).json({ error: 'Invalid phone or password' });
+      return;
+    }
+
+    // Compare provided password with hashed password in database
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      res.status(401).json({ error: 'Invalid phone or password' });
+      return;
+    }
+
+    // Generate JWT tokens
+    const { accessToken, refreshToken } = generateTokens(user.id);
+
+    // Return user data without password
+    const { password: _, ...userWithoutPassword } = user;
+    res.json({ success: true, user: userWithoutPassword, accessToken, refreshToken });
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).json({ error: 'Failed to login' });
+  }
+};
+
+export const signup = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { phone, fullName, password } = req.body;
+
+    if (!phone || !fullName || !password) {
+      res.status(400).json({ error: 'Phone, fullName, and password are required' });
+      return;
+    }
+
+    // Check if phone already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { phone }
+    });
+
+    if (existingUser) {
+      res.status(400).json({ error: 'Phone number already registered' });
+      return;
+    }
+
+    // Hash password before storing
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: { phone, fullName, password: hashedPassword }
+    });
+
+    // Generate JWT tokens
+    const { accessToken, refreshToken } = generateTokens(user.id);
+
+    // Return user data without password
+    const { password: _, ...userWithoutPassword } = user;
+    res.status(201).json({ success: true, user: userWithoutPassword, accessToken, refreshToken });
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).json({ error: 'Failed to signup' });
+  }
+};
 
 export const getAllUsers = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const users = await prisma.user.findMany();
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        phone: true,
+        fullName: true,
+        avatar: true,
+        bio: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
     res.json(users);
   } catch (err) {
     console.error('Error:', err);
@@ -16,7 +103,15 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
     const { id } = req.params;
     const user = await prisma.user.findUnique({
       where: { id: parseInt(id as string) },
-      include: { chats: true, sentMessages: true }
+      select: {
+        id: true,
+        phone: true,
+        fullName: true,
+        avatar: true,
+        bio: true,
+        createdAt: true,
+        updatedAt: true
+      }
     });
     
     if (!user) {
@@ -33,15 +128,24 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
 
 export const createUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, name, avatar, bio } = req.body;
+    const { phone, fullName, password, avatar, bio } = req.body;
     
-    if (!email) {
-      res.status(400).json({ error: 'Email is required' });
+    if (!phone || !fullName || !password) {
+      res.status(400).json({ error: 'Phone, fullName and password are required' });
       return;
     }
 
     const user = await prisma.user.create({
-      data: { email, name, avatar, bio }
+      data: { phone, fullName, password, avatar, bio },
+      select: {
+        id: true,
+        phone: true,
+        fullName: true,
+        avatar: true,
+        bio: true,
+        createdAt: true,
+        updatedAt: true
+      }
     });
 
     res.status(201).json(user);
@@ -54,11 +158,20 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
 export const updateUser = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { email, name, avatar, bio } = req.body;
+    const { fullName, avatar, bio } = req.body;
 
     const user = await prisma.user.update({
       where: { id: parseInt(id as string) },
-      data: { email, name, avatar, bio }
+      data: { fullName, avatar, bio },
+      select: {
+        id: true,
+        phone: true,
+        fullName: true,
+        avatar: true,
+        bio: true,
+        createdAt: true,
+        updatedAt: true
+      }
     });
 
     res.json(user);
@@ -80,5 +193,31 @@ export const deleteUser = async (req: Request, res: Response): Promise<void> => 
   } catch (err) {
     console.error('Error:', err);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+};
+
+export const refreshToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refreshToken: oldRefreshToken } = req.body;
+
+    if (!oldRefreshToken) {
+      res.status(400).json({ error: 'Refresh token is required' });
+      return;
+    }
+
+    const decoded = verifyRefreshToken(oldRefreshToken);
+
+    if (!decoded) {
+      res.status(401).json({ error: 'Invalid or expired refresh token' });
+      return;
+    }
+
+    // Generate new tokens
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(decoded.userId);
+
+    res.json({ success: true, accessToken, refreshToken: newRefreshToken });
+  } catch (err) {
+    console.error('Error:', err);
+    res.status(500).json({ error: 'Failed to refresh token' });
   }
 };

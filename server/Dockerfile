@@ -7,7 +7,7 @@ RUN npm install
 
 COPY . .
 
-ARG DATABASE_URL=mysql://chatuser:admin123@localhost:3306/chat_app
+ARG DATABASE_URL
 RUN DATABASE_URL=$DATABASE_URL npx prisma generate
 
 RUN npm run build

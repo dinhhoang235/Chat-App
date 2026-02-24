@@ -1,12 +1,14 @@
 import React, { createContext, useState, useContext } from "react";
+import { authAPI } from "../services/auth";
+import { tokenStorage } from "../utils/tokenStorage";
 
 interface AuthContextType {
   isLoggedIn: boolean;
-  user: { phone: string; fullName: string; gender?: string; dob?: string; bio?: string } | null;
-  login: (phone: string, password: string) => boolean;
-  signup: (phone: string, fullName: string, password: string) => boolean;
+  user: { id: number; phone: string; fullName: string; avatar?: string; bio?: string } | null;
+  login: (phone: string, password: string) => Promise<boolean>;
+  signup: (phone: string, fullName: string, password: string) => Promise<boolean>;
   logout: () => void;
-  updateProfile: (data: Partial<{ phone: string; fullName: string; gender?: string; dob?: string; bio?: string }>) => void;
+  updateProfile: (data: Partial<{ fullName: string; avatar?: string; bio?: string }>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,66 +17,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState<{ phone: string; fullName: string } | null>(
+  const [user, setUser] = useState<{ id: number; phone: string; fullName: string; avatar?: string; bio?: string } | null>(
     null
   );
 
-  // Mock users for testing
-  const mockUsers = [
-    {
-      phone: "0123456789",
-      password: "123456",
-      fullName: "Nguyễn Văn A",
-    },
-    {
-      phone: "0987654321",
-      password: "password",
-      fullName: "Trần Thị B",
-    },
-  ];
-
-  const login = (phone: string, password: string): boolean => {
-    const user = mockUsers.find(
-      (u) => u.phone === phone && u.password === password
-    );
-
-    if (user) {
-      setIsLoggedIn(true);
-      setUser({ phone: user.phone, fullName: user.fullName });
-      return true;
+  const login = async (phone: string, password: string): Promise<boolean> => {
+    try {
+      const data = await authAPI.login(phone, password);
+      if (data.success && data.user && data.accessToken && data.refreshToken) {
+        setIsLoggedIn(true);
+        setUser(data.user);
+        await tokenStorage.saveTokens(data.accessToken, data.refreshToken);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Login error:", error);
+      return false;
     }
-    return false;
   };
 
-  const signup = (
+  const signup = async (
     phone: string,
     fullName: string,
     password: string
-  ): boolean => {
-    // Check if phone already exists
-    const exists = mockUsers.some((u) => u.phone === phone);
-    if (exists) {
+  ): Promise<boolean> => {
+    try {
+      const data = await authAPI.signup(phone, fullName, password);
+      if (data.success && data.user && data.accessToken && data.refreshToken) {
+        setIsLoggedIn(true);
+        setUser(data.user);
+        await tokenStorage.saveTokens(data.accessToken, data.refreshToken);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Signup error:", error);
       return false;
     }
-
-    // Add new user to mock data
-    mockUsers.push({ phone, fullName, password });
-    setIsLoggedIn(true);
-    setUser({ phone, fullName });
-    return true;
   };
 
-  const updateProfile = (data: Partial<{ phone: string; fullName: string; gender?: string; dob?: string }>) => {
+  const updateProfile = (data: Partial<{ fullName: string; avatar?: string; bio?: string }>) => {
     setUser((prev) => {
       if (!prev) return prev;
-      const next = { ...prev, ...data } as typeof prev;
-      return next;
+      return { ...prev, ...data };
     });
   };
 
-  const logout = () => {
+  const logout = async () => {
     setIsLoggedIn(false);
     setUser(null);
+    await tokenStorage.removeTokens();
   };
 
   return (

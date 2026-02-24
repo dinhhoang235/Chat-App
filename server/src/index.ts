@@ -15,7 +15,6 @@ app.use(express.json());
 app.get('/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    console.log('✓ Database connected');
     res.json({ 
       status: 'ok',
       database: 'connected'
@@ -33,6 +32,14 @@ app.get('/health', async (_req, res) => {
 app.use('/api/users', userRoutes);
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, async () => {
+  try {
+    // Test database connection once on startup
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('✓ Database connected');
+    console.log(`Server running on port ${PORT}`);
+  } catch (err) {
+    console.error('✗ Failed to connect to database:', err);
+    process.exit(1);
+  }
 });

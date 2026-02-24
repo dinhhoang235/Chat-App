@@ -1,4 +1,28 @@
 services:
+  app:
+    build:
+      context: .
+      args:
+        DATABASE_URL: "mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:${MYSQL_PORT}/${MYSQL_DATABASE}"
+    container_name: chat-app
+    restart: always
+    env_file: .env
+    environment:
+      DATABASE_HOST: mysql
+      DATABASE_USER: ${MYSQL_USER}
+      DATABASE_PASSWORD: ${MYSQL_PASSWORD}
+      DATABASE_NAME: ${MYSQL_DATABASE}
+      DATABASE_PORT: ${MYSQL_PORT}
+      DATABASE_URL: "mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:${MYSQL_PORT}/${MYSQL_DATABASE}"
+      NODE_ENV: production
+    ports:
+      - "${PORT}:3000"
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - chat-network
+
   mysql:
     image: mysql:8.0
     container_name: chat-mysql
@@ -13,6 +37,8 @@ services:
       - "${MYSQL_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - chat-network
 
   redis:
     image: redis:7-alpine
@@ -22,7 +48,12 @@ services:
       - "${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - chat-network
 
 volumes:
   mysql_data:
   redis_data:
+
+networks:
+  chat-network:

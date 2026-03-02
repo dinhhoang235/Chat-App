@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, TouchableOpacity, ImageBackground, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/themeContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { contacts } from '../../constants/mockData';
 import { useAuth } from '../../context/authContext';
-import { MaterialIcons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
+import ProfileBioModal from '../../components/ProfileBioModal';
 
 export default function UserProfile() {
   const { colors } = useTheme();
@@ -15,6 +15,7 @@ export default function UserProfile() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const id = (params as any).id as string;
+  const [bioVisible, setBioVisible] = React.useState(false);
 
   // Support special 'me' route which shows the logged-in user's profile
   const isMeRoute = id === 'me';
@@ -64,22 +65,19 @@ export default function UserProfile() {
         <View style={{ alignItems: 'center', padding: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>{profile?.name ?? (isStranger ? 'Người dùng' : 'Không xác định')}</Text>
-            {isOwn ? (
-              <TouchableOpacity style={{ marginLeft: 8 }}>
-                <MaterialIcons name="edit" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-            ) : null}
           </View>
 
-          {profile?.phone ? (
-            <Text style={{ color: colors.textSecondary, marginTop: 6 }}>{profile.phone}</Text>
-          ) : isStranger ? (
-            <Text style={{ color: colors.textSecondary, marginTop: 6 }}>Số điện thoại: {id}</Text>
-          ) : null}
-
           {/* Bio: show under phone number (me or profile) */}
-          {(isMeRoute ? user?.bio : profile?.bio) ? (
-            <Text style={{ color: colors.textSecondary, marginTop: 6, textAlign: 'center' }}>{isMeRoute ? user?.bio : profile?.bio}</Text>
+          {isMeRoute ? (
+            <TouchableOpacity onPress={() => setBioVisible(true)}>
+              {user?.bio ? (
+                <Text style={{ color: colors.textSecondary, marginTop: 6, textAlign: 'center' }}>{user.bio}</Text>
+              ) : (
+                <Text style={{ color: colors.tint, marginTop: 6, textAlign: 'center', fontWeight: '500' }}>Cập nhật giới thiệu bản thân</Text>
+              )}
+            </TouchableOpacity>
+          ) : profile?.bio ? (
+            <Text style={{ color: colors.textSecondary, marginTop: 6, textAlign: 'center' }}>{profile.bio}</Text>
           ) : null}
         </View>
 
@@ -104,6 +102,15 @@ export default function UserProfile() {
         </View>
 
       </View>
+
+      <ProfileBioModal
+        visible={bioVisible}
+        onClose={() => setBioVisible(false)}
+        initialValue={user?.bio ?? ''}
+        onSave={() => {
+          Alert.alert('Thành công', 'Cập nhật bio thành công');
+        }}
+      />
     </SafeAreaView>
   );
 }

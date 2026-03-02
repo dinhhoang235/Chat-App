@@ -1,8 +1,10 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/themeContext';
+import { useAuth } from '../context/authContext';
+import { userAPI } from '../services/user';
 
 
 type Props = {
@@ -14,9 +16,11 @@ type Props = {
 
 export default function ProfileBioModal({ visible, onClose, initialValue = '', onSave }: Props) {
   const { scheme, colors } = useTheme();
+  const { user, updateProfile } = useAuth();
   const rowBg = colors.surface;
   const [value, setValue] = React.useState(initialValue);
   const [share, setShare] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
   const maxLen = 100;
 
   React.useEffect(() => {
@@ -26,7 +30,25 @@ export default function ProfileBioModal({ visible, onClose, initialValue = '', o
     }
   }, [visible, initialValue]);
 
+  const handleSave = async () => {
+    if (!user?.id) {
+      Alert.alert('Lỗi', 'Không thể lưu bio');
+      return;
+    }
 
+    setLoading(true);
+    try {
+      await userAPI.updateUser(user.id, { bio: value.trim() });
+      updateProfile({ bio: value.trim() });
+      onSave?.(value.trim(), share);
+      onClose();
+    } catch (error) {
+      console.error('Failed to update bio:', error);
+      Alert.alert('Lỗi', 'Không thể cập nhật bio');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -35,14 +57,18 @@ export default function ProfileBioModal({ visible, onClose, initialValue = '', o
           <View style={{ flex: 1, backgroundColor: rowBg }}>
             {/* Header */}
             <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <TouchableOpacity onPress={onClose}>
-                <MaterialIcons name="close" size={24} color={colors.text} />
+              <TouchableOpacity onPress={onClose} disabled={loading}>
+                <MaterialIcons name="close" size={24} color={loading ? colors.textSecondary : colors.text} />
               </TouchableOpacity>
 
               <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>Chỉnh sửa lời giới thiệu</Text>
 
-              <TouchableOpacity onPress={() => { onSave?.(value.trim(), share); onClose(); }}>
-                <Text style={{ color: colors.tint, fontWeight: '700' }}>Lưu</Text>
+              <TouchableOpacity onPress={handleSave} disabled={loading}>
+                {loading ? (
+                  <ActivityIndicator size="small" color={colors.tint} />
+                ) : (
+                  <Text style={{ color: colors.tint, fontWeight: '700' }}>Lưu</Text>
+                )}
               </TouchableOpacity>
             </View>
 

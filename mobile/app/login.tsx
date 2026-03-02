@@ -66,6 +66,9 @@ export default function LoginScreen() {
             placeholder="Nhập số điện thoại"
             placeholderTextColor={colors.textSecondary}
             keyboardType="phone-pad"
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
             value={phone}
             onChangeText={setPhone}
             editable={!loading}
@@ -80,6 +83,10 @@ export default function LoginScreen() {
               placeholder="Nhập mật khẩu"
               placeholderTextColor={colors.textSecondary}
               secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              keyboardType="ascii-capable"
               value={password}
               onChangeText={setPassword}
               editable={!loading}

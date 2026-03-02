@@ -82,6 +82,9 @@ export default function SignupScreen() {
             placeholder="Nhập số điện thoại"
             placeholderTextColor={colors.textSecondary}
             keyboardType="phone-pad"
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
             value={phone}
             onChangeText={setPhone}
             editable={!loading}
@@ -94,6 +97,9 @@ export default function SignupScreen() {
             style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: colors.input, color: colors.text }}
             placeholder="Nhập họ và tên"
             placeholderTextColor={colors.textSecondary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
             value={fullName}
             onChangeText={setFullName}
             editable={!loading}
@@ -108,6 +114,10 @@ export default function SignupScreen() {
               placeholder="Nhập mật khẩu"
               placeholderTextColor={colors.textSecondary}
               secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              keyboardType="ascii-capable"
               value={password}
               onChangeText={setPassword}
               onFocus={handleInputFocus}
@@ -134,6 +144,10 @@ export default function SignupScreen() {
               placeholder="Xác nhận mật khẩu"
               placeholderTextColor={colors.textSecondary}
               secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              keyboardType="ascii-capable"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               onFocus={handleInputFocus}

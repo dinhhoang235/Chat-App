@@ -21,12 +21,18 @@ export default function ProfileInfo() {
   const isOwn = isMeRoute || (profile?.phone && user?.phone && profile.phone === user.phone);
 
   // use account info when viewing "me"
+  const formatDate = (iso?: string | null) => {
+    if (!iso) return undefined;
+    const d = new Date(iso);
+    return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+  };
+
   const displayProfile = isMeRoute && user ? {
     name: user.fullName,
     phone: user.phone,
     initials: user.fullName?.split(' ').map((n: string) => n[0]).slice(0,2).join('').toUpperCase(),
-    gender: (user as any).gender ?? undefined,
-    dob: (user as any).dob ?? undefined,
+    gender: user.gender ?? undefined,
+    dob: formatDate(user.dateOfBirth),
   } : profile;
   const [editVisible, setEditVisible] = React.useState(false);
 

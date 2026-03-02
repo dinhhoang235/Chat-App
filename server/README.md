@@ -38,6 +38,7 @@ docker compose ps             # Kiểm tra trạng thái
 docker compose logs -f        # Xem logs
 
 # Database
+npx prisma generate           # Tạo lại Prisma Client (sau khi sửa schema)
 npx prisma db push            # Đồng bộ schema
 npx prisma studio             # Xem & chỉnh sửa data
 

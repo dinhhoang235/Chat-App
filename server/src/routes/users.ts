@@ -21,6 +21,7 @@ router.post('/refresh', refreshToken);
 router.get('/', getAllUsers);
 router.get('/:id', getUserById);
 router.post('/', createUser);
+router.patch('/:id', updateUser);
 router.put('/:id', updateUser);
 router.delete('/:id', deleteUser);
 

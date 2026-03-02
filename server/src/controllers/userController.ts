@@ -33,7 +33,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Return user data without password
     const { password: _, ...userWithoutPassword } = user;
-    res.json({ success: true, user: userWithoutPassword, accessToken, refreshToken });
+    res.json({ success: true, user: { ...userWithoutPassword, gender: user.gender ?? null, dateOfBirth: user.dateOfBirth ?? null }, accessToken, refreshToken });
   } catch (err) {
     console.error('Error:', err);
     res.status(500).json({ error: 'Failed to login' });
@@ -71,7 +71,7 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
 
     // Return user data without password
     const { password: _, ...userWithoutPassword } = user;
-    res.status(201).json({ success: true, user: userWithoutPassword, accessToken, refreshToken });
+    res.status(201).json({ success: true, user: { ...userWithoutPassword, gender: null, dateOfBirth: null }, accessToken, refreshToken });
   } catch (err) {
     console.error('Error:', err);
     res.status(500).json({ error: 'Failed to signup' });
@@ -87,6 +87,8 @@ export const getAllUsers = async (_req: Request, res: Response): Promise<void> =
         fullName: true,
         avatar: true,
         bio: true,
+        gender: true,
+        dateOfBirth: true,
         createdAt: true,
         updatedAt: true
       }
@@ -109,6 +111,8 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
         fullName: true,
         avatar: true,
         bio: true,
+        gender: true,
+        dateOfBirth: true,
         createdAt: true,
         updatedAt: true
       }
@@ -158,17 +162,27 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
 export const updateUser = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { fullName, avatar, bio } = req.body;
+    const { fullName, avatar, bio, gender, dateOfBirth } = req.body;
+
+    // Only include fields that are provided
+    const data: any = {};
+    if (fullName !== undefined) data.fullName = fullName;
+    if (avatar !== undefined) data.avatar = avatar;
+    if (bio !== undefined) data.bio = bio;
+    if (gender !== undefined) data.gender = gender;
+    if (dateOfBirth !== undefined) data.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
 
     const user = await prisma.user.update({
       where: { id: parseInt(id as string) },
-      data: { fullName, avatar, bio },
+      data,
       select: {
         id: true,
         phone: true,
         fullName: true,
         avatar: true,
         bio: true,
+        gender: true,
+        dateOfBirth: true,
         createdAt: true,
         updatedAt: true
       }
@@ -176,8 +190,12 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
 
     res.json(user);
   } catch (err) {
-    console.error('Error:', err);
-    res.status(500).json({ error: 'Failed to update user' });
+    console.error('Error updating user:', err);
+    if (err instanceof Error) {
+      res.status(500).json({ error: 'Failed to update user', details: err.message });
+    } else {
+      res.status(500).json({ error: 'Failed to update user' });
+    }
   }
 };
 

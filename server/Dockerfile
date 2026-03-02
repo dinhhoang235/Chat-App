@@ -7,8 +7,8 @@ RUN npm install
 
 COPY . .
 
-ARG DATABASE_URL
-RUN DATABASE_URL=$DATABASE_URL npx prisma generate
+# Generate Prisma client (doesn't need DATABASE_URL)
+RUN npx prisma generate
 
 RUN npm run build
 

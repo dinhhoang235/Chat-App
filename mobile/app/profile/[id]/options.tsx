@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../../context/authContext';
 import ImagePickerModal from '../../../components/ImagePickerModal';
 import ProfileBioModal from '../../../components/ProfileBioModal';
@@ -8,10 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../context/themeContext';
 import { Header } from '../../../components/Header';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { contacts } from '../../../constants/mockData';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as ImagePickerLib from 'expo-image-picker';
 import { uploadImage } from '../../../services/imageUpload';
+import { userAPI } from '../../../services/user';
+import { checkFriendshipStatus, sendFriendRequest, acceptFriendRequest, cancelFriendRequest, removeFriend, type User } from '../../../services/friendship';
 
 function Row({ icon, title, subtitle, onPress, rightNode, showChevron = true }: any) {
   const { colors } = useTheme();
@@ -43,12 +44,64 @@ export default function ProfileOptions() {
   const params = useLocalSearchParams();
   const auth = useAuth();
   const id = (params as any).id as string;
-  const profile = contacts.find((c) => c.id === id) || { name: 'Người dùng', initials: (id || 'U').slice(0,2).toUpperCase() } as any;
+  const [profile, setProfile] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [friendshipStatus, setFriendshipStatus] = useState<string | null>(null);
+
+  const isMeRoute = id === 'me';
+
+  const loadProfile = useCallback(async () => {
+    try {
+      if (!profile) setLoading(true);
+      const userId = isMeRoute && auth.user ? auth.user.id : parseInt(id);
+      
+      const promises: [Promise<any>, Promise<any> | null] = [
+        userAPI.getUserById(userId),
+        (auth.user && !isMeRoute) ? checkFriendshipStatus(userId) : null
+      ];
+
+      const [userData, statusData] = await Promise.all(promises);
+      
+      if (userData) {
+        setProfile(userData);
+      }
+
+      if (statusData) {
+        let mappedStatus = 'NONE';
+        const s = statusData;
+        
+        if (s.status === 'request_received') {
+          mappedStatus = 'PENDING_RECEIVED';
+        } else if (s.status === 'request_sent') {
+          // If the request was rejected, treat it as NONE so the user can send again
+          mappedStatus = s.requestStatus === 'rejected' ? 'NONE' : 'PENDING_SENT';
+        } else if (['friends', 'accepted', 'friend'].includes(s.status)) {
+          mappedStatus = 'ACCEPTED';
+        } else if (s.status) {
+          mappedStatus = s.status.toUpperCase();
+        }
+        
+        setFriendshipStatus(mappedStatus);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, auth.user, isMeRoute, profile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isMeRoute && auth.user) {
+        loadProfile();
+      } else if (id && id !== 'me') {
+        loadProfile();
+      }
+    }, [id, auth.user, isMeRoute, loadProfile])
+  );
 
   // relationship state
-  const isMeRoute = id === 'me';
   const isOwn = isMeRoute || (auth.user && profile?.phone && auth.user.phone && profile.phone === auth.user.phone);
-  const isFriend = !!profile && !isOwn && profile.id !== 'me';
 
   const [imgPickerVisible, setImgPickerVisible] = React.useState(false);
   const [imgPickerType, setImgPickerType] = React.useState<'avatar' | 'cover'>('avatar');
@@ -61,6 +114,71 @@ export default function ProfileOptions() {
   const openImgPicker = (type: 'avatar' | 'cover') => {
     setImgPickerType(type);
     setImgPickerVisible(true);
+  };
+
+  const handleSendFriendRequest = async () => {
+    if (!profile?.id) return;
+    try {
+      await sendFriendRequest(profile.id);
+      setFriendshipStatus('PENDING_SENT');
+      Alert.alert('Thành công', 'Đã gửi lời mời kết bạn');
+    } catch (error) {
+      console.error('Error sending friend request:', error);
+      Alert.alert('Lỗi', 'Không thể gửi lời mời kết bạn. Vui lòng thử lại sau.');
+    }
+  };
+
+  const handleAcceptFriendRequest = async () => {
+    if (!profile?.id) return;
+    try {
+      await acceptFriendRequest(profile.id);
+      setFriendshipStatus('ACCEPTED');
+      Alert.alert('Thành công', 'Bạn bè đã được kết nối');
+    } catch (error) {
+      console.error('Error accepting friend request:', error);
+      Alert.alert('Lỗi', 'Không thể chấp nhận lời mời. Vui lòng thử lại sau.');
+    }
+  };
+
+  const handleCancelFriendRequest = async () => {
+    if (!profile?.id) return;
+    try {
+      await cancelFriendRequest(profile.id);
+      setFriendshipStatus('NONE');
+      Alert.alert('Thành công', 'Lời mời đã bị hủy');
+    } catch (error) {
+      console.error('Error canceling friend request:', error);
+      Alert.alert('Lỗi', 'Không thể hủy lời mời. Vui lòng thử lại sau.');
+    }
+  };
+
+  const handleRemoveFriend = async () => {
+    if (!profile?.id) return;
+    
+    Alert.alert(
+      'Xác nhận xóa bạn',
+      `Bạn có chắc chắn muốn xóa ${profile.fullName} khỏi danh sách bạn bè?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        { 
+          text: 'Xóa', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await removeFriend(profile.id);
+              setFriendshipStatus('NONE');
+              Alert.alert('Thành công', 'Đã xóa bạn bè');
+            } catch (error) {
+              console.error('Error removing friend:', error);
+              Alert.alert('Lỗi', 'Không thể xóa bạn bè. Vui lòng thử lại sau.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handlePick = async (action: 'take' | 'library' | 'zstyle' | 'choose-old') => {
@@ -122,9 +240,18 @@ export default function ProfileOptions() {
       Alert.alert('Lỗi', 'Không thể tải ảnh lên. Vui lòng thử lại.');
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
-      <Header title={profile.name} showBack onBackPress={() => router.back()} />
+      <Header title={profile?.fullName || 'Người dùng'} showBack onBackPress={() => router.back()} />
 
       <ScrollView>
         {isOwn ? (
@@ -148,7 +275,7 @@ export default function ProfileOptions() {
               <Row icon="settings" title="Cài đặt chung" onPress={() => router.push('/settings')} />
             </View>
           </>
-        ) : isFriend ? (
+        ) : friendshipStatus === 'ACCEPTED' ? (
           // friend
           <>
             <View >
@@ -156,29 +283,51 @@ export default function ProfileOptions() {
               <Row icon="edit" title="Đổi tên gợi nhớ" onPress={() => Alert.alert('Đổi tên gợi nhớ', 'Demo')} />
             </View>
 
-            <View style={{ paddingHorizontal: 16, paddingTop: 18 }}>
-              <Text style={{ color: colors.tint, fontWeight: '700' }}>Cài đặt riêng tư</Text>
-            </View>
-
             <View className="mt-6 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="flag" title="Báo xấu" onPress={() => Alert.alert('Báo xấu', 'Gửi báo xấu demo')} />
-              {!isOwn && (
-                <TouchableOpacity className="py-4" onPress={() => Alert.alert('Xóa bạn', 'Bạn sẽ xóa bạn này (demo)')}>
-                  <Text style={{ color: '#EF4444', textAlign: 'center', fontWeight: '700' }}>Xóa bạn</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity 
+                onPress={handleRemoveFriend} 
+                className="px-4 py-4 flex-row items-center" 
+                style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: '#FEE2E2' }}>
+                  <MaterialIcons name="person-remove" size={20} color="#EF4444" />
+                </View>
+                <Text style={{ color: '#EF4444', fontWeight: '600' }}>Xóa bạn</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : friendshipStatus === 'PENDING_RECEIVED' ? (
+          // received friend request - show accept button as "Kết bạn"
+          <>
+            <View>
+              <Row icon="person-add" title="Kết bạn" onPress={handleAcceptFriendRequest} />
+              <Row icon="info" title="Thông tin" onPress={() => router.push(`/profile/${id}/info`)} />
+              <Row icon="edit" title="Đổi tên gợi nhớ" onPress={() => Alert.alert('Đổi tên gợi nhớ', 'Demo')} />
+              <Row icon="flag" title="Báo xấu" onPress={() => Alert.alert('Báo xấu', 'Gửi báo xấu demo')} />
+              <Row icon="block" title="Quản lý chặn" onPress={() => Alert.alert('Quản lý chặn', 'Demo')} />
+            </View>
+          </>
+        ) : friendshipStatus === 'PENDING_SENT' ? (
+          // sent friend request
+          <>
+            <View>
+              <Row 
+                icon="person-add" 
+                title="Đã gửi lời mời kết bạn" 
+                onPress={handleCancelFriendRequest}
+              />
+              <Row icon="info" title="Thông tin" onPress={() => router.push(`/profile/${id}/info`)} />
+              <Row icon="edit" title="Đổi tên gợi nhớ" onPress={() => Alert.alert('Đổi tên gợi nhớ', 'Demo')} />
+              <Row icon="flag" title="Báo xấu" onPress={() => Alert.alert('Báo xấu', 'Gửi báo xấu demo')} />
+              <Row icon="block" title="Quản lý chặn" onPress={() => Alert.alert('Quản lý chặn', 'Demo')} />
             </View>
           </>
         ) : (
-          // stranger
+          // stranger (NONE)
           <>
-            <View style={{ padding: 16 }}>
-              <TouchableOpacity style={{ backgroundColor: '#2563EB', paddingVertical: 12, borderRadius: 22, alignItems: 'center', marginBottom: 12 }} onPress={() => Alert.alert('Kết bạn', 'Yêu cầu kết bạn đã gửi (demo)')}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Kết bạn</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
+            <View>
+              <Row icon="person-add" title="Kết bạn" onPress={handleSendFriendRequest} />
               <Row icon="info" title="Thông tin" onPress={() => router.push(`/profile/${id}/info`)} />
               <Row icon="edit" title="Đổi tên gợi nhớ" onPress={() => Alert.alert('Đổi tên gợi nhớ', 'Demo')} />
               <Row icon="flag" title="Báo xấu" onPress={() => Alert.alert('Báo xấu', 'Gửi báo xấu demo')} />

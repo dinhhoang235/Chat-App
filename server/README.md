@@ -39,6 +39,7 @@ docker compose logs -f        # Xem logs
 
 # Database
 npx prisma generate           # Tạo lại Prisma Client (sau khi sửa schema)
+npx prisma db push
 npx prisma migrate dev --name <migration_name>  # Tạo migration (thay <migration_name> bằng tên phù hợp)
 npx prisma studio             # Xem & chỉnh sửa data
 

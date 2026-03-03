@@ -1,15 +1,25 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ImageBackground, Alert, Image, Modal, StatusBar } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, ImageBackground, Alert, Image, Modal, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/themeContext';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { contacts } from '../../constants/mockData';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/authContext';
 import { Header } from '../../components/Header';
 import ProfileBioModal from '../../components/ProfileBioModal';
 import { MaterialIcons } from '@expo/vector-icons';
+import { userAPI } from '../../services/user';
+import { checkFriendshipStatus, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest, User } from '../../services/friendship';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+// Constants
+const AVATAR_SIZE = 92;
+const AVATAR_RADIUS = AVATAR_SIZE / 2;
+const AVATAR_IMAGE_SIZE = 86;
+const AVATAR_IMAGE_RADIUS = AVATAR_IMAGE_SIZE / 2;
+const COVER_IMAGE_HEIGHT = 220;
+const HEADER_HEIGHT = 56;
+const HEADER_ELEVATION = 6;
 
 export default function UserProfile() {
   const { colors } = useTheme();
@@ -20,37 +30,197 @@ export default function UserProfile() {
   const id = (params as any).id as string;
   const [bioVisible, setBioVisible] = React.useState(false);
   const [imageViewerUri, setImageViewerUri] = React.useState<string | null>(null);
+  const [profile, setProfile] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [friendshipStatus, setFriendshipStatus] = useState<string>('NONE');
+  const [sendingRequest, setSendingRequest] = useState(false);
 
   // Support special 'me' route which shows the logged-in user's profile
   const isMeRoute = id === 'me';
-  let profile = contacts.find((c) => c.id === id);
 
-  if (isMeRoute && user) {
-    profile = { id: 'me', name: user.fullName, phone: user.phone, initials: user.fullName?.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase(), color: colors.tint } as any;
-  }
+  // Helper functions
+  const getAvatarUrl = useCallback((avatarPath?: string) => {
+    return avatarPath ? `${API_BASE_URL}${avatarPath}` : null;
+  }, []);
+
+  const getCoverUrl = useCallback((coverPath?: string) => {
+    return coverPath ? `${API_BASE_URL}${coverPath}` : null;
+  }, []);
+
+  const calculateInitials = useCallback((fullName?: string, fallbackId?: string) => {
+    if (fullName) {
+      return fullName
+        .split(' ')
+        .map((n: string) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+    }
+    return fallbackId ? fallbackId.slice(-2).toUpperCase() : 'U';
+  }, []);
+
+  // Memoized values
+  const initials = useMemo(
+    () => profile?.fullName ? calculateInitials(profile.fullName) : calculateInitials(undefined, id),
+    [profile?.fullName, id, calculateInitials]
+  );
+
+  const avatarUrl = useMemo(() => getAvatarUrl(profile?.avatar), [profile?.avatar, getAvatarUrl]);
+  const coverUrl = useMemo(() => getCoverUrl(profile?.coverImage), [profile?.coverImage, getCoverUrl]);
 
   // If not found and id looks like a phone number, treat as stranger with phone as id
   const isPhoneLike = /^\d+$/.test(id || '');
-  const isOwn = isMeRoute || (profile?.phone && user?.phone && profile.phone === user.phone);
-  const isFriend = !!profile && !isOwn;
+
+  const loadUserProfile = useCallback(async () => {
+    try {
+      // Only show main loader if we don't have profile data yet (first load)
+      if (!profile) setLoading(true);
+      
+      const userId = isMeRoute && user ? user.id : parseInt(id);
+      
+      // Load user profile and friendship status in parallel for better performance
+      const promises: [Promise<any>, Promise<any> | null] = [
+        userAPI.getUserById(userId).catch(err => {
+          if (isPhoneLike) return { id: userId.toString(), fullName: 'Người dùng ' + id };
+          throw err;
+        }),
+        (user && !isMeRoute) ? checkFriendshipStatus(userId) : null
+      ];
+
+      const [userData, statusData] = await Promise.all(promises);
+      
+      if (userData) {
+        setProfile(userData);
+      }
+      
+      if (statusData) {
+        let mappedStatus = 'NONE';
+        const s = statusData;
+        
+        if (s.status === 'request_received') {
+          mappedStatus = 'PENDING_RECEIVED';
+        } else if (s.status === 'request_sent') {
+          // If the request was rejected, treat it as NONE so the user can send again
+          mappedStatus = s.requestStatus === 'rejected' ? 'NONE' : 'PENDING_SENT';
+        } else if (['friends', 'accepted', 'friend'].includes(s.status)) {
+          mappedStatus = 'ACCEPTED';
+        } else if (s.status) {
+          mappedStatus = s.status.toUpperCase();
+        }
+        
+        setFriendshipStatus(mappedStatus);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      if (!profile) Alert.alert('Lỗi', 'Không thể tải thông tin người dùng');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, user, isMeRoute, isPhoneLike, profile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isMeRoute && user) {
+        loadUserProfile();
+      } else if (id && id !== 'me') {
+        loadUserProfile();
+      }
+    }, [id, user, isMeRoute, loadUserProfile])
+  );
+
+  const handleSendFriendRequest = async () => {
+    if (!profile?.id) return;
+    
+    const previousStatus = friendshipStatus;
+    try {
+      setFriendshipStatus('PENDING_SENT'); // Optimistic update
+      setSendingRequest(true);
+      await sendFriendRequest(parseInt(profile.id));
+      Alert.alert('Thành công', 'Đã gửi lời mời kết bạn');
+    } catch (error) {
+      setFriendshipStatus(previousStatus); // Rollback
+      console.error('Error sending friend request:', error);
+      Alert.alert('Lỗi', 'Không thể gửi lời mời kết bạn. Vui lòng thử lại sau.');
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const handleCancelFriendRequest = async () => {
+    if (!profile?.id) return;
+    
+    const previousStatus = friendshipStatus;
+    try {
+      setFriendshipStatus('NONE'); // Optimistic update
+      setSendingRequest(true);
+      await cancelFriendRequest(parseInt(profile.id));
+      Alert.alert('Thành công', ' Đã hủy yêu cầu kết bạn');
+    } catch (error) {
+      setFriendshipStatus(previousStatus); // Rollback
+      console.error('Error canceling friend request:', error);
+      Alert.alert('Lỗi', 'Không thể hủy yêu cầu kết bạn. Vui lòng thử lại sau.');
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const handleAcceptFriendRequest = async () => {
+    if (!profile?.id) return;
+    
+    const previousStatus = friendshipStatus;
+    try {
+      setFriendshipStatus('ACCEPTED'); // Optimistic update
+      setSendingRequest(true);
+      await acceptFriendRequest(parseInt(profile.id));
+      Alert.alert('Thành công', 'Đã chấp nhận lời mời kết bạn');
+    } catch (error) {
+      setFriendshipStatus(previousStatus); // Rollback
+      console.error('Error accepting friend request:', error);
+      Alert.alert('Lỗi', 'Không thể chấp nhận lời mời. Vui lòng thử lại sau.');
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const handleRejectFriendRequest = async () => {
+    if (!profile?.id) return;
+    
+    const previousStatus = friendshipStatus;
+    try {
+      setFriendshipStatus('NONE'); // Optimistic update
+      setSendingRequest(true);
+      await rejectFriendRequest(parseInt(profile.id));
+      Alert.alert('Thành công', 'Đã từ chối lời mời kết bạn');
+    } catch (error) {
+      setFriendshipStatus(previousStatus); // Rollback
+      console.error('Error rejecting friend request:', error);
+      Alert.alert('Lỗi', 'Không thể từ chối lời mời. Vui lòng thử lại sau.');
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
   const isStranger = !profile && isPhoneLike;
 
-  const initials = profile?.initials ?? (profile?.name ? profile.name.split(' ').map(n => n[0]).slice(0,2).join('') : (id ? id.slice(-2).toUpperCase() : 'U'));
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View>
         <TouchableOpacity activeOpacity={0.9} onPress={() => {
-          if (isMeRoute && user?.coverImage) {
-            setImageViewerUri(`${API_BASE_URL}${user.coverImage}`);
+          if (coverUrl) {
+            setImageViewerUri(coverUrl);
           }
         }}>
           <ImageBackground
-            source={isMeRoute && user?.coverImage
-              ? { uri: `${API_BASE_URL}${user.coverImage}` }
-              : undefined
-            }
-            style={{ height: 220, backgroundColor: '#2563EB' }}
+            source={coverUrl ? { uri: coverUrl } : undefined}
+            style={{ height: COVER_IMAGE_HEIGHT, backgroundColor: '#2563EB' }}
           />
         </TouchableOpacity>
 
@@ -64,19 +234,19 @@ export default function UserProfile() {
         />
 
         {/* Spacer to reserve header height so content isn't hidden under absolute header */}
-        <View style={{ height: 56 + insets.top }} />
+        <View style={{ height: HEADER_HEIGHT + insets.top }} />
 
         {/* Avatar + name (raise avatar above cover) */}
         <View style={{ alignItems: 'center', marginTop: -120 - insets.top }}>
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => isMeRoute && user?.avatar && setImageViewerUri(`${API_BASE_URL}${user.avatar}`)}
-            style={{ width: 92, height: 92, borderRadius: 46, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.background, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 }}
+            onPress={() => avatarUrl && setImageViewerUri(avatarUrl)}
+            style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_RADIUS, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.background, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: HEADER_ELEVATION }}
           >
-            {isMeRoute && user?.avatar ? (
+            {avatarUrl ? (
               <Image
-                source={{ uri: `${API_BASE_URL}${user.avatar}` }}
-                style={{ width: 86, height: 86, borderRadius: 43 }}
+                source={{ uri: avatarUrl }}
+                style={{ width: AVATAR_IMAGE_SIZE, height: AVATAR_IMAGE_SIZE, borderRadius: AVATAR_IMAGE_RADIUS }}
               />
             ) : (
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 26 }}>{initials}</Text>
@@ -91,7 +261,7 @@ export default function UserProfile() {
 
         <View style={{ alignItems: 'center', padding: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>{profile?.name ?? (isStranger ? 'Người dùng' : 'Không xác định')}</Text>
+            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>{profile?.fullName ?? (isStranger ? 'Người dùng' : 'Không xác định')}</Text>
           </View>
 
           {/* Bio: show under phone number (me or profile) */}
@@ -110,19 +280,69 @@ export default function UserProfile() {
 
         {/* Actions */}
         <View style={{ padding: 12 }}>
-          {isFriend ? (
+          {isMeRoute ? null : friendshipStatus === 'ACCEPTED' ? (
             <View style={{ alignItems: 'center', marginBottom: 6 }}>
               <TouchableOpacity style={{ backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 22 }} onPress={() => router.push(`/chat/${profile?.id}`)}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Nhắn tin</Text>
               </TouchableOpacity>
             </View>
-          ) : isStranger ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-              <TouchableOpacity style={{ backgroundColor: colors.surfaceVariant, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 22, marginRight: 12 }}>
-                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>Nhắn tin</Text>
+          ) : friendshipStatus === 'NONE' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <TouchableOpacity 
+                style={{ backgroundColor: '#2563EB', paddingVertical: 12, borderRadius: 22, flex: 1, alignItems: 'center' }} 
+                onPress={() => router.push(`/chat/${profile?.id}`)}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Nhắn tin</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={{ backgroundColor: '#2563EB', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 22 }}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Kết bạn</Text>
+              <TouchableOpacity 
+                disabled={sendingRequest}
+                onPress={handleSendFriendRequest}
+                style={{ backgroundColor: sendingRequest ? '#9CA3AF' : colors.surfaceVariant, paddingVertical: 12, borderRadius: 22, flex: 1, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>{sendingRequest ? 'Đang gửi...' : 'Kết bạn'}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : friendshipStatus === 'PENDING_SENT' ? (
+            <View style={{ alignItems: 'center' }}>
+              <TouchableOpacity
+                disabled={sendingRequest}
+                onPress={handleCancelFriendRequest}
+                style={{ backgroundColor: colors.surfaceVariant, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, marginBottom: 12 }}
+              >
+                <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>
+                  {sendingRequest ? 'Đang xử lý...' : 'Đã gửi lời mời'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={{ backgroundColor: '#2563EB', paddingHorizontal: 32, paddingVertical: 10, borderRadius: 22 }} 
+                onPress={() => router.push(`/chat/${profile?.id}`)}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Nhắn tin</Text>
+              </TouchableOpacity>
+            </View>
+          ) : friendshipStatus === 'PENDING_RECEIVED' ? (
+            <View style={{ alignItems: 'center', marginBottom: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
+                <TouchableOpacity 
+                  disabled={sendingRequest}
+                  onPress={handleAcceptFriendRequest}
+                  style={{ backgroundColor: '#10B981', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center' }}>Đồng ý</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  disabled={sendingRequest}
+                  onPress={handleRejectFriendRequest}
+                  style={{ backgroundColor: colors.surfaceVariant, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 }}
+                >
+                  <Text style={{ color: colors.textSecondary, fontWeight: '700', textAlign: 'center' }}>Từ chối</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity 
+                style={{ backgroundColor: '#2563EB', paddingHorizontal: 32, paddingVertical: 10, borderRadius: 22 }} 
+                onPress={() => router.push(`/chat/${profile?.id}`)}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Nhắn tin</Text>
               </TouchableOpacity>
             </View>
           ) : null}

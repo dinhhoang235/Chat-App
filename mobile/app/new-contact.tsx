@@ -1,12 +1,69 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Header } from "../components/Header";
 import { useTheme } from "../context/themeContext";
 import { MaterialIcons } from '@expo/vector-icons';
+import { userAPI } from '../services/user';
 
 export default function NewContact() {
   const { colors } = useTheme();
+  const router = useRouter();
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSearchContact = async () => {
+    if (!phoneNumber.trim()) {
+      Alert.alert('Vui lòng nhập số điện thoại');
+      return;
+    }
+    
+    // Normalize phone number: remove leading 0 if present, allow both formats
+    const normalizedPhone = phoneNumber.startsWith('0') 
+      ? phoneNumber.substring(1) 
+      : phoneNumber;
+    
+    if (!normalizedPhone.trim()) {
+      Alert.alert('Vui lòng nhập số điện thoại');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Get all users and find by phone number
+      const users = await userAPI.getAllUsers();
+      
+      // Search for user with matching phone (handle both formats)
+      const user = users.find((u: any) => {
+        const userPhone = u.phone.startsWith('0') 
+          ? u.phone.substring(1) 
+          : u.phone;
+        return userPhone === normalizedPhone || u.phone === phoneNumber;
+      });
+      
+      if (!user) {
+        Alert.alert(
+          'Không tìm thấy tài khoản',
+          'Số điện thoại này chưa được đăng ký hoặc không có trong danh bạ.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      router.push(`/profile/${user.id}`);
+    } catch (error) {
+      Alert.alert(
+        'Lỗi',
+        'Không thể tìm kiếm. Vui lòng thử lại sau.',
+        [{ text: 'OK' }]
+      );
+      console.error('Search error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -35,11 +92,21 @@ export default function NewContact() {
             placeholder="Nhập số điện thoại"
             placeholderTextColor={colors.textSecondary}
             keyboardType="phone-pad"
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
             style={{ flex: 1, backgroundColor: colors.surface, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 8, color: colors.text }}
           />
 
-          <TouchableOpacity style={{ marginLeft: 8, padding: 12, backgroundColor: '#2563EB', borderRadius: 8 }}>
-            <MaterialIcons name="arrow-forward" size={20} color="#fff" />
+          <TouchableOpacity 
+            onPress={handleSearchContact}
+            disabled={!phoneNumber.trim() || loading}
+            style={{ marginLeft: 8, padding: 12, backgroundColor: (phoneNumber.trim() && !loading) ? '#2563EB' : '#9CA3AF', borderRadius: 8 }}
+          >
+            {loading ? (
+              <ActivityIndicator size={20} color="#fff" />
+            ) : (
+              <MaterialIcons name="arrow-forward" size={20} color="#fff" />
+            )}
           </TouchableOpacity>
         </View>
 

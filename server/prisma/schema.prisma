@@ -22,6 +22,44 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Friend relationships
+  sentFriendRequests     FriendRequest[] @relation("sentRequests")
+  receivedFriendRequests FriendRequest[] @relation("receivedRequests")
+  
+  friends                Friendship[] @relation("userFriends")
+  friendOf               Friendship[] @relation("friendOf")
+
   @@map("users")
+}
+
+model FriendRequest {
+  id        Int     @id @default(autoincrement())
+  senderId  Int
+  sender    User    @relation("sentRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  
+  receiverId Int
+  receiver   User    @relation("receivedRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  status    String  @default("pending") // pending, accepted, rejected
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([senderId, receiverId]) // Một user chỉ có thể gửi 1 lời mời cho user khác
+  @@map("friend_requests")
+}
+
+model Friendship {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  user      User    @relation("userFriends", fields: [userId], references: [id], onDelete: Cascade)
+  
+  friendId  Int
+  friend    User    @relation("friendOf", fields: [friendId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, friendId])
+  @@map("friendships")
 }
 

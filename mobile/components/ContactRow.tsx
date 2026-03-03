@@ -1,12 +1,21 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/themeContext';
-import type { Contact } from '../constants/mockData';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+export interface ContactItem {
+  id: number | string;
+  fullName: string;
+  phone: string;
+  avatar?: string;
+  bio?: string;
+}
 
 type Props = {
-  contact: Contact;
+  contact: ContactItem;
   onPress?: () => void;
   onCall?: () => void;
   onVideo?: () => void;
@@ -16,19 +25,26 @@ export function ContactRow({ contact, onPress, onCall, onVideo }: Props) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const iconColor = colors.icon;
-  const initials = contact.initials ?? contact.name.split(' ').map(n => n[0]).slice(0, 2).join('');
+  const initials = contact.fullName.split(' ').map(n => n[0]).slice(0, 2).join('');
 
   return (
     <TouchableOpacity onPress={onPress} className="px-4 py-3 flex-row items-center" style={{ paddingRight: 0 }}>
       <View className="flex-row items-center">
-        <View
-          style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: contact.color || '#6B7280' }}
-        >
-          <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
-        </View>
+        {contact.avatar ? (
+          <Image
+            source={{ uri: `${API_BASE_URL}${contact.avatar}` }}
+            style={{ width: 48, height: 48, borderRadius: 24 }}
+          />
+        ) : (
+          <View
+            style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6B7280' }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+          </View>
+        )}
 
         <View style={{ marginLeft: 12, flex: 1 }}>
-          <Text style={{ color: colors.text, fontSize: 16 }}>{contact.name}</Text>
+          <Text style={{ color: colors.text, fontSize: 16 }}>{contact.fullName}</Text>
           {contact.phone ? (
             <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{contact.phone}</Text>
           ) : null}

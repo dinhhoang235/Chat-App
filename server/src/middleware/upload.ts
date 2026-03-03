@@ -1,8 +1,16 @@
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Ensure directories exist
+const ensureUploadDir = (uploadDir: string) => {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+};
 
 // Configure multer storage
 const storage = multer.diskStorage({
@@ -10,6 +18,8 @@ const storage = multer.diskStorage({
     const uploadDir = path.join(__dirname, '../../media', 
       file.fieldname === 'avatar' ? 'avatars' : 'covers'
     );
+    // Ensure directory exists before writing
+    ensureUploadDir(uploadDir);
     cb(null, uploadDir);
   },
   filename: (req, _file, cb) => {

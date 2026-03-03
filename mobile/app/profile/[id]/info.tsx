@@ -1,13 +1,14 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../context/themeContext';
 import { Header } from '../../../components/Header';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { contacts } from '../../../constants/mockData';
 import { useAuth } from '../../../context/authContext';
 import ProfileEditModal from '../../../components/ProfileEditModal';
+import { userAPI } from '../../../services/user';
+import type { User } from '../../../services/friendship';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -17,26 +18,57 @@ export default function ProfileInfo() {
   const router = useRouter();
   const { user } = useAuth();
   const id = (params as any).id as string;
+  const [profile, setProfile] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const profile = contacts.find((c) => c.id === id) || { name: 'Người dùng' } as any;
   const isMeRoute = id === 'me';
-  const isOwn = isMeRoute || (profile?.phone && user?.phone && profile.phone === user.phone);
 
-  // use account info when viewing "me"
+  const loadProfile = useCallback(async () => {
+    try {
+      setLoading(true);
+      const userId = isMeRoute && user ? user.id : parseInt(id);
+      const userData = await userAPI.getUserById(userId);
+      setProfile(userData);
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, user, isMeRoute]);
+
+  useEffect(() => {
+    if (isMeRoute && user) {
+      loadProfile();
+    } else if (id && id !== 'me') {
+      loadProfile();
+    }
+  }, [id, user, isMeRoute, loadProfile]);
+
   const formatDate = (iso?: string | null) => {
     if (!iso) return undefined;
     const d = new Date(iso);
     return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
   };
 
-  const displayProfile = isMeRoute && user ? {
-    name: user.fullName,
-    phone: user.phone,
-    initials: user.fullName?.split(' ').map((n: string) => n[0]).slice(0,2).join('').toUpperCase(),
-    gender: user.gender ?? undefined,
-    dob: formatDate(user.dateOfBirth),
-  } : profile;
+  const displayProfile = {
+    name: profile?.fullName || 'Người dùng',
+    phone: profile?.phone || '',
+    initials: profile?.fullName?.split(' ').map((n: string) => n[0]).slice(0,2).join('').toUpperCase() || 'U',
+    gender: profile?.gender ?? undefined,
+    dob: formatDate(profile?.dateOfBirth),
+    avatar: profile?.avatar,
+  };
+
+  const isOwn = isMeRoute || (profile?.phone && user?.phone && profile.phone === user.phone);
   const [editVisible, setEditVisible] = React.useState(false);
+
+  if (loading) {
+    return (
+      <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.tint} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
@@ -45,13 +77,13 @@ export default function ProfileInfo() {
       <View style={{ padding: 16 }}>
         <View style={{ alignItems: 'center', marginBottom: 12 }}>
           <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-            {isMeRoute && user?.avatar ? (
+            {displayProfile.avatar ? (
               <Image
-                source={{ uri: `${API_BASE_URL}${user.avatar}` }}
+                source={{ uri: `${API_BASE_URL}${displayProfile.avatar}` }}
                 style={{ width: 88, height: 88, borderRadius: 44 }}
               />
             ) : (
-              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 28 }}>{(displayProfile.initials || displayProfile.name?.slice(0,2) || 'U').toUpperCase()}</Text>
+              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 28 }}>{displayProfile.initials}</Text>
             )}
           </View>
           <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>{displayProfile.name}</Text>

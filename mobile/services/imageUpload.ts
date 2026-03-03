@@ -1,4 +1,4 @@
-import * as ImageManipulator from 'expo-image-manipulator';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import apiClient from './api';
 
 export type ImageType = 'avatar' | 'cover';
@@ -13,13 +13,16 @@ export const compressImage = async (imageUri: string, type: ImageType) => {
   try {
     const isAvatar = type === 'avatar';
 
-    const compressed = await ImageManipulator.manipulateAsync(
-      imageUri,
-      // Only resize by width to preserve aspect ratio and avoid distortion
-      [{ resize: { width: isAvatar ? 600 : 1440 } }],
-      { compress: isAvatar ? 0.92 : 0.95, format: ImageManipulator.SaveFormat.JPEG }
-    );
-    return compressed.uri;
+    const imageRef = await ImageManipulator.manipulate(imageUri)
+      .resize({ width: isAvatar ? 600 : 1440 })
+      .renderAsync();
+
+    const result = await imageRef.saveAsync({
+      compress: isAvatar ? 0.92 : 0.95,
+      format: SaveFormat.JPEG,
+    });
+
+    return result.uri;
   } catch (error) {
     console.warn('Image compression failed, using original:', error);
     return imageUri;

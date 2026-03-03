@@ -15,6 +15,7 @@ model User {
   password      String
   fullName      String
   avatar        String?
+  coverImage    String?
   bio           String?
   gender        String?
   dateOfBirth   DateTime?

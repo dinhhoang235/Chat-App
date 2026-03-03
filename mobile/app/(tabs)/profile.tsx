@@ -1,10 +1,12 @@
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, Image } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../context/authContext";
 import { Header } from "../../components/Header";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "../../context/themeContext";
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const items = [
   { title: 'Tài khoản và bảo mật', subtitle: 'Cài đặt mật khẩu, 2 bước xác thực', icon: 'security', href: '/settings/account' },
@@ -40,7 +42,14 @@ export default function Profile() {
           {user && (
             <TouchableOpacity onPress={() => router.push('/profile/me')} className="flex-row items-center" style={{ padding: 12, backgroundColor: colors.card }}>
               <View style={{ width: 56, height: 56, backgroundColor: colors.tint, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
-                <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>{user.fullName.charAt(0).toUpperCase()}</Text>
+                {user.avatar ? (
+                  <Image
+                    source={{ uri: `${API_BASE_URL}${user.avatar}` }}
+                    style={{ width: 56, height: 56, borderRadius: 28 }}
+                  />
+                ) : (
+                  <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>{user.fullName.charAt(0).toUpperCase()}</Text>
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: colors.text, fontWeight: '600' }}>{user.fullName}</Text>

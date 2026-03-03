@@ -29,6 +29,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    volumes:
+      - ./media:/app/media
 
   mysql:
     image: mysql:8.0

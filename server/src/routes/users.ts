@@ -9,6 +9,7 @@ import {
   updateUser,
   deleteUser
 } from '../controllers/userController.js';
+import { upload } from '../middleware/upload.js';
 
 const router = Router();
 
@@ -21,8 +22,8 @@ router.post('/refresh', refreshToken);
 router.get('/', getAllUsers);
 router.get('/:id', getUserById);
 router.post('/', createUser);
-router.patch('/:id', updateUser);
-router.put('/:id', updateUser);
+router.patch('/:id', upload.any(), updateUser);
+router.put('/:id', upload.any(), updateUser);
 router.delete('/:id', deleteUser);
 
 export default router;

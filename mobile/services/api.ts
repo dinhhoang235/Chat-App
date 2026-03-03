@@ -5,10 +5,8 @@ const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL}/api`;
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 30000 // 30s timeout for all requests (file uploads need time)
+  // Don't set default Content-Type header - let browser/axios decide based on request
 });
 
 // Flag to prevent multiple refresh token requests
@@ -27,6 +25,12 @@ apiClient.interceptors.request.use(
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
+    
+    // Set Content-Type for non-FormData requests
+    if (!(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json';
+    }
+    
     return config;
   },
   (error) => {

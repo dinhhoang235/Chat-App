@@ -4,11 +4,11 @@ import { tokenStorage } from "../utils/tokenStorage";
 
 interface AuthContextType {
   isLoggedIn: boolean;
-  user: { id: number; phone: string; fullName: string; avatar?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null } | null;
+  user: { id: number; phone: string; fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null } | null;
   login: (phone: string, password: string) => Promise<boolean>;
   signup: (phone: string, fullName: string, password: string) => Promise<boolean>;
   logout: () => void;
-  updateProfile: (data: Partial<{ fullName: string; avatar?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null }>) => void;
+  updateProfile: (data: Partial<{ fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null }>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,7 +17,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState<{ id: number; phone: string; fullName: string; avatar?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null } | null>(
+  const [user, setUser] = useState<{ id: number; phone: string; fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null } | null>(
     null
   );
 
@@ -57,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const updateProfile = (data: Partial<{ fullName: string; avatar?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null }>) => {
+  const updateProfile = (data: Partial<{ fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null }>) => {
     setUser((prev) => {
       if (!prev) return prev;
       return { ...prev, ...data };

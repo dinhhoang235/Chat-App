@@ -39,7 +39,7 @@ docker compose logs -f        # Xem logs
 
 # Database
 npx prisma generate           # Tạo lại Prisma Client (sau khi sửa schema)
-npx prisma db push            # Đồng bộ schema
+npx prisma migrate dev --name <migration_name>  # Tạo migration (thay <migration_name> bằng tên phù hợp)
 npx prisma studio             # Xem & chỉnh sửa data
 
 # Server
@@ -81,4 +81,47 @@ SELECT * FROM users;
 docker compose logs -f       # Xem logs
 docker compose restart       # Restart
 docker compose down -v       # Reset (mất dữ liệu)
+```
+
+## Hướng Dẫn Thêm Field Mới Vào Models
+
+**Bước 1: Sửa schema**
+```bash
+# Mở file prisma/schema.prisma và thêm field mới
+# Ví dụ: thêm field "role" vào User model
+```
+
+**Bước 2: Tạo migration**
+```bash
+npx prisma migrate dev --name <tên_migration>
+# Ví dụ: npx prisma migrate dev --name add_role_to_user
+```
+
+**Bước 3: Chọn khi được hỏi**
+- "Do you want to generate Prisma Client?" → Y
+
+**Nếu bị lỗi:**
+
+**Lỗi: Shadow database không được phép**
+```bash
+docker compose exec mysql mysql -u root -p'admin123' -e "GRANT ALL PRIVILEGES ON *.* TO 'chatuser'@'%'; FLUSH PRIVILEGES;"
+```
+
+**Lỗi: Drift detected (schema không sync)**
+```bash
+npx prisma migrate reset    # Reset database (mất dữ liệu)
+# hoặc
+npx prisma db push          # Push schema trực tiếp (không reset)
+```
+
+**Kiểm tra status migration**
+```bash
+npx prisma migrate status   # Xem trạng thái
+npx prisma studio          # Xem data trong bảng
+```
+
+**Tóm tắt nhanh:**
+```bash
+# Sửa schema.prisma → chạy:
+npx prisma migrate dev --name <tên>
 ```

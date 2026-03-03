@@ -10,6 +10,8 @@ import { Header } from '../../../components/Header';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { contacts } from '../../../constants/mockData';
+import * as ImagePickerLib from 'expo-image-picker';
+import { uploadImage } from '../../../services/imageUpload';
 
 function Row({ icon, title, subtitle, onPress, rightNode, showChevron = true }: any) {
   const { colors } = useTheme();
@@ -61,10 +63,64 @@ export default function ProfileOptions() {
     setImgPickerVisible(true);
   };
 
-  const handlePick = (action: 'take' | 'library' | 'zstyle' | 'choose-old') => {
+  const handlePick = async (action: 'take' | 'library' | 'zstyle' | 'choose-old') => {
     setImgPickerVisible(false);
-    // demo: replace with real flow (ImagePicker or upload)
-    Alert.alert('Chọn ảnh', `Loại: ${imgPickerType}, hành động: ${action}`);
+    try {
+      let result;
+      
+      if (action === 'take') {
+        const permission = await ImagePickerLib.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Quyền truy cập', 'Cần cấp phép truy cập camera');
+          return;
+        }
+        result = await ImagePickerLib.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: imgPickerType === 'avatar' ? [1, 1] : [16, 9],
+          quality: 1, // raw quality - compression handled by compressImage
+        });
+      } else if (action === 'library') {
+        const permission = await ImagePickerLib.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Quyền truy cập', 'Cần cấp phép truy cập thư viện ảnh');
+          return;
+        }
+        result = await ImagePickerLib.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: imgPickerType === 'avatar' ? [1, 1] : [16, 9],
+          quality: 1, // raw quality - compression handled by compressImage
+        });
+      }
+
+      if (!result?.canceled && result?.assets?.[0]) {
+        const imageUri = result.assets[0].uri;
+        
+        try {
+          // Upload image
+          const uploadResult = await uploadImage({ 
+            imageUri, 
+            type: imgPickerType, 
+            userId: auth.user!.id 
+          });
+          
+          Alert.alert('Thành công', `Cập nhật ${imgPickerType === 'avatar' ? 'ảnh đại diện' : 'ảnh bìa'} thành công`);
+          
+          // Update auth context with server-returned path
+          if (auth.updateProfile && uploadResult.data) {
+            const field = imgPickerType === 'avatar' ? 'avatar' : 'coverImage';
+            auth.updateProfile({ [field]: uploadResult.data[field] });
+          }
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          Alert.alert('Lỗi', 'Không thể tải ảnh lên. Vui lòng thử lại.');
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Lỗi', 'Không thể tải ảnh lên. Vui lòng thử lại.');
+    }
   };
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>

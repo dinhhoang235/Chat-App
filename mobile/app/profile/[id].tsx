@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ImageBackground, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ImageBackground, Alert, Image, Modal, StatusBar } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/themeContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -7,6 +7,9 @@ import { contacts } from '../../constants/mockData';
 import { useAuth } from '../../context/authContext';
 import { Header } from '../../components/Header';
 import ProfileBioModal from '../../components/ProfileBioModal';
+import { MaterialIcons } from '@expo/vector-icons';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function UserProfile() {
   const { colors } = useTheme();
@@ -16,6 +19,7 @@ export default function UserProfile() {
   const { user } = useAuth();
   const id = (params as any).id as string;
   const [bioVisible, setBioVisible] = React.useState(false);
+  const [imageViewerUri, setImageViewerUri] = React.useState<string | null>(null);
 
   // Support special 'me' route which shows the logged-in user's profile
   const isMeRoute = id === 'me';
@@ -36,7 +40,19 @@ export default function UserProfile() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <View>
-        <ImageBackground source={{ uri: 'https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=1200&q=60' }} style={{ height: 220, backgroundColor: '#111' }} />
+        <TouchableOpacity activeOpacity={0.9} onPress={() => {
+          if (isMeRoute && user?.coverImage) {
+            setImageViewerUri(`${API_BASE_URL}${user.coverImage}`);
+          }
+        }}>
+          <ImageBackground
+            source={isMeRoute && user?.coverImage
+              ? { uri: `${API_BASE_URL}${user.coverImage}` }
+              : undefined
+            }
+            style={{ height: 220, backgroundColor: '#2563EB' }}
+          />
+        </TouchableOpacity>
 
         <Header
           transparent
@@ -52,14 +68,25 @@ export default function UserProfile() {
 
         {/* Avatar + name (raise avatar above cover) */}
         <View style={{ alignItems: 'center', marginTop: -120 - insets.top }}>
-          <View style={{ width: 92, height: 92, borderRadius: 46, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.background, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 }}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 26 }}>{initials}</Text>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => isMeRoute && user?.avatar && setImageViewerUri(`${API_BASE_URL}${user.avatar}`)}
+            style={{ width: 92, height: 92, borderRadius: 46, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.background, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 }}
+          >
+            {isMeRoute && user?.avatar ? (
+              <Image
+                source={{ uri: `${API_BASE_URL}${user.avatar}` }}
+                style={{ width: 86, height: 86, borderRadius: 43 }}
+              />
+            ) : (
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 26 }}>{initials}</Text>
+            )}
 
             {/* small online dot */}
             {profile?.online ? (
               <View style={{ position: 'absolute', right: -6, top: 8, backgroundColor: '#10B981', width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.background }} />
             ) : null}
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={{ alignItems: 'center', padding: 12 }}>
@@ -111,6 +138,26 @@ export default function UserProfile() {
           Alert.alert('Thành công', 'Cập nhật bio thành công');
         }}
       />
+
+      {/* Fullscreen image viewer */}
+      <Modal visible={!!imageViewerUri} transparent animationType="fade" statusBarTranslucent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' }}>
+          <StatusBar hidden />
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 48, right: 20, zIndex: 10, padding: 8 }}
+            onPress={() => setImageViewerUri(null)}
+          >
+            <MaterialIcons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {imageViewerUri && (
+            <Image
+              source={{ uri: imageViewerUri }}
+              style={{ width: '100%', height: '80%' }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

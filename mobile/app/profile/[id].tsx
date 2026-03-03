@@ -135,7 +135,7 @@ export default function UserProfile() {
     try {
       setFriendshipStatus('PENDING_SENT'); // Optimistic update
       setSendingRequest(true);
-      await sendFriendRequest(parseInt(profile.id));
+      await sendFriendRequest(Number(profile.id));
       Alert.alert('Thành công', 'Đã gửi lời mời kết bạn');
     } catch (error) {
       setFriendshipStatus(previousStatus); // Rollback
@@ -153,7 +153,7 @@ export default function UserProfile() {
     try {
       setFriendshipStatus('NONE'); // Optimistic update
       setSendingRequest(true);
-      await cancelFriendRequest(parseInt(profile.id));
+      await cancelFriendRequest(Number(profile.id));
       Alert.alert('Thành công', ' Đã hủy yêu cầu kết bạn');
     } catch (error) {
       setFriendshipStatus(previousStatus); // Rollback
@@ -171,7 +171,7 @@ export default function UserProfile() {
     try {
       setFriendshipStatus('ACCEPTED'); // Optimistic update
       setSendingRequest(true);
-      await acceptFriendRequest(parseInt(profile.id));
+      await acceptFriendRequest(Number(profile.id));
       Alert.alert('Thành công', 'Đã chấp nhận lời mời kết bạn');
     } catch (error) {
       setFriendshipStatus(previousStatus); // Rollback
@@ -189,7 +189,7 @@ export default function UserProfile() {
     try {
       setFriendshipStatus('NONE'); // Optimistic update
       setSendingRequest(true);
-      await rejectFriendRequest(parseInt(profile.id));
+      await rejectFriendRequest(Number(profile.id));
       Alert.alert('Thành công', 'Đã từ chối lời mời kết bạn');
     } catch (error) {
       setFriendshipStatus(previousStatus); // Rollback

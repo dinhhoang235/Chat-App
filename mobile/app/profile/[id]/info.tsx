@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../context/themeContext';
 import { Header } from '../../../components/Header';
@@ -8,6 +8,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { contacts } from '../../../constants/mockData';
 import { useAuth } from '../../../context/authContext';
 import ProfileEditModal from '../../../components/ProfileEditModal';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function ProfileInfo() {
   const { colors } = useTheme();
@@ -43,7 +45,14 @@ export default function ProfileInfo() {
       <View style={{ padding: 16 }}>
         <View style={{ alignItems: 'center', marginBottom: 12 }}>
           <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 28 }}>{(displayProfile.initials || displayProfile.name?.slice(0,2) || 'U').toUpperCase()}</Text>
+            {isMeRoute && user?.avatar ? (
+              <Image
+                source={{ uri: `${API_BASE_URL}${user.avatar}` }}
+                style={{ width: 88, height: 88, borderRadius: 44 }}
+              />
+            ) : (
+              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 28 }}>{(displayProfile.initials || displayProfile.name?.slice(0,2) || 'U').toUpperCase()}</Text>
+            )}
           </View>
           <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>{displayProfile.name}</Text>
         </View>

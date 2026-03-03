@@ -1,11 +1,13 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Header } from "../../components/Header";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "../../context/themeContext";
 import { useAuth } from "../../context/authContext";
 import { useRouter } from "expo-router";
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function SwitchAccount() {
   const { scheme, colors } = useTheme();
@@ -30,7 +32,14 @@ export default function SwitchAccount() {
               <View className="flex-row items-center">
                 <View style={{ position: 'relative' }} className="mr-4">
                   <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.surface }}>
-                    <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{user.fullName.charAt(0).toUpperCase()}</Text>
+                    {user?.avatar ? (
+                      <Image
+                        source={{ uri: `${API_BASE_URL}${user.avatar}` }}
+                        style={{ width: 48, height: 48, borderRadius: 24 }}
+                      />
+                    ) : (
+                      <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{user.fullName.charAt(0).toUpperCase()}</Text>
+                    )}
                   </View>
                   <View style={{ position: 'absolute', right: -6, top: -6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success, borderWidth: 2, borderColor: '#fff' }}>
                     <MaterialIcons name="check" size={14} color="#fff" />

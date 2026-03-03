@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Switch, ScrollView, Alert } from "react-native";
+import { View, Text, TouchableOpacity, Switch, ScrollView, Alert, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Header } from "../../components/Header";
 import { useTheme } from "../../context/themeContext";
@@ -7,6 +7,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useAuth } from "../../context/authContext";
 import { useRouter } from 'expo-router';
 import MyQrModal from '../../components/MyQrModal';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function AccountSettings() {
   const theme = useTheme();
@@ -26,7 +28,14 @@ export default function AccountSettings() {
         <TouchableOpacity onPress={() => router.push('/profile/me/info')} className={`${theme.scheme === 'dark' ? 'bg-background-dark' : 'bg-white'} rounded-lg px-4 py-3 flex-row items-center justify-between border ${theme.scheme === 'dark' ? 'border-gray-800' : 'border-gray-200'} mb-4`}>
           <View className="flex-row items-center">
             <View className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-800 items-center justify-center mr-4 overflow-hidden">
-              <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-bold text-lg`}>{user ? user.fullName.charAt(0).toUpperCase() : 'U'}</Text>
+              {user?.avatar ? (
+                <Image
+                  source={{ uri: `${API_BASE_URL}${user.avatar}` }}
+                  style={{ width: 56, height: 56, borderRadius: 28 }}
+                />
+              ) : (
+                <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-bold text-lg`}>{user ? user.fullName.charAt(0).toUpperCase() : 'U'}</Text>
+              )}
             </View>
             <View>
               <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-semibold`}>{user ? user.fullName : 'Tên người dùng'}</Text>

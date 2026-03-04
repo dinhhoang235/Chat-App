@@ -27,4 +27,24 @@ export const userAPI = {
     });
     return response.data;
   },
+
+  getSearchHistoryDB: async () => {
+    const response = await apiClient.get('/users/search/history');
+    return response.data;
+  },
+
+  saveSearchHistoryDB: async (searchedUserId: number) => {
+    const response = await apiClient.post('/users/search/history', { searchedUserId });
+    return response.data;
+  },
+
+  removeSearchHistoryDB: async (searchedUserId: number) => {
+    const response = await apiClient.post('/users/search/history/remove', { searchedUserId });
+    return response.data;
+  },
+
+  clearSearchHistoryDB: async () => {
+    const response = await apiClient.post('/users/search/history/clear');
+    return response.data;
+  },
 };

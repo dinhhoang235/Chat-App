@@ -36,6 +36,11 @@ export default function SearchBar({ value, onChange, onSubmit, onBack, onQR, col
               spellCheck={false}
             />
 
+            {value.length > 0 && (
+              <TouchableOpacity onPress={() => onChange('')} style={{ padding: 4 }}>
+                <MaterialIcons name="cancel" color={colors.textSecondary} size={18} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 

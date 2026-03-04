@@ -2,6 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { tokenStorage } from '../utils/tokenStorage';
 
 const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL}/api`;
+export const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

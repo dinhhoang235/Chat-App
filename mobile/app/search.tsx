@@ -26,8 +26,7 @@ export default function GlobalSearch() {
     const { colors } = useTheme();
     const router = useRouter();
     const [query, setQuery] = useState('');
-    const [history, setHistory] = useState<string[]>([]);
-    const HISTORY_KEY = '@search_history';
+    const [history, setHistory] = useState<any[]>([]);
 
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -37,6 +36,53 @@ export default function GlobalSearch() {
     useEffect(() => {
         loadHistory();
     }, []);
+
+    const loadHistory = async () => {
+        try {
+            const response = await userAPI.getSearchHistoryDB();
+            if (response.success) {
+                setHistory(response.data);
+            }
+        } catch (e) {
+            console.error('Failed to load search history from DB', e);
+        }
+    };
+
+    const removeHistoryItem = async (searchedUserId: number) => {
+        // Optimistic UI: Xóa ngay trên giao diện trước khi đợi server phản hồi
+        const previousHistory = [...history];
+        setHistory((prev) => prev.filter((x) => x.id !== searchedUserId));
+
+        try {
+            await userAPI.removeSearchHistoryDB(searchedUserId);
+        } catch (e) {
+            // Nếu lỗi thì hoàn tác lại danh sách cũ
+            setHistory(previousHistory);
+            console.error('Failed to remove history item', e);
+        }
+    };
+
+    const clearHistory = async () => {
+        const previousHistory = [...history];
+        setHistory([]);
+
+        try {
+            await userAPI.clearSearchHistoryDB();
+        } catch (e) {
+            setHistory(previousHistory);
+            console.error('Failed to clear history', e);
+        }
+    };
+
+    const handleOpenProfile = async (id: string) => {
+        try {
+            // Không đợi API xong mới chuyển trang để tránh lag UI
+            userAPI.saveSearchHistoryDB(parseInt(id)).catch(e => {
+                console.error('Failed to save search history:', e);
+            });
+        } catch (e) {}
+        router.push(`/profile/${id}`);
+    };
 
     // Perform search when query changes
     useEffect(() => {
@@ -84,7 +130,9 @@ export default function GlobalSearch() {
     // Refresh search results when screen regains focus to update friendship status
     useFocusEffect(
         useCallback(() => {
-            if (query.trim()) {
+            if (!query.trim()) {
+                loadHistory();
+            } else {
                 const refreshResults = async () => {
                     try {
                         const response = await userAPI.searchUsers(query);
@@ -104,50 +152,6 @@ export default function GlobalSearch() {
             }
         }, [query])
     );
-
-    const loadHistory = async () => {
-        try {
-            const raw = await AsyncStorage.getItem(HISTORY_KEY);
-            if (raw) setHistory(JSON.parse(raw));
-        } catch (e) {
-            console.warn('Failed to load search history', e);
-        }
-    };
-
-    const saveHistory = async (arr: string[]) => {
-        try {
-            await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(arr));
-        } catch (e) {
-            console.warn('Failed to save search history', e);
-        }
-    };
-
-    const addToHistory = async (q: string) => {
-        const t = q.trim();
-        if (!t) return;
-        setHistory((prev) => {
-            const next = [t, ...prev.filter((x) => x !== t)].slice(0, 10);
-            saveHistory(next);
-            return next;
-        });
-    };
-
-    const removeHistoryItem = async (item: string) => {
-        setHistory((prev) => {
-            const next = prev.filter((x) => x !== item);
-            saveHistory(next);
-            return next;
-        });
-    };
-
-    const clearHistory = async () => {
-        setHistory([]);
-        try {
-            await AsyncStorage.removeItem(HISTORY_KEY);
-        } catch (e) {
-            console.warn('Failed to clear history', e);
-        }
-    };
 
     const contactResults = useMemo(() => {
         return searchResults.map((result) => ({
@@ -246,7 +250,7 @@ export default function GlobalSearch() {
             <SearchBar
                 value={query}
                 onChange={setQuery}
-                onSubmit={() => addToHistory(query)}
+                onSubmit={() => {}}
                 onBack={() => router.back()}
                 onQR={() => Alert.alert('Quét mã QR', 'Chức năng quét mã QR chưa được triển khai.')}
                 colors={colors}
@@ -257,7 +261,7 @@ export default function GlobalSearch() {
                     history.length > 0 ? (
                         <SearchHistory
                             history={history}
-                            onSelect={(h) => { setQuery(h); }}
+                            onSelect={(user) => { handleOpenProfile(String(user.id)); }}
                             onRemove={removeHistoryItem}
                             onClear={clearHistory}
                             colors={colors}
@@ -295,7 +299,7 @@ export default function GlobalSearch() {
                                 sentRequests={[]}
                                 searchResultsData={searchResults}
                                 onOpenChat={(id) => router.push(`/chat/${id}`)}
-                                onOpenProfile={(id) => router.push(`/profile/${id}`)}
+                                onOpenProfile={handleOpenProfile}
                                 onSendFriendRequest={(phone) => {
                                     const result = searchResults.find(r => r.phone === phone);
                                     if (result) {

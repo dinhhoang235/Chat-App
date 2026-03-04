@@ -29,7 +29,25 @@ model User {
   friends                Friendship[] @relation("userFriends")
   friendOf               Friendship[] @relation("friendOf")
 
+  searchHistory          SearchHistory[] @relation("userSearchHistory")
+  searchedBy             SearchHistory[] @relation("searchedByUser")
+
   @@map("users")
+}
+
+model SearchHistory {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation("userSearchHistory", fields: [userId], references: [id], onDelete: Cascade)
+  
+  searchedUserId Int
+  searchedUser   User     @relation("searchedByUser", fields: [searchedUserId], references: [id], onDelete: Cascade)
+  
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, searchedUserId])
+  @@map("search_history")
 }
 
 model FriendRequest {

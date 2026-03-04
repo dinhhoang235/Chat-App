@@ -1,13 +1,26 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../context/themeContext';
-import { contacts, messages } from '../constants/mockData';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SearchBar from '../components/SearchBar';
 import SearchHistory from '../components/SearchHistory';
 import ResultsList from '../components/ResultsList';
+import { userAPI } from '../services/user';
+import { sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '../services/friendship';
+
+type SearchResult = {
+  id: number;
+  phone: string;
+  fullName: string;
+  avatar?: string;
+  bio?: string;
+  isFriend: boolean;
+  source: 'friend' | 'stranger';
+  requestStatus?: 'pending' | 'accepted' | 'rejected' | null;
+  requestDirection?: 'sent' | 'received' | null;
+};
 
 export default function GlobalSearch() {
     const { colors } = useTheme();
@@ -16,13 +29,81 @@ export default function GlobalSearch() {
     const [history, setHistory] = useState<string[]>([]);
     const HISTORY_KEY = '@search_history';
 
-    const [sentRequests, setSentRequests] = useState<string[]>([]);
-    const SENT_KEY = '@sent_friend_requests';
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
+    const [searchCache, setSearchCache] = useState<Record<string, SearchResult[]>>({});
 
     useEffect(() => {
         loadHistory();
-        loadSentRequests();
     }, []);
+
+    // Perform search when query changes
+    useEffect(() => {
+        const performSearch = async () => {
+            if (!query.trim()) {
+                setSearchResults([]);
+                setSearchError(null);
+                return;
+            }
+
+            // Check cache first
+            const cacheKey = query.trim().toLowerCase();
+            if (searchCache[cacheKey]) {
+                setSearchResults(searchCache[cacheKey]);
+                setSearchError(null);
+                return;
+            }
+
+            setIsLoading(true);
+            setSearchError(null);
+
+            try {
+                const response = await userAPI.searchUsers(query);
+                const results = response.data || [];
+                setSearchResults(results);
+                
+                // Cache the results
+                setSearchCache((prev) => ({
+                    ...prev,
+                    [cacheKey]: results
+                }));
+            } catch (error) {
+                console.error('Search error:', error);
+                setSearchError('Không thể thực hiện tìm kiếm');
+                setSearchResults([]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        const debounceTimer = setTimeout(performSearch, 300);
+        return () => clearTimeout(debounceTimer);
+    }, [query, searchCache]);
+
+    // Refresh search results when screen regains focus to update friendship status
+    useFocusEffect(
+        useCallback(() => {
+            if (query.trim()) {
+                const refreshResults = async () => {
+                    try {
+                        const response = await userAPI.searchUsers(query);
+                        setSearchResults(response.data || []);
+                        
+                        // Update cache as well
+                        const cacheKey = query.trim().toLowerCase();
+                        setSearchCache((prev) => ({
+                            ...prev,
+                            [cacheKey]: response.data || []
+                        }));
+                    } catch (error) {
+                        console.error('Failed to refresh search results:', error);
+                    }
+                };
+                refreshResults();
+            }
+        }, [query])
+    );
 
     const loadHistory = async () => {
         try {
@@ -33,28 +114,11 @@ export default function GlobalSearch() {
         }
     };
 
-    const loadSentRequests = async () => {
-        try {
-            const raw = await AsyncStorage.getItem(SENT_KEY);
-            if (raw) setSentRequests(JSON.parse(raw));
-        } catch (e) {
-            console.warn('Failed to load sent friend requests', e);
-        }
-    };
-
     const saveHistory = async (arr: string[]) => {
         try {
             await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(arr));
         } catch (e) {
             console.warn('Failed to save search history', e);
-        }
-    };
-
-    const saveSentRequests = async (arr: string[]) => {
-        try {
-            await AsyncStorage.setItem(SENT_KEY, JSON.stringify(arr));
-        } catch (e) {
-            console.warn('Failed to save sent friend requests', e);
         }
     };
 
@@ -86,52 +150,94 @@ export default function GlobalSearch() {
     };
 
     const contactResults = useMemo(() => {
-        if (!query.trim()) return [];
-        const q = query.toLowerCase();
-        const normalizedDigits = query.replace(/\D/g, '');
-        const isPhoneQuery = normalizedDigits.length >= 3; // require at least 3 digits to avoid accidental matches
+        return searchResults.map((result) => ({
+            id: String(result.id),
+            name: result.fullName,
+            phone: result.phone,
+        }));
+    }, [searchResults]);
 
-        const results = contacts.filter((c) => {
-            const nameMatch = c.name.toLowerCase().includes(q);
-            const phone = (c.phone || '').replace(/\D/g, '');
-            const phoneMatch = isPhoneQuery && phone.includes(normalizedDigits);
-            return nameMatch || phoneMatch;
-        });
-
-        // prefer exact phone matches/phone matches first
-        results.sort((a, b) => {
-            const aPhone = (a.phone || '').replace(/\D/g, '');
-            const bPhone = (b.phone || '').replace(/\D/g, '');
-            const aPhoneMatch = isPhoneQuery && aPhone.includes(normalizedDigits) ? 1 : 0;
-            const bPhoneMatch = isPhoneQuery && bPhone.includes(normalizedDigits) ? 1 : 0;
-            return bPhoneMatch - aPhoneMatch;
-        });
-
-        return results;
-    }, [query]);
-
-    const messageResults = useMemo(() => {
-        if (!query.trim()) return [];
-        const q = query.toLowerCase();
-        return messages.filter((m) => (m.lastMessage || '').toLowerCase().includes(q));
-    }, [query]);
-
-    const sendFriendRequest = async (phone: string) => {
-        // Placeholder: in a real app this would call your backend API.
-        // For now show a confirmation Alert and mark the phone as requested (no navigation).
+    const handleSendFriendRequest = async (userId: number) => {
         try {
-            const normalized = phone.replace(/\D/g, '');
-            if (normalized) {
-                setSentRequests((prev) => {
-                    const next = [normalized, ...prev.filter((x) => x !== normalized)].slice(0, 50);
-                    saveSentRequests(next);
-                    return next;
-                });
-            }
+            setIsLoading(true);
+            await sendFriendRequest(userId);
+            
+            // Update searchResults to reflect pending status
+            setSearchResults((prev) => 
+                prev.map((result) => 
+                    result.id === userId ? { ...result, requestStatus: 'pending', requestDirection: 'sent' } : result
+                )
+            );
 
-            Alert.alert('Yêu cầu kết bạn', 'Yêu cầu kết bạn đã được gửi tới ' + phone);
-        } catch (e) {
-            console.warn('Failed to send friend request', e);
+            Alert.alert('Yêu cầu kết bạn', 'Yêu cầu kết bạn đã được gửi thành công');
+        } catch (error) {
+            console.error('Failed to send friend request:', error);
+            Alert.alert('Lỗi', 'Không thể gửi yêu cầu kết bạn');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleAcceptFriendRequest = async (userId: number) => {
+        try {
+            setIsLoading(true);
+            await acceptFriendRequest(userId);
+            
+            // Update searchResults to reflect accepted status
+            setSearchResults((prev) => 
+                prev.map((result) => 
+                    result.id === userId ? { ...result, isFriend: true, requestStatus: 'accepted' } : result
+                )
+            );
+
+            Alert.alert('Đã chấp nhận', 'Bạn đã chấp nhận yêu cầu kết bạn');
+        } catch (error) {
+            console.error('Failed to accept friend request:', error);
+            Alert.alert('Lỗi', 'Không thể chấp nhận yêu cầu kết bạn');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleRejectFriendRequest = async (userId: number) => {
+        try {
+            setIsLoading(true);
+            await rejectFriendRequest(userId);
+            
+            // Update searchResults to reflect rejected status
+            setSearchResults((prev) => 
+                prev.map((result) => 
+                    result.id === userId ? { ...result, requestStatus: 'rejected', requestDirection: null } : result
+                )
+            );
+
+            Alert.alert('Đã từ chối', 'Bạn đã từ chối yêu cầu kết bạn');
+        } catch (error) {
+            console.error('Failed to reject friend request:', error);
+            Alert.alert('Lỗi', 'Không thể từ chối yêu cầu kết bạn');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleCancelFriendRequest = async (userId: number) => {
+        try {
+            setIsLoading(true);
+            await cancelFriendRequest(userId);
+            
+            // Update searchResults to reflect cancelled status
+            setSearchResults((prev) => 
+                prev.map((result) => 
+                    result.id === userId ? { ...result, requestStatus: null, requestDirection: null } : result
+                )
+            );
+
+            Alert.alert('Đã hủy', 'Bạn đã hủy yêu cầu kết bạn');
+        } catch (error) {
+            console.error('Failed to cancel friend request:', error);
+            Alert.alert('Lỗi', 'Không thể hủy yêu cầu kết bạn');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -151,27 +257,58 @@ export default function GlobalSearch() {
                     history.length > 0 ? (
                         <SearchHistory
                             history={history}
-                            onSelect={(h) => { setQuery(h); addToHistory(h); }}
+                            onSelect={(h) => { setQuery(h); }}
                             onRemove={removeHistoryItem}
                             onClear={clearHistory}
                             colors={colors}
                         />
                     ) : (
                         <View style={{ alignItems: 'center', marginTop: 40 }}>
-                            <Text style={{ color: colors.textSecondary }}>Bắt đầu nhập để tìm kiếm trong danh bạ và tin nhắn</Text>
+                            <Text style={{ color: colors.textSecondary }}>Bắt đầu nhập để tìm kiếm bạn bè</Text>
                         </View>
                     )
                 ) : (
-                    <ResultsList
-                        contactResults={contactResults}
-                        messageResults={messageResults}
-                        query={query}
-                        sentRequests={sentRequests}
-                        onOpenChat={(id) => router.push(`/chat/${id}`)}
-                        onOpenProfile={(id) => router.push(`/profile/${id}`)}
-                        onSendFriendRequest={(phone) => sendFriendRequest(phone)}
-                        colors={colors}
-                    />
+                    <>
+                        {isLoading && (
+                            <View style={{ alignItems: 'center', marginTop: 20 }}>
+                                <Text style={{ color: colors.textSecondary }}>Đang tìm kiếm...</Text>
+                            </View>
+                        )}
+                        
+                        {searchError && (
+                            <View style={{ alignItems: 'center', marginTop: 20 }}>
+                                <Text style={{ color: '#ef4444' }}>{searchError}</Text>
+                            </View>
+                        )}
+
+                        {!isLoading && !searchError && contactResults.length === 0 && (
+                            <View style={{ alignItems: 'center', marginTop: 40 }}>
+                                <Text style={{ color: colors.textSecondary }}>Không tìm thấy kết quả</Text>
+                            </View>
+                        )}
+
+                        {!isLoading && !searchError && contactResults.length > 0 && (
+                            <ResultsList
+                                contactResults={contactResults}
+                                messageResults={[]}
+                                query={query}
+                                sentRequests={[]}
+                                searchResultsData={searchResults}
+                                onOpenChat={(id) => router.push(`/chat/${id}`)}
+                                onOpenProfile={(id) => router.push(`/profile/${id}`)}
+                                onSendFriendRequest={(phone) => {
+                                    const result = searchResults.find(r => r.phone === phone);
+                                    if (result) {
+                                        handleSendFriendRequest(result.id);
+                                    }
+                                }}
+                                onAcceptFriendRequest={handleAcceptFriendRequest}
+                                onRejectFriendRequest={handleRejectFriendRequest}
+                                onCancelFriendRequest={handleCancelFriendRequest}
+                                colors={colors}
+                            />
+                        )}
+                    </>
                 )}
             </View>
         </SafeAreaView>

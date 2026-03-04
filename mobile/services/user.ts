@@ -20,4 +20,11 @@ export const userAPI = {
     const response = await apiClient.delete(`/users/${id}`);
     return response.data;
   },
+
+  searchUsers: async (query: string) => {
+    const response = await apiClient.get('/users/search', {
+      params: { query }
+    });
+    return response.data;
+  },
 };

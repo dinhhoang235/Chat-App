@@ -37,9 +37,9 @@ export function ContactRow({ contact, onPress, onCall, onVideo }: Props) {
           />
         ) : (
           <View
-            style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6B7280' }}
+            style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}
           >
-            <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{initials.toUpperCase()}</Text>
           </View>
         )}
 

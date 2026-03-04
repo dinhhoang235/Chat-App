@@ -7,7 +7,8 @@ import {
   getUserById,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  searchUsers
 } from '../controllers/userController.js';
 import {
   sendFriendRequest,
@@ -33,6 +34,7 @@ router.post('/refresh', refreshToken);
 
 // User routes
 router.get('/', getAllUsers);
+router.get('/search', authMiddleware, searchUsers);
 router.get('/:id', getUserById);
 router.post('/', createUser);
 router.patch('/:id', upload.any(), updateUser);

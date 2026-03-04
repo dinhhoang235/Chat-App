@@ -128,6 +128,41 @@ export default function UserProfile() {
     }, [id, user, isMeRoute, loadUserProfile])
   );
 
+  // Separate effect to refresh friendship status on focus
+  useFocusEffect(
+    useCallback(() => {
+      const refreshFriendshipStatus = async () => {
+        if (!user || isMeRoute) return;
+        
+        try {
+          const userId = parseInt(id);
+          const statusData = await checkFriendshipStatus(userId);
+          
+          if (statusData) {
+            let mappedStatus = 'NONE';
+            const s = statusData;
+            
+            if (s.status === 'request_received') {
+              mappedStatus = 'PENDING_RECEIVED';
+            } else if (s.status === 'request_sent') {
+              mappedStatus = s.requestStatus === 'rejected' ? 'NONE' : 'PENDING_SENT';
+            } else if (['friends', 'accepted', 'friend'].includes(s.status)) {
+              mappedStatus = 'ACCEPTED';
+            } else if (s.status) {
+              mappedStatus = s.status.toUpperCase();
+            }
+            
+            setFriendshipStatus(mappedStatus);
+          }
+        } catch (error) {
+          console.error('Error refreshing friendship status:', error);
+        }
+      };
+      
+      refreshFriendshipStatus();
+    }, [id, user, isMeRoute])
+  );
+
   const handleSendFriendRequest = async () => {
     if (!profile?.id) return;
     

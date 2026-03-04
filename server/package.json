@@ -16,7 +16,7 @@
   "description": "",
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.4.1",
-    "@prisma/client": "^7.4.1",
+    "@prisma/client": "^7.4.2",
     "@types/jsonwebtoken": "^9.0.10",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
@@ -32,7 +32,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^25.3.0",
     "nodemon": "^3.1.14",
-    "prisma": "^7.4.1",
+    "prisma": "^7.4.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

@@ -2,10 +2,8 @@ services:
   app:
     build:
       context: .
-      args:
-        DATABASE_URL: "mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:${MYSQL_PORT}/${MYSQL_DATABASE}"
     container_name: chat-app
-    restart: always
+    restart: no
     env_file: .env
     environment:
       DATABASE_HOST: mysql
@@ -14,23 +12,21 @@ services:
       DATABASE_NAME: ${MYSQL_DATABASE}
       DATABASE_PORT: ${MYSQL_PORT}
       DATABASE_URL: "mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:${MYSQL_PORT}/${MYSQL_DATABASE}"
-      NODE_ENV: production
+      NODE_ENV: development
     ports:
       - "${PORT}:3000"
     depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      - mysql
+      - redis
     networks:
       - chat-network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     volumes:
       - ./media:/app/media
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./.env:/app/.env
+      - ./package.json:/app/package.json
+      - ./tsconfig.json:/app/tsconfig.json
 
   mysql:
     image: mysql:8.0

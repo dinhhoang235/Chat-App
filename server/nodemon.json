@@ -1,0 +1,15 @@
+{
+  "watch": ["src", "prisma/schema.prisma"],
+  "ext": "ts,prisma",
+  "ignore": ["node_modules", "dist"],
+  "exec": "tsx",
+  "args": "src/index.ts",
+  "events": {
+    "restart": "npx prisma generate"
+  },
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 500,
+  "verbose": true
+}

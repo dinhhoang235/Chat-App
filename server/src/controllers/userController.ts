@@ -13,6 +13,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Validate phone number format (must be exactly 10 digits)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(phone)) {
+      res.status(400).json({ error: 'Phone number must be exactly 10 digits' });
+      return;
+    }
+
     const user = await prisma.user.findUnique({
       where: { phone }
     });
@@ -47,6 +54,13 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
 
     if (!phone || !fullName || !password) {
       res.status(400).json({ error: 'Phone, fullName, and password are required' });
+      return;
+    }
+
+    // Validate phone number format (must be exactly 10 digits)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(phone)) {
+      res.status(400).json({ error: 'Phone number must be exactly 10 digits' });
       return;
     }
 

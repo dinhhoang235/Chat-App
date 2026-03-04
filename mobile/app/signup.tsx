@@ -45,6 +45,11 @@ export default function SignupScreen() {
       return;
     }
 
+    if (phone.length !== 10) {
+      Alert.alert("Lỗi", "Số điện thoại phải có đúng 10 chữ số");
+      return;
+    }
+
     if (password !== confirmPassword) {
       Alert.alert("Lỗi", "Mật khẩu không trùng khớp");
       return;
@@ -86,7 +91,8 @@ export default function SignupScreen() {
             autoCorrect={false}
             spellCheck={false}
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(text) => setPhone(text.replace(/[^0-9]/g, ""))}
+            maxLength={10}
             editable={!loading}
           />
         </View>

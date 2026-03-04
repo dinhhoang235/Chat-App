@@ -35,6 +35,11 @@ export default function LoginScreen() {
       return;
     }
 
+    if (phone.length !== 10) {
+      Alert.alert("Lỗi", "Số điện thoại phải có đúng 10 chữ số");
+      return;
+    }
+
     setLoading(true);
     try {
       const success = await login(phone, password);
@@ -70,7 +75,8 @@ export default function LoginScreen() {
             autoCorrect={false}
             spellCheck={false}
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(text) => setPhone(text.replace(/[^0-9]/g, ""))}
+            maxLength={10}
             editable={!loading}
           />
         </View>

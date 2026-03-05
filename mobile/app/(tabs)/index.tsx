@@ -13,6 +13,7 @@ import { useTabBar } from '../../context/tabBarContext';
 import { chatApi } from "../../services/chat";
 import { socketService } from "../../services/socket";
 import { useAuth } from "../../context/authContext";
+import { API_URL } from "../../services/api";
 import StartChatModal from "../../components/StartChatModal";
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -36,16 +37,23 @@ export default function Messages() {
         const lastMsg = conv.messages[0];
         const otherParticipant = conv.participants.find((p: any) => p.userId !== user?.id);
         
+        // Check if the last message was sent by the current user
+        const isFromMe = lastMsg?.senderId === user?.id;
+        const lastMessageText = lastMsg 
+          ? (isFromMe ? `Bạn: ${lastMsg.content}` : lastMsg.content)
+          : 'Chưa có tin nhắn';
+        
         return {
           id: conv.id.toString(),
           name: conv.name || otherParticipant?.user.fullName || 'Người dùng Zalo',
-          lastMessage: lastMsg?.content || 'Chưa có tin nhắn',
+          lastMessage: lastMessageText,
           time: lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
           unread: conv._count?.messages || 0,
           initials: (conv.name || otherParticipant?.user.fullName || 'Z')[0],
           color: conv.isGroup ? colors.tint : (otherParticipant?.user.avatar ? undefined : colors.tint),
-          avatar: otherParticipant?.user.avatar,
-          isGroup: conv.isGroup
+          avatar: otherParticipant?.user.avatar ? `${API_URL}${otherParticipant.user.avatar}` : undefined,
+          isGroup: conv.isGroup,
+          targetUserId: otherParticipant?.userId.toString()
         };
       });
       setData(mapped);
@@ -63,8 +71,13 @@ export default function Messages() {
       fetchConversations(); 
     });
 
+    socketService.on('new_message', () => {
+      fetchConversations();
+    });
+
     return () => {
       socketService.off('conversation_updated');
+      socketService.off('new_message');
     };
   }, [fetchConversations]);
 
@@ -170,7 +183,18 @@ export default function Messages() {
           renderItem={({ item }) => (
             <MessageRow
               message={item}
-              onPress={() => { if (!selectionMode) router.push({ pathname: '/chat/[id]', params: { id: item.id, name: item.name } }); }}
+              onPress={() => { 
+                if (!selectionMode) {
+                  router.push({ 
+                    pathname: '/chat/[id]', 
+                    params: { 
+                      id: item.id, 
+                      name: item.name,
+                      targetUserId: item.targetUserId 
+                    } 
+                  }); 
+                } 
+              }}
               onAction={(action) => handleRowAction(action, item.id)}
               selectionMode={selectionMode}
               selected={selectedIds.includes(item.id)}

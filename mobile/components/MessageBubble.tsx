@@ -5,10 +5,12 @@ import { useTheme } from '../context/themeContext';
 type ChatMessage = {
   id: string;
   text?: string;
+  content?: string;
   time?: string;
   fromMe?: boolean;
   type?: 'text' | 'sticker' | 'contact' | 'separator';
   contactName?: string;
+  contactAvatar?: string;
   contactAvatarColor?: string;
   reactions?: { emoji: string; count?: number }[];
 };
@@ -40,12 +42,14 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
 
   // helper to render highlighted parts
   const renderHighlighted = (text?: string) => {
-    if (!text || !highlightQuery) return <Text style={{ color: textColor }}>{text}</Text>;
+    const displayText = text || message.content;
+    if (!displayText) return null;
+    if (!highlightQuery) return <Text style={{ color: textColor }}>{displayText}</Text>;
     const q = highlightQuery.trim().toLowerCase();
-    if (!q) return <Text style={{ color: textColor }}>{text}</Text>;
+    if (!q) return <Text style={{ color: textColor }}>{displayText}</Text>;
 
     const parts: { text: string; highlight: boolean }[] = [];
-    let remaining = text;
+    let remaining = displayText;
     while (remaining.length > 0) {
       const idx = remaining.toLowerCase().indexOf(q);
       if (idx === -1) {
@@ -106,8 +110,15 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       <View className={`flex-row ${message.fromMe ? 'justify-end' : 'justify-start'} px-4 my-2`}> 
         {!message.fromMe && (
           <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
-            <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant }}>
-              <Text style={{ color: colors.text, fontWeight: '700' }}>{message.contactName ? message.contactName.slice(0,1) : 'A'}</Text>
+            <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant, overflow: 'hidden' }}>
+              {message.contactAvatar ? (
+                <Image 
+                  source={{ uri: message.contactAvatar }} 
+                  style={{ width: 40, height: 40 }} 
+                />
+              ) : (
+                <Text style={{ color: colors.text, fontWeight: '700' }}>{message.contactName ? message.contactName.slice(0,1) : 'A'}</Text>
+              )}
             </View>
           </TouchableOpacity>
         )}

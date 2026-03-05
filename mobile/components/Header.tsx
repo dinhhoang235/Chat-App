@@ -91,7 +91,11 @@ export const Header: React.FC<HeaderProps> = ({
               )}
               <View>
                 {title ? (
-                  <TouchableOpacity disabled={!onTitlePress} onPress={onTitlePress}>
+                  <TouchableOpacity 
+                    disabled={!onTitlePress} 
+                    onPress={() => onTitlePress?.()}
+                    style={{ paddingVertical: 4, paddingRight: 40 }}
+                  >
                     <Text style={titleStyle} numberOfLines={1}>{title}</Text>
                   </TouchableOpacity>
                 ) : null}

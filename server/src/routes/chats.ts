@@ -14,9 +14,9 @@ export const chatRoutes = (io: Server) => {
   router.use(authMiddleware);
 
   router.get('/conversations', getConversations);
-  router.get('/:conversationId/messages', getMessages);
+  router.get('/:conversationId/messages', getMessages(io));
   router.post('/:conversationId/messages', sendMessage(io));
-  router.post('/start', startConversation);
+  router.post('/start', startConversation(io));
 
   return router;
 };

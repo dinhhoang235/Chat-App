@@ -1,10 +1,20 @@
 import React from 'react';
-import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
+import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/themeContext';
-import type { Message } from '../constants/mockData';
 
 export type MenuItem = { key: string; label: string; icon: string; destructive?: boolean };
+
+type Message = {
+  id: string;
+  name: string;
+  lastMessage: string;
+  time: string;
+  unread?: number;
+  initials?: string;
+  color?: string;
+  avatar?: string;
+};
 
 type Props = {
   visible: boolean;
@@ -44,8 +54,12 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
             }}
             pointerEvents="none"
           >
-            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280' }}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{(message.initials ?? message.name.split(' ').map((n: string) => n[0]).slice(0,2).join(''))}</Text>
+            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280', overflow: 'hidden' }}>
+              {message.avatar ? (
+                <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48 }} />
+              ) : (
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{(message.initials ?? message.name.split(' ').map((n: string) => n[0]).slice(0,2).join(''))}</Text>
+              )}
             </View>
 
             <View style={{ marginLeft: 12, flex: 1 }}>

@@ -33,29 +33,40 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
         messages: {
           take: 1,
           orderBy: { createdAt: 'desc' }
-        },
-        _count: {
-          select: {
-            messages: {
-              where: {
-                // Approximate unread: messages after user lastReadAt
-                // In a real app, you would join with participant's lastReadAt
-                // For simplicity, we'll fetch lastReadAt separately or assume count
-              }
-            }
-          }
         }
+      },
+      orderBy: {
+        updatedAt: 'desc'
       }
     });
 
-    return res.json(conversations);
+    // Manually calculate unread count for each conversation
+    const mappedConversations = await Promise.all(conversations.map(async (conv) => {
+      const participant = conv.participants.find(p => p.userId === userId);
+      const unreadCount = await prisma.message.count({
+        where: {
+          conversationId: conv.id,
+          senderId: { not: userId },
+          createdAt: { gt: participant?.lastReadAt || new Date(0) }
+        }
+      });
+
+      return {
+        ...conv,
+        _count: {
+          messages: unreadCount
+        }
+      };
+    }));
+
+    return res.json(mappedConversations);
   } catch (err) {
     console.error('Get conversations error:', err);
     return res.status(500).json({ message: 'Error fetching conversations' });
   }
 };
 
-export const getMessages = async (req: AuthRequest, res: Response): Promise<any> => {
+export const getMessages = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { conversationId } = req.params;
   const userId = req.userId;
 
@@ -105,6 +116,9 @@ export const getMessages = async (req: AuthRequest, res: Response): Promise<any>
       data: { lastReadAt: new Date() }
     });
 
+    // Notify user to refresh conversation list unread count
+    io.to(`user:${userId}`).emit('conversation_updated', { conversationId: convId });
+
     return res.json(messages);
   } catch (err) {
     console.error('Get messages error:', err);
@@ -153,12 +167,10 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
     });
 
     participants.forEach(p => {
-      if (p.userId !== userId) {
-        io.to(`user:${p.userId}`).emit('conversation_updated', {
-          conversationId: message.conversationId,
-          lastMessage: message
-        });
-      }
+      io.to(`user:${p.userId}`).emit('conversation_updated', {
+        conversationId: message.conversationId,
+        lastMessage: message
+      });
     });
 
     return res.status(201).json(message);
@@ -168,7 +180,7 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
   }
 };
 
-export const startConversation = async (req: AuthRequest, res: Response): Promise<any> => {
+export const startConversation = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { targetUserId } = req.body;
   const userId = req.userId;
 
@@ -176,7 +188,9 @@ export const startConversation = async (req: AuthRequest, res: Response): Promis
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
-  if (userId === parseInt(targetUserId)) {
+  const targetIdNum = parseInt(targetUserId);
+
+  if (userId === targetIdNum) {
     return res.status(400).json({ message: 'Cannot chat with yourself' });
   }
 
@@ -187,13 +201,39 @@ export const startConversation = async (req: AuthRequest, res: Response): Promis
         isGroup: false,
         AND: [
           { participants: { some: { userId } } },
-          { participants: { some: { userId: parseInt(targetUserId) } } }
+          { participants: { some: { userId: targetIdNum } } }
         ]
+      },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatar: true,
+                phone: true
+              }
+            }
+          }
+        },
+        messages: {
+          take: 1,
+          orderBy: { createdAt: 'desc' }
+        }
       }
     });
 
     if (existing) {
       return res.json(existing);
+    }
+
+    // NEW LOGIC: If a message is provided, create the conversation. 
+    // If NOT, we just return a 404 or empty response so the frontend knows it doesn't exist yet.
+    const { firstMessage } = req.body;
+    
+    if (!firstMessage) {
+      return res.status(404).json({ message: 'No existing conversation' });
     }
 
     // Create new conversation
@@ -203,15 +243,50 @@ export const startConversation = async (req: AuthRequest, res: Response): Promis
         participants: {
           create: [
             { userId },
-            { userId: parseInt(targetUserId) }
+            { userId: targetIdNum }
           ]
+        },
+        messages: {
+          create: {
+            content: firstMessage,
+            senderId: userId
+          }
+        }
+      },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatar: true,
+                phone: true
+              }
+            }
+          }
+        },
+        messages: {
+          take: 1,
+          orderBy: { createdAt: 'desc' }
         }
       }
     });
 
-    res.status(201).json(conversation);
+    // Notify both users about the new conversation
+    const lastMessage = conversation.messages[0];
+    io.to(`user:${userId}`).emit('conversation_updated', { 
+      conversationId: conversation.id,
+      lastMessage
+    });
+    io.to(`user:${targetIdNum}`).emit('conversation_updated', { 
+      conversationId: conversation.id,
+      lastMessage
+    });
+
+    return res.status(201).json(conversation);
   } catch (err) {
     console.error('Start conversation error:', err);
-    res.status(500).json({ message: 'Error starting conversation' });
+    return res.status(500).json({ message: 'Error starting conversation' });
   }
 };

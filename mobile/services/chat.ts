@@ -5,5 +5,6 @@ export const chatApi = {
   getMessages: (id: string | number) => apiClient.get(`/chats/${id}/messages`),
   sendMessage: (id: string | number, content: string, type: string = 'text') => 
     apiClient.post(`/chats/${id}/messages`, { content, type }),
-  startConversation: (targetUserId: number) => apiClient.post('/chats/start', { targetUserId }),
+  startConversation: (targetUserId: number, firstMessage?: string) => 
+    apiClient.post('/chats/start', { targetUserId, firstMessage }),
 };

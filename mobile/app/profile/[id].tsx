@@ -80,9 +80,9 @@ export default function UserProfile() {
       
       // Load user profile and friendship status in parallel for better performance
       const promises: [Promise<any>, Promise<any> | null] = [
-        userAPI.getUserById(userId).catch(err => {
+        userAPI.getUserById(userId).catch(() => {
           if (isPhoneLike) return { id: userId.toString(), fullName: 'Người dùng ' + id };
-          throw err;
+          return null;
         }),
         (user && !isMeRoute) ? checkFriendshipStatus(userId) : null
       ];
@@ -235,6 +235,22 @@ export default function UserProfile() {
     }
   };
 
+  const handleMessagePress = useCallback(async () => {
+    if (!profile?.id) return;
+    
+    // Simply navigate to /chat/new with target user info
+    // This matches the logic in StartChatModal.tsx
+    // The conversation will only be created on the first message sent in ChatThread
+    router.push({
+      pathname: '/chat/new',
+      params: { 
+        targetUserId: profile.id.toString(),
+        name: profile.fullName,
+        avatar: profile.avatar || ''
+      }
+    });
+  }, [profile, router]);
+
   const isStranger = !profile && isPhoneLike;
 
   if (loading) {
@@ -317,7 +333,7 @@ export default function UserProfile() {
         <View style={{ padding: 12 }}>
           {isMeRoute ? null : friendshipStatus === 'ACCEPTED' ? (
             <View style={{ alignItems: 'center', marginBottom: 6 }}>
-              <TouchableOpacity style={{ backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 22 }} onPress={() => router.push(`/chat/${profile?.id}`)}>
+              <TouchableOpacity style={{ backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 22 }} onPress={handleMessagePress}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Nhắn tin</Text>
               </TouchableOpacity>
             </View>
@@ -325,7 +341,7 @@ export default function UserProfile() {
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
               <TouchableOpacity 
                 style={{ backgroundColor: '#2563EB', paddingVertical: 12, borderRadius: 22, flex: 1, alignItems: 'center' }} 
-                onPress={() => router.push(`/chat/${profile?.id}`)}
+                onPress={handleMessagePress}
               >
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Nhắn tin</Text>
               </TouchableOpacity>
@@ -350,7 +366,7 @@ export default function UserProfile() {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={{ backgroundColor: '#2563EB', paddingHorizontal: 32, paddingVertical: 10, borderRadius: 22 }} 
-                onPress={() => router.push(`/chat/${profile?.id}`)}
+                onPress={handleMessagePress}
               >
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Nhắn tin</Text>
               </TouchableOpacity>
@@ -375,7 +391,7 @@ export default function UserProfile() {
               </View>
               <TouchableOpacity 
                 style={{ backgroundColor: '#2563EB', paddingHorizontal: 32, paddingVertical: 10, borderRadius: 22 }} 
-                onPress={() => router.push(`/chat/${profile?.id}`)}
+                onPress={handleMessagePress}
               >
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Nhắn tin</Text>
               </TouchableOpacity>

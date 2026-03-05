@@ -15,22 +15,46 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { chatApi } from '../../services/chat';
 import { socketService } from '../../services/socket';
 import { useAuth } from '../../context/authContext';
+import { API_URL } from '../../services/api';
 
 export default function ChatThread() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const params = useLocalSearchParams();
   const router = useRouter();
-  const id = params.id as string;
+  const id = (params.id as string) === 'new' ? null : params.id as string;
   const targetUserId = params.targetUserId as string;
   const paramName = params.name as string | undefined;
   // isNewConversation khi navigate từ /chat/new hoặc khi chưa có conversation id
-  const isNewConversation = (id === 'new' || !id) && !!targetUserId;
+  const isNewConversation = (!id || id === 'new') && !!targetUserId;
 
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(!isNewConversation);
   const [conversationId, setConversationId] = useState<string | null>(id || null);
+  const [targetUserIdState, setTargetUserIdState] = useState<string | null>(targetUserId || (params.targetUserId as string) || null);
   const [creatingConversation, setCreatingConversation] = useState(false);
+
+  // If we are in 'new' mode, we should still check if a conversation actually exists
+  // but we won't show the loading spinner to the user.
+  useEffect(() => {
+    const checkExisting = async () => {
+      if (isNewConversation && targetUserIdState && !conversationId) {
+        try {
+          const response = await chatApi.startConversation(Number(targetUserIdState));
+          const conv = response.data;
+          const convId = conv.id || conv.conversationId;
+          
+          if (convId && conv.messages && conv.messages.length > 0) {
+            // If it exists AND has messages, switch to regular mode
+            setConversationId(convId.toString());
+          }
+        } catch {
+          console.log("No existing conversation found yet, sticking with 'new' mode");
+        }
+      }
+    };
+    checkExisting();
+  }, [isNewConversation, targetUserIdState, conversationId]);
 
   // Search mode toggled by Options or header
   const initialSearch = !!(params as any).search;
@@ -79,18 +103,30 @@ export default function ChatThread() {
     if (!conversationId) return;
     try {
       const response = await chatApi.getMessages(conversationId);
+      
       const mapped = response.data.map((m: any) => ({
         ...m,
         fromMe: m.senderId === user?.id,
-        time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        contactName: m.sender?.fullName,
+        contactAvatar: m.sender?.avatar ? `${API_URL}${m.sender.avatar}` : undefined
       }));
+
+      // If we still don't have targetUserId, extract it from the messages
+      if (!targetUserIdState && mapped.length > 0) {
+        const otherMessage = mapped.find((m: any) => m.senderId !== user?.id);
+        if (otherMessage) {
+          setTargetUserIdState(otherMessage.senderId.toString());
+        }
+      }
+
       setMessages(mapped);
     } catch (err) {
       console.error("Fetch messages error:", err);
     } finally {
       setLoading(false);
     }
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, targetUserIdState]);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -107,11 +143,18 @@ export default function ChatThread() {
 
     // Listen for new messages
     socketService.on('new_message', (message) => {
-      setMessages(prev => [...prev, {
-        ...message,
-        fromMe: message.senderId === userId,
-        time: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
+      setMessages(prev => {
+        // Prevent duplicate messages if already in state
+        if (prev.find(m => m.id === message.id)) return prev;
+        
+        return [...prev, {
+          ...message,
+          fromMe: message.senderId === userId,
+          time: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          contactName: message.sender?.fullName,
+          contactAvatar: message.sender?.avatar ? `${API_URL}${message.sender.avatar}` : undefined
+        }];
+      });
       // Scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -132,39 +175,47 @@ export default function ChatThread() {
     try {
       let targetConversationId = conversationId;
 
-      // If this is a new conversation, create it first
+      // If this is a new conversation, create it with the first message
       if (isNewConversation && !conversationId) {
         setCreatingConversation(true);
-        const response = await chatApi.startConversation(Number(targetUserId));
-        targetConversationId = response.data?.id || response.data?.conversationId;
-        
-        if (!targetConversationId) {
-          console.error("Failed to create conversation");
+        try {
+          const response = await chatApi.startConversation(Number(targetUserIdState), text);
+          const conv = response.data;
+          targetConversationId = conv.id || conv.conversationId;
+          
+          if (targetConversationId) {
+            setConversationId(targetConversationId.toString());
+            // Clear 'new' state since it's now a real conversation
+            // The message is already created by startConversation
+            const lastMessage = conv.messages?.[0];
+            if (lastMessage) {
+              setMessages([{
+                ...lastMessage,
+                fromMe: true,
+                time: new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }]);
+            }
+          }
+          return; // Message is already sent as part of startConversation
+        } catch (err) {
+          console.error("Error creating conversation on send:", err);
           setMessageText(text);
-          setCreatingConversation(false);
           return;
+        } finally {
+          setCreatingConversation(false);
         }
-
-        setConversationId(targetConversationId);
-        setCreatingConversation(false);
       }
 
-      // Send the message
-      if (!targetConversationId) {
-        console.error("No conversation ID available");
-        setMessageText(text);
-        return;
-      }
-
-      await chatApi.sendMessage(targetConversationId, text);
-
-      // Join the conversation room if it's new
-      if (isNewConversation) {
-        socketService.emit('join_conversation', parseInt(targetConversationId, 10));
-      }
+      await chatApi.sendMessage(Number(targetConversationId), text);
+      
+      // Socket.io will handle appending the message for both sender and receiver.
+      
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (err) {
-      console.error("Send message error:", err);
-      setMessageText(text);
+      console.error("Send error:", err);
+      setMessageText(text); // Restore text if error
     }
   };
 
@@ -218,15 +269,9 @@ export default function ChatThread() {
               showBack
               onBackPress={() => router.back()}
               onTitlePress={() => {
-                if (isNewConversation) {
-                  router.push(`/profile/${targetUserId}`);
-                } else {
-                  // If it's an existing conversation, we might need more logic 
-                  // to find the target user ID if it's a 1-1 chat.
-                  // For now, if targetUserId exists in params, we use it.
-                  if (targetUserId) {
-                    router.push(`/profile/${targetUserId}`);
-                  }
+                const finalTargetUserId = targetUserIdState;
+                if (finalTargetUserId) {
+                  router.push(`/profile/${finalTargetUserId}`);
                 }
               }}
               rightActions={[
@@ -235,13 +280,14 @@ export default function ChatThread() {
                 { 
                   icon: 'more-vert', 
                   onPress: () => router.push({
-                    pathname: `/chat/${id}/options`,
+                    pathname: '/chat/[id]/options',
                     params: { 
+                      id,
                       name: paramName, 
                       avatar: params.avatar,
                       targetUserId: targetUserId
                     }
-                  }) 
+                  } as any) 
                 },
               ]}
             />

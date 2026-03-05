@@ -21,6 +21,7 @@ interface HeaderProps {
   onHeaderLayout?: (layout: { x: number; y: number; width: number; height: number }) => void;
   showBack?: boolean;
   onBackPress?: () => void;
+  onTitlePress?: () => void;
   variant?: "light" | "dark";
   /** Render header transparent (no background/border). Useful to overlay over cover images. */
   transparent?: boolean;
@@ -43,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   onHeaderLayout,
   showBack = false,
   onBackPress,
+  onTitlePress,
   variant,
   transparent = false,
   overlay = false,
@@ -89,7 +91,9 @@ export const Header: React.FC<HeaderProps> = ({
               )}
               <View>
                 {title ? (
-                  <Text style={titleStyle} numberOfLines={1}>{title}</Text>
+                  <TouchableOpacity disabled={!onTitlePress} onPress={onTitlePress}>
+                    <Text style={titleStyle} numberOfLines={1}>{title}</Text>
+                  </TouchableOpacity>
                 ) : null}
                 {subtitle ? (
                   <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{subtitle}</Text>

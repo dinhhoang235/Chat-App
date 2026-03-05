@@ -52,8 +52,10 @@ export default function ChatOptions() {
   // resolve id / contact so we can detect groups reliably
   const id = (params as any).id as string;
   const contact = contacts.find(c => c.id === id);
-  const name = contact?.name ?? (params as any).id ?? 'Người dùng';
-  const avatar = (params as any).avatar as string | undefined;
+  const name = (params as any).name || contact?.name || contact?.fullName || 'Người dùng';
+  const rawAvatar = (params as any).avatar as string | undefined;
+  const avatar = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${process.env.EXPO_PUBLIC_API_URL}${rawAvatar}`) : undefined;
+  
   const getInitials = (n: string) => {
     const parts = n.trim().split(/\s+/);
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();

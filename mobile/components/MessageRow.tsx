@@ -1,15 +1,23 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from "../context/themeContext";
 import MenuModal from './MenuModal';
-import { contacts } from '../constants/mockData';
 import MuteOptionsSheet from './MuteOptionsSheet';
 import MuteSettingsModal from './MuteSettingsModal';
-import type { Message } from '../constants/mockData';
 
 type Props = {
-  message: Message;
+  message: {
+    id: string;
+    name: string;
+    lastMessage: string;
+    time: string;
+    unread?: number;
+    initials?: string;
+    color?: string;
+    avatar?: string;
+    isGroup?: boolean;
+  };
   onPress?: () => void;
   onAction?: (action: string) => void;
   selectionMode?: boolean;
@@ -26,8 +34,7 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
   const rowRef = useRef<any>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const initials = message.initials ?? message.name.split(' ').map(n => n[0]).slice(0, 2).join('');
-  const contact = contacts.find(c => c.id === message.id);
-  const isGroup = !!contact?.isGroup;
+  const isGroup = !!message.isGroup;
 
   const menuItems = [
     { key: 'mark_unread', label: 'Đánh dấu chưa đọc', icon: 'drafts' },
@@ -92,16 +99,24 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
               )}
             </TouchableOpacity>
 
-            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280', marginLeft: 8 }}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280', marginLeft: 8, overflow: 'hidden' }}>
+              {message.avatar ? (
+                <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48 }} />
+              ) : (
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+              )}
             </View>
           </View>
         ) : (
           <View
-            className="w-12 h-12 rounded-full items-center justify-center"
+            className="w-12 h-12 rounded-full items-center justify-center overflow-hidden"
             style={{ backgroundColor: message.color || '#6B7280' }}
           >
-            <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+            {message.avatar ? (
+              <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48 }} />
+            ) : (
+              <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+            )}
           </View>
         )}
 

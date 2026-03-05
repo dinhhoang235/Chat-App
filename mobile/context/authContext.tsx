@@ -1,6 +1,7 @@
-import React, { createContext, useState, useContext } from "react";
+import React, { createContext, useState, useContext, useEffect } from "react";
 import { authAPI } from "../services/auth";
 import { tokenStorage } from "../utils/tokenStorage";
+import { socketService } from "../services/socket";
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -20,6 +21,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<{ id: number; phone: string; fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null } | null>(
     null
   );
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      socketService.connect();
+    } else {
+      socketService.disconnect();
+    }
+  }, [isLoggedIn]);
 
   const login = async (phone: string, password: string): Promise<boolean> => {
     try {

@@ -3,12 +3,26 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import prisma from './db.js';
 import userRoutes from './routes/users.js';
+import { chatRoutes } from './routes/chats.js';
+import { setupSocket } from './socket.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app: Express = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: '*',
+  },
+});
+
 const PORT = process.env.PORT || 3000;
+
+// Setup Socket.io
+setupSocket(io);
 
 // Middleware
 app.use(cors());
@@ -39,9 +53,10 @@ app.get('/health', async (_req, res) => {
 
 // Routes (multer applied per route)
 app.use('/api/users', userRoutes);
+app.use('/api/chats', chatRoutes(io));
 
 // Start server
-app.listen(PORT, async () => {
+httpServer.listen(PORT, async () => {
   try {
     // Test database connection once on startup
     await prisma.$queryRaw`SELECT 1`;

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, FlatList, TextInput, TouchableOpacity, Keyboard, ActivityIndicator } from 'react-native';
+import { View, FlatList, TextInput, TouchableOpacity, Keyboard, ActivityIndicator, Image } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
 import { Header } from '../../components/Header';
@@ -16,6 +16,8 @@ import { chatApi } from '../../services/chat';
 import { socketService } from '../../services/socket';
 import { useAuth } from '../../context/authContext';
 import { API_URL } from '../../services/api';
+import { useTyping } from '../../hooks/useTyping';
+import { TypingDots } from '../../components/TypingDots';
 
 export default function ChatThread() {
   const { colors } = useTheme();
@@ -36,6 +38,15 @@ export default function ChatThread() {
   const [targetUserIdState, setTargetUserIdState] = useState<string | null>(targetUserId || (params.targetUserId as string) || null);
   const [creatingConversation, setCreatingConversation] = useState(false);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
+  const { isTyping, typingUser, handleType } = useTyping(conversationId, user?.id);
+
+  // Derive which avatar to show: if typingUser has an avatar, use it; otherwise fallback to params.avatar
+  const displayTypingAvatar = typingUser?.avatar 
+    ? (typingUser.avatar.startsWith('http') ? typingUser.avatar : `${API_URL}${typingUser.avatar}`)
+    : (params.avatar 
+        ? (params.avatar.startsWith('http') ? params.avatar : `${API_URL}${params.avatar}`)
+        : 'https://i.pravatar.cc/150');
+
   const messagesRef = useRef<any[]>([]);
 
   // Keep messagesRef in sync
@@ -86,6 +97,11 @@ export default function ChatThread() {
   const [composerVisible, setComposerVisible] = useState(false);
   const inputRef = useRef<any>(null);
   const [messageText, setMessageText] = useState('');
+
+  const onTextChange = (text: string) => {
+    setMessageText(text);
+    handleType();
+  };
 
   const insets = useSafeAreaInsets();
 
@@ -417,6 +433,27 @@ export default function ChatThread() {
                     }
                   }}
                   onEndReachedThreshold={0.5}
+                  ListHeaderComponent={() => isTyping ? (
+                    <View className="px-4 py-2 flex-row items-center">
+                      <Image 
+                        source={{ uri: displayTypingAvatar }} 
+                        className="w-10 h-10 rounded-full mr-3"
+                        style={{ backgroundColor: colors.surfaceVariant }}
+                      />
+                      <View 
+                        style={{ 
+                          backgroundColor: colors.bubbleOther,
+                          borderWidth: 1,
+                          borderColor: colors.surfaceVariant,
+                          paddingHorizontal: 10,
+                          paddingVertical: 8,
+                          borderRadius: 18
+                        }}
+                      >
+                        <TypingDots />
+                      </View>
+                    </View>
+                  ) : null}
                   ListFooterComponent={() => loadingMore ? (
                     <ActivityIndicator style={{ marginVertical: 10 }} color={colors.tint} />
                   ) : null}
@@ -503,7 +540,7 @@ export default function ChatThread() {
                     <TextInput
                       ref={inputRef}
                       value={messageText}
-                      onChangeText={text => setMessageText(text)}
+                      onChangeText={onTextChange}
                       placeholder="Tin nhắn"
                       placeholderTextColor={colors.textSecondary}
                       style={{ 

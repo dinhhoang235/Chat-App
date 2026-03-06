@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { TokenPayload } from './utils/jwt.js';
+import prisma from './db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -46,10 +47,25 @@ export const setupSocket = (io: Server) => {
     });
 
     // Handle typing status
-    socket.on('typing_start', (conversationId: number) => {
+    socket.on('typing_start', async (conversationId: number) => {
+      let avatar = '';
+      if (socket.user?.userId) {
+        try {
+          // You might want to cache this in redis for better performance later
+          const user = await prisma.user.findUnique({
+            where: { id: socket.user.userId },
+            select: { avatar: true }
+          });
+          avatar = user?.avatar || '';
+        } catch (err) {
+          console.error('Error fetching user avatar for typing event:', err);
+        }
+      }
+
       socket.to(`conversation:${conversationId}`).emit('user_typing_start', {
         userId: socket.user?.userId,
-        conversationId
+        conversationId,
+        avatar
       });
     });
 

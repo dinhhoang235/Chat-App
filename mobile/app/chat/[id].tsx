@@ -413,7 +413,6 @@ export default function ChatThread() {
                   }}
                   onEndReached={() => {
                     if (hasMore && !loadingMore && messages.length >= 10) {
-                      console.log('Fetching more messages...');
                       fetchMessages(true);
                     }
                   }}

@@ -9,6 +9,7 @@ import prisma from './db.js';
 import userRoutes from './routes/users.js';
 import { chatRoutes } from './routes/chats.js';
 import { setupSocket } from './socket.js';
+import { connectRedis } from './utils/redis.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app: Express = express();
@@ -23,6 +24,9 @@ const PORT = process.env.PORT || 3000;
 
 // Setup Socket.io
 setupSocket(io);
+
+// Connect Redis (Caching only)
+connectRedis().catch(err => console.error('Redis startup failed:', err));
 
 // Middleware
 app.use(cors());

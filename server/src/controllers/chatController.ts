@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../db.js';
 import { Server } from 'socket.io';
 import { AuthRequest } from '../middleware/auth.js';
+import { getCachedMessages, bulkCacheMessages, cacheMessage } from '../utils/redis.js';
 
 export const getConversations = async (req: AuthRequest, res: Response): Promise<any> => {
   const userId = req.userId;
@@ -77,8 +78,6 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
 
   try {
     const convId = parseInt(Array.isArray(conversationId) ? conversationId[0] : conversationId);
-    const take = parseInt(limit as string);
-    const cursorId = cursor ? parseInt(cursor as string) : undefined;
     
     // Check if user is participant
     const participant = await prisma.conversationParticipant.findUnique({
@@ -102,6 +101,18 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
       return res.status(403).json({ message: 'Not a member of this conversation' });
     }
 
+    const take = parseInt(limit as string);
+    const cursorId = cursor ? parseInt(cursor as string) : undefined;
+
+    // 1. Try to get from Cache if it's the first page (no cursor)
+    if (!cursor) {
+      const cached = await getCachedMessages(convId, take);
+      if (cached && cached.length > 0) {
+        console.log('Serving messages from Redis cache');
+        return res.json(cached);
+      }
+    }
+
     const messages = await prisma.message.findMany({
       where: { conversationId: convId },
       take: take,
@@ -119,6 +130,9 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
       }
     });
 
+    // ... Get participants and map messagesWithSeen logic ...
+    // (I'll keep the mapping part but we'll use messagesWithSeen for caching)
+    
     // Get participants to determine who has seen which messages
     const participants = await prisma.conversationParticipant.findMany({
       where: { conversationId: convId },
@@ -142,8 +156,13 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
           fullName: p.user.fullName,
           avatar: p.user.avatar ? (p.user.avatar.startsWith('http') ? p.user.avatar : p.user.avatar) : null
         }));
-      return { ...msg, seenBy };
+      return { ...msg, seenBy, fromMe: msg.senderId === userId };
     });
+
+    // 2. Cache first page if we just fetched it from DB
+    if (!cursor) {
+      bulkCacheMessages(convId, messagesWithSeen).catch(e => console.error(e));
+    }
 
     // Update lastReadAt
     await prisma.conversationParticipant.update({
@@ -211,6 +230,9 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
 
     // 2. Broadcast via socket
     io.to(`conversation:${convId}`).emit('new_message', message);
+    
+    // 3. Cache the new message
+    cacheMessage(convId, { ...message, seenBy: [] }).catch(e => console.error(e));
     
     // Also notify users who might not be in the conversation room currently 
     // but should see an updated list of conversations

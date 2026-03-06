@@ -120,35 +120,38 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
     const take = parseInt(limit as string);
     const cursorId = cursor ? parseInt(cursor as string) : undefined;
 
+    let messages;
+    let fromCache = false;
+
     // 1. Try to get from Cache if it's the first page (no cursor)
     if (!cursor) {
       const cached = await getCachedMessages(convId, take);
       if (cached && cached.length > 0) {
         console.log('Serving messages from Redis cache');
-        return res.json(cached);
+        messages = cached;
+        fromCache = true;
       }
     }
 
-    const messages = await prisma.message.findMany({
-      where: { conversationId: convId },
-      take: take,
-      skip: cursorId ? 1 : 0,
-      cursor: cursorId ? { id: cursorId } : undefined,
-      orderBy: { id: 'desc' }, // Use ID for more reliable cursor pagination
-      include: {
-        sender: {
-          select: {
-            id: true,
-            fullName: true,
-            avatar: true
+    if (!messages) {
+      messages = await prisma.message.findMany({
+        where: { conversationId: convId },
+        take: take,
+        skip: cursorId ? 1 : 0,
+        cursor: cursorId ? { id: cursorId } : undefined,
+        orderBy: { id: 'desc' }, // Use ID for more reliable cursor pagination
+        include: {
+          sender: {
+            select: {
+              id: true,
+              fullName: true,
+              avatar: true
+            }
           }
         }
-      }
-    });
+      });
+    }
 
-    // ... Get participants and map messagesWithSeen logic ...
-    // (I'll keep the mapping part but we'll use messagesWithSeen for caching)
-    
     // Get participants to determine who has seen which messages
     const participants = await prisma.conversationParticipant.findMany({
       where: { conversationId: convId },
@@ -163,10 +166,10 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
       }
     });
 
-    // Map messages to include seenBy info
+    // Map messages to include seenBy info - ALWAYS recompute from current DB state
     const messagesWithSeen = messages.map(msg => {
       const seenBy = participants
-        .filter(p => p.userId !== msg.senderId && p.lastReadAt >= msg.createdAt)
+        .filter(p => p.userId !== msg.senderId && new Date(p.lastReadAt).getTime() >= new Date(msg.createdAt).getTime())
         .map(p => ({
           id: p.user.id,
           fullName: p.user.fullName,
@@ -175,9 +178,9 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
       return { ...msg, seenBy, fromMe: msg.senderId === userId };
     });
 
-    // 2. Cache first page if we just fetched it from DB
-    if (!cursor) {
-      bulkCacheMessages(convId, messagesWithSeen).catch(e => console.error(e));
+    // 2. Cache first page if we just fetched it from DB (store raw messages, not computed seenBy)
+    if (!cursor && !fromCache) {
+      bulkCacheMessages(convId, messages).catch(e => console.error(e));
     }
 
     const now = new Date();
@@ -198,24 +201,6 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
       conversationId: convId,
       userId,
       seenAt: now,
-      user: {
-        id: userId,
-        fullName: participant.user.fullName,
-        avatar: participant.user.avatar
-      }
-    });
-
-    // Notify ALL participants to refresh conversation list unread count
-    const allParticipantsInConv = await prisma.conversationParticipant.findMany({
-      where: { conversationId: convId }
-    });
-
-    allParticipantsInConv.forEach(p => {
-      io.to(`user:${p.userId}`).emit('conversation_updated', { 
-        conversationId: convId,
-        userId: userId,
-        action: 'read'
-      });
     });
 
     return res.json(messagesWithSeen);
@@ -338,7 +323,7 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
     io.to(`conversation:${convId}`).emit('new_message', message);
     
     // 3. Cache the new message
-    cacheMessage(convId, { ...message, seenBy: [] }).catch(e => console.error(e));
+    cacheMessage(convId, message).catch(e => console.error(e));
     
     // Also notify users who might not be in the conversation room currently 
     // but should see an updated list of conversations

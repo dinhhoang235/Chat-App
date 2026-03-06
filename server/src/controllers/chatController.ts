@@ -68,6 +68,7 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
 
 export const getMessages = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { conversationId } = req.params;
+  const { cursor, limit = '20' } = req.query;
   const userId = req.userId;
 
   if (!userId) {
@@ -76,6 +77,8 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
 
   try {
     const convId = parseInt(Array.isArray(conversationId) ? conversationId[0] : conversationId);
+    const take = parseInt(limit as string);
+    const cursorId = cursor ? parseInt(cursor as string) : undefined;
     
     // Check if user is participant
     const participant = await prisma.conversationParticipant.findUnique({
@@ -101,7 +104,10 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
 
     const messages = await prisma.message.findMany({
       where: { conversationId: convId },
-      orderBy: { createdAt: 'asc' },
+      take: take,
+      skip: cursorId ? 1 : 0,
+      cursor: cursorId ? { id: cursorId } : undefined,
+      orderBy: { id: 'desc' }, // Use ID for more reliable cursor pagination
       include: {
         sender: {
           select: {

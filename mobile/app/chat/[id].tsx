@@ -30,9 +30,18 @@ export default function ChatThread() {
 
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(!isNewConversation);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(id || null);
   const [targetUserIdState, setTargetUserIdState] = useState<string | null>(targetUserId || (params.targetUserId as string) || null);
   const [creatingConversation, setCreatingConversation] = useState(false);
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
+  const messagesRef = useRef<any[]>([]);
+
+  // Keep messagesRef in sync
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // If we are in 'new' mode, we should still check if a conversation actually exists
   // but we won't show the loading spinner to the user.
@@ -55,6 +64,14 @@ export default function ChatThread() {
     };
     checkExisting();
   }, [isNewConversation, targetUserIdState, conversationId]);
+
+  // Reset state when conversation changes
+  useEffect(() => {
+    setInitialFetchDone(false);
+    setHasMore(true);
+    setMessages([]);
+    if (conversationId) setLoading(true);
+  }, [conversationId]);
 
   // Search mode toggled by Options or header
   const initialSearch = !!(params as any).search;
@@ -98,48 +115,66 @@ export default function ChatThread() {
     },
   });
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (isLoadMore = false) => {
     if (!conversationId) return;
+    if (isLoadMore && (!hasMore || loadingMore)) return;
+
     try {
-      const response = await chatApi.getMessages(conversationId);
+      if (isLoadMore) setLoadingMore(true);
       
-      const mapped = response.data.map((m: any) => ({
+      const cursor = isLoadMore && messagesRef.current.length > 0 
+        ? messagesRef.current[messagesRef.current.length - 1].id 
+        : undefined;
+
+      const response = await chatApi.getMessages(Number(conversationId), cursor, 20);
+      const newMessages = response.data;
+
+      const mapped = newMessages.map((m: any) => ({
         ...m,
         fromMe: m.senderId === user?.id,
         time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         contactName: m.sender?.fullName,
         contactAvatar: m.sender?.avatar ? `${API_URL}${m.sender.avatar}` : undefined,
         seenBy: m.seenBy || []
-      })).reverse();
+      }));
 
+      if (isLoadMore) {
+        setMessages(prev => [...prev, ...mapped]);
+      } else {
+        setMessages(mapped);
+        setInitialFetchDone(true);
+      }
+
+      setHasMore(newMessages.length === 20);
+      
       // If we still don't have targetUserId, extract it from the messages
       if (!targetUserIdState && mapped.length > 0) {
-        // Since reversed, oldest is at the end, newest at the beginning. 
-        // We just need any message not from me.
         const otherMessage = mapped.find((m: any) => m.senderId !== user?.id);
         if (otherMessage) {
           setTargetUserIdState(otherMessage.senderId.toString());
         }
       }
-
-      setMessages(mapped);
     } catch (err) {
       console.error("Fetch messages error:", err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [conversationId, user?.id, targetUserIdState]);
+  }, [conversationId, user?.id, hasMore, loadingMore, targetUserIdState]);
+
+  useEffect(() => {
+    if (!isFocused || !conversationId || initialFetchDone) return;
+    
+    fetchMessages(false);
+
+    const conversationIdNum = parseInt(conversationId, 10);
+    socketService.emit('join_conversation', conversationIdNum);
+  }, [conversationId, isFocused, fetchMessages, initialFetchDone]);
 
   useEffect(() => {
     if (!isFocused) return;
     
-    fetchMessages();
-
-    // Join room (only if conversation exists)
-    if (!conversationId) return;
-    
-    const conversationIdNum = parseInt(conversationId, 10);
-    socketService.emit('join_conversation', conversationIdNum);
+    const conversationIdNum = conversationId ? parseInt(conversationId, 10) : null;
 
     // Listen for seen events
     const handleMessageSeen = (data: any) => {
@@ -173,8 +208,6 @@ export default function ChatThread() {
     // Listen for new messages
     const handleNewMessage = (message: any) => {
       setMessages(prev => {
-        // Find if we have a temporary message with the same content for current user
-        // and replace it with the real one from server
         const isDuplicate = prev.find(m => m.id === message.id);
         if (isDuplicate) return prev;
 
@@ -199,36 +232,19 @@ export default function ChatThread() {
         return [mappedMessage, ...prev];
       });
 
-      // Scroll to bottom (index 0 in inverted list) when new message arrives
       setTimeout(() => {
         flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
       }, 100);
-
-      // When in chat, seeing a new message should trigger a seen update
-      if (message.senderId !== userId) {
-        // Emit seen event or the getMessages call will handle it on next focus
-        // For real-time, we could call an endpoint here or let the server handle it
-      }
     };
 
     socketService.on('new_message', handleNewMessage);
 
     return () => {
-      socketService.emit('leave_conversation', conversationIdNum);
+      if (conversationIdNum) socketService.emit('leave_conversation', conversationIdNum);
       socketService.off('new_message');
       socketService.off('message_seen');
     };
-  }, [conversationId, fetchMessages, user?.id, isFocused]);
-
-  // Handle initial scroll when messages load
-  useEffect(() => {
-    if (isFocused && messages.length > 0) {
-      const timer = setTimeout(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [messages.length, isFocused]);
+  }, [conversationId, user?.id, isFocused]);
 
   const handleSend = async () => {
     if (!messageText.trim()) return;
@@ -384,16 +400,27 @@ export default function ChatThread() {
                   data={messages}
                   inverted
                   keyExtractor={(i) => i.id.toString()}
-                  initialNumToRender={15}
-                  maxToRenderPerBatch={10}
+                  initialNumToRender={20}
+                  maxToRenderPerBatch={20}
                   windowSize={10}
                   maintainVisibleContentPosition={{
                     minIndexForVisible: 0,
+                    autoscrollToTopThreshold: 10,
                   }}
                   contentContainerStyle={{ 
                     paddingVertical: 12,
                     paddingBottom: 0
                   }}
+                  onEndReached={() => {
+                    if (hasMore && !loadingMore && messages.length >= 10) {
+                      console.log('Fetching more messages...');
+                      fetchMessages(true);
+                    }
+                  }}
+                  onEndReachedThreshold={0.5}
+                  ListFooterComponent={() => loadingMore ? (
+                    <ActivityIndicator style={{ marginVertical: 10 }} color={colors.tint} />
+                  ) : null}
                   renderItem={({ item, index }: any) => {
                     const nextMessage = messages[index - 1]; // Inverted list: index 0 is at bottom (newest)
                     // If message above (index-1) is from same user, this is NOT the last in that user's consecutive group

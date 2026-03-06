@@ -38,14 +38,16 @@ export default function Messages() {
         const otherParticipant = conv.participants.find((p: any) => p.userId !== user?.id);
         
         // Check if the last message was sent by the current user
-        const isFromMe = lastMsg?.senderId === user?.id;
+        // We use user?.id to compare with senderId from the message
+        const isFromMe = lastMsg && user && (lastMsg.senderId === user.id);
+        
         const lastMessageText = lastMsg 
           ? (isFromMe ? `Bạn: ${lastMsg.content}` : lastMsg.content)
           : 'Chưa có tin nhắn';
         
         return {
           id: conv.id.toString(),
-          name: conv.name || otherParticipant?.user.fullName || 'Người dùng Zalo',
+          name: conv.name || otherParticipant?.user.fullName || 'Người dùng',
           lastMessage: lastMessageText,
           time: lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
           unread: conv._count?.messages || 0,
@@ -62,18 +64,17 @@ export default function Messages() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, colors.tint]);
+  }, [user, colors.tint]);
 
   useEffect(() => {
     fetchConversations();
 
-    socketService.on('conversation_updated', () => {
-      fetchConversations(); 
-    });
-
-    socketService.on('new_message', () => {
+    const handleUpdate = () => {
       fetchConversations();
-    });
+    };
+
+    socketService.on('conversation_updated', handleUpdate);
+    socketService.on('new_message', handleUpdate);
 
     return () => {
       socketService.off('conversation_updated');

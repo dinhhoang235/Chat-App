@@ -78,10 +78,9 @@ export default function ChatThread() {
   const [pendingOpen, setPendingOpen] = useState(false);
 
   const keyboardHeight = useSharedValue(0);
-  const listPaddingBottom = insets.bottom + 64;
 
-  const animatedSpacerStyle = useAnimatedStyle(() => ({
-    height: keyboardHeight.value,
+  const animatedContentStyle = useAnimatedStyle(() => ({
+    paddingBottom: Math.max(0, keyboardHeight.value - insets.bottom / 2),
   }));
 
   useKeyboardHandler({
@@ -109,11 +108,14 @@ export default function ChatThread() {
         fromMe: m.senderId === user?.id,
         time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         contactName: m.sender?.fullName,
-        contactAvatar: m.sender?.avatar ? `${API_URL}${m.sender.avatar}` : undefined
-      }));
+        contactAvatar: m.sender?.avatar ? `${API_URL}${m.sender.avatar}` : undefined,
+        seenBy: m.seenBy || []
+      })).reverse();
 
       // If we still don't have targetUserId, extract it from the messages
       if (!targetUserIdState && mapped.length > 0) {
+        // Since reversed, oldest is at the end, newest at the beginning. 
+        // We just need any message not from me.
         const otherMessage = mapped.find((m: any) => m.senderId !== user?.id);
         if (otherMessage) {
           setTargetUserIdState(otherMessage.senderId.toString());
@@ -139,44 +141,120 @@ export default function ChatThread() {
     const conversationIdNum = parseInt(conversationId, 10);
     socketService.emit('join_conversation', conversationIdNum);
 
+    // Listen for seen events
+    const handleMessageSeen = (data: any) => {
+      const { userId: seenByUserId, seenAt, user: seenUser } = data;
+      if (seenByUserId === user?.id) return;
+
+      const userData = seenUser || { 
+        id: seenByUserId, 
+        fullName: 'User', 
+        avatar: undefined 
+      };
+
+      setMessages(prev => prev.map(m => {
+        if (new Date(m.createdAt) <= new Date(seenAt)) {
+          const alreadySeen = m.seenBy?.some((u: any) => u.id === seenByUserId);
+          if (!alreadySeen && m.senderId !== seenByUserId) {
+            return {
+              ...m,
+              seenBy: [...(m.seenBy || []), userData]
+            };
+          }
+        }
+        return m;
+      }));
+    };
+
+    socketService.on('message_seen', handleMessageSeen);
+
     const userId = user?.id;
 
     // Listen for new messages
-    socketService.on('new_message', (message) => {
+    const handleNewMessage = (message: any) => {
       setMessages(prev => {
-        // Prevent duplicate messages if already in state
-        if (prev.find(m => m.id === message.id)) return prev;
+        // Find if we have a temporary message with the same content for current user
+        // and replace it with the real one from server
+        const isDuplicate = prev.find(m => m.id === message.id);
+        if (isDuplicate) return prev;
+
+        const tempIdx = prev.findIndex(m => m.status === 'sending' && m.content === message.content && m.senderId === message.senderId);
         
-        return [...prev, {
+        const mappedMessage = {
           ...message,
           fromMe: message.senderId === userId,
           time: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           contactName: message.sender?.fullName,
-          contactAvatar: message.sender?.avatar ? `${API_URL}${message.sender.avatar}` : undefined
-        }];
+          contactAvatar: message.sender?.avatar ? `${API_URL}${message.sender.avatar}` : undefined,
+          seenBy: message.seenBy || [],
+          status: 'sent'
+        };
+
+        if (tempIdx !== -1) {
+          const newMessages = [...prev];
+          newMessages[tempIdx] = mappedMessage;
+          return newMessages;
+        }
+        
+        return [mappedMessage, ...prev];
       });
-      // Scroll to bottom
+
+      // Scroll to bottom (index 0 in inverted list) when new message arrives
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
       }, 100);
-    });
+
+      // When in chat, seeing a new message should trigger a seen update
+      if (message.senderId !== userId) {
+        // Emit seen event or the getMessages call will handle it on next focus
+        // For real-time, we could call an endpoint here or let the server handle it
+      }
+    };
+
+    socketService.on('new_message', handleNewMessage);
 
     return () => {
       socketService.emit('leave_conversation', conversationIdNum);
       socketService.off('new_message');
+      socketService.off('message_seen');
     };
   }, [conversationId, fetchMessages, user?.id, isFocused]);
+
+  // Handle initial scroll when messages load
+  useEffect(() => {
+    if (isFocused && messages.length > 0) {
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [messages.length, isFocused]);
 
   const handleSend = async () => {
     if (!messageText.trim()) return;
     const text = messageText.trim();
     setMessageText('');
 
+    // Scroll to bottom (index 0 in inverted list)
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+
+    const tempId = `temp-${Date.now()}`;
+    const tempMessage = {
+      id: tempId,
+      content: text,
+      fromMe: true,
+      senderId: user?.id,
+      createdAt: new Date().toISOString(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sending'
+    };
+
     try {
       let targetConversationId = conversationId;
 
       // If this is a new conversation, create it with the first message
       if (isNewConversation && !conversationId) {
+        setMessages([tempMessage]);
         setCreatingConversation(true);
         try {
           const response = await chatApi.startConversation(Number(targetUserIdState), text);
@@ -185,20 +263,20 @@ export default function ChatThread() {
           
           if (targetConversationId) {
             setConversationId(targetConversationId.toString());
-            // Clear 'new' state since it's now a real conversation
-            // The message is already created by startConversation
             const lastMessage = conv.messages?.[0];
             if (lastMessage) {
               setMessages([{
                 ...lastMessage,
                 fromMe: true,
-                time: new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                time: new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                status: 'sent'
               }]);
             }
           }
-          return; // Message is already sent as part of startConversation
+          return;
         } catch (err) {
           console.error("Error creating conversation on send:", err);
+          setMessages([]);
           setMessageText(text);
           return;
         } finally {
@@ -206,16 +284,16 @@ export default function ChatThread() {
         }
       }
 
+      setMessages(prev => [tempMessage, ...prev]);
+
       await chatApi.sendMessage(Number(targetConversationId), text);
       
-      // Socket.io will handle appending the message for both sender and receiver.
-      
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      // We don't manually set 'sent' here because the socket 'new_message' 
+      // will arrive and replace this temp message or add the real one.
     } catch (err) {
       console.error("Send error:", err);
-      setMessageText(text); // Restore text if error
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setMessageText(text);
     }
   };
 
@@ -293,179 +371,181 @@ export default function ChatThread() {
             />
           )}
 
-          {loading ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={colors.tint} />
-            </View>
-          ) : (
-            <View style={{ flex: 1 }}>
-              <FlatList
-                ref={flatListRef}
-                data={messages}
-                keyExtractor={(i) => i.id.toString()}
-                renderItem={({ item }: any) => (
-                  <MessageBubble 
-                    message={item} 
-                    highlightQuery={searchQuery} 
-                    onPress={() => { if (composerVisible) setComposerVisible(false); }} 
-                    onAvatarPress={() => {
-                      if (item.fromMe) return router.push('/profile/me');
-                      router.push(`/profile/${item.senderId}`);
-                    }}
-                  />
-                )}
-                contentContainerStyle={{ 
-                  paddingVertical: 12,
-                  paddingBottom: listPaddingBottom
-                }}
-              />
-            </View>
-          )}
+          {/* Wrapper for messages and composer that pushes up with keyboard */}
+          <Animated.View style={[{ flex: 1 }, animatedContentStyle]}>
+            {loading ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={colors.tint} />
+              </View>
+            ) : (
+              <View style={{ flex: 1, marginBottom: 2 }}>
+                <FlatList
+                  ref={flatListRef}
+                  data={messages}
+                  inverted
+                  keyExtractor={(i) => i.id.toString()}
+                  initialNumToRender={15}
+                  maxToRenderPerBatch={10}
+                  windowSize={10}
+                  maintainVisibleContentPosition={{
+                    minIndexForVisible: 0,
+                  }}
+                  contentContainerStyle={{ 
+                    paddingVertical: 12,
+                    paddingBottom: 0
+                  }}
+                  renderItem={({ item, index }: any) => {
+                    const nextMessage = messages[index - 1]; // Inverted list: index 0 is at bottom (newest)
+                    // If message above (index-1) is from same user, this is NOT the last in that user's consecutive group
+                    const isLastInConsecutiveGroup = !nextMessage || nextMessage.senderId !== item.senderId;
+                    
+                    // For 'seen' status: index 0 is the newest message
+                    const isThreadLast = index === 0;
 
-          {/* Bottom search bar: replace composer when in searchMode */}
-          {searchMode ? (
-            <View
-              style={{
-                borderTopWidth: 1,
-                borderTopColor: colors.surfaceVariant,
-                backgroundColor: colors.surface,
-              }}
-            >
-              <InThreadSearch
-                messages={messages as any}
-                query={searchQuery}
-                onQueryChange={setSearchQuery}
-                resultIndices={resultIndices}
-                currentResultIndex={currentResultIndex}
-                onSetCurrentResultIndex={setCurrentResultIndex}
-                onClose={() => setSearchMode(false)}
-                onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
-                renderMode="bottom"
-              />
+                    return (
+                      <MessageBubble 
+                        message={item} 
+                        highlightQuery={searchQuery} 
+                        isLastInGroup={isLastInConsecutiveGroup}
+                        isThreadLast={isThreadLast}
+                        onPress={() => { if (composerVisible) setComposerVisible(false); }} 
+                        onAvatarPress={() => {
+                          if (item.fromMe) return router.push('/profile/me');
+                          router.push(`/profile/${item.senderId}`);
+                        }}
+                      />
+                    );
+                  }}
+                />
+              </View>
+            )}
 
-              {/* Animated spacer for search mode - same as composer */}
-              <Animated.View
-                style={[
-                  { 
-                    backgroundColor: colors.surface,
-                    paddingBottom: insets.bottom,
-                  },
-                  animatedSpacerStyle,
-                ]}
-              />
-            </View>
-          ) : null}
-
-          {/* Composer: hidden when search mode is active */}
-          {!searchMode && (
-            <View
-              style={{
-                borderTopWidth: 1,
-                borderTopColor: colors.surfaceVariant,
-                backgroundColor: colors.surface,
-              }}
-            >
-              <View 
-                className="px-4 flex-row items-center" 
+            {/* Bottom search bar: replace composer when in searchMode */}
+            {searchMode ? (
+              <View
                 style={{
-                  paddingBottom: 4,
-                  paddingTop: 4,
+                  borderTopWidth: 1,
+                  borderTopColor: colors.surfaceVariant,
+                  backgroundColor: colors.surface,
                 }}
               >
-                <TouchableOpacity className="mr-3">
-                  <MaterialIcons name="emoji-emotions" size={26} color={colors.icon} />
-                </TouchableOpacity>
+                <InThreadSearch
+                  messages={messages as any}
+                  query={searchQuery}
+                  onQueryChange={setSearchQuery}
+                  resultIndices={resultIndices}
+                  currentResultIndex={currentResultIndex}
+                  onSetCurrentResultIndex={setCurrentResultIndex}
+                  onClose={() => setSearchMode(false)}
+                  onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
+                  renderMode="bottom"
+                />
+              </View>
+            ) : null}
 
+            {/* Composer: hidden when search mode is active */}
+            {!searchMode && (
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: colors.surfaceVariant,
+                  backgroundColor: colors.surface,
+                  marginTop: -8, // Kéo composer lên sát hơn với tin nhắn
+                }}
+              >
                 <View 
-                  className="flex-1 px-2 py-2 mr-3" 
-                  style={{ 
-                    backgroundColor: colors.surface, 
-                    borderRadius: 10, 
-                    minHeight: 40,
-                    maxHeight: 100,
-                    justifyContent: 'center' 
+                  className="px-4 flex-row items-center" 
+                  style={{
+                    paddingBottom: 4,
+                    paddingTop: 4,
                   }}
                 >
-                  <TextInput
-                    ref={inputRef}
-                    value={messageText}
-                    onChangeText={text => setMessageText(text)}
-                    placeholder="Tin nhắn"
-                    placeholderTextColor={colors.textSecondary}
+                  <TouchableOpacity className="mr-3">
+                    <MaterialIcons name="emoji-emotions" size={26} color={colors.icon} />
+                  </TouchableOpacity>
+
+                  <View 
+                    className="flex-1 px-2 py-2 mr-3" 
                     style={{ 
-                      color: colors.text, 
-                      fontSize: 16, 
-                      paddingVertical: 8,
-                      textAlignVertical: 'center'
+                      backgroundColor: colors.surface, 
+                      borderRadius: 10, 
+                      minHeight: 40,
+                      maxHeight: 100,
+                      justifyContent: 'center' 
                     }}
-                    multiline
-                    onFocus={() => setComposerVisible(false)}
-                  />
+                  >
+                    <TextInput
+                      ref={inputRef}
+                      value={messageText}
+                      onChangeText={text => setMessageText(text)}
+                      placeholder="Tin nhắn"
+                      placeholderTextColor={colors.textSecondary}
+                      style={{ 
+                        color: colors.text, 
+                        fontSize: 16, 
+                        paddingVertical: 8,
+                        textAlignVertical: 'center'
+                      }}
+                      multiline
+                    />
+                  </View>
+
+                  {/* Right action icons: show send when typing, otherwise more/mic/image */}
+                  <View className="flex-row items-center">
+                    {messageText.trim().length > 0 ? (
+                      <TouchableOpacity 
+                        onPress={handleSend}
+                        disabled={creatingConversation}
+                        style={{ padding: 6, opacity: creatingConversation ? 0.5 : 1 }}
+                      >
+                        {creatingConversation ? (
+                          <ActivityIndicator size={28} color={colors.tint} />
+                        ) : (
+                          <MaterialIcons name="send" size={34} color={colors.tint} />
+                        )}
+                      </TouchableOpacity>
+                    ) : (
+                      <>
+                        <TouchableOpacity 
+                          className="mr-4" 
+                          onPress={() => { 
+                            inputRef.current?.blur?.(); 
+                            Keyboard.dismiss(); 
+                            setComposerVisible(v => !v); 
+                          }} 
+                          style={{ padding: 6 }}
+                        >
+                          <MaterialIcons 
+                            name="more-horiz" 
+                            size={24} 
+                            color={composerVisible ? colors.tint : colors.icon} 
+                          />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                          className="mr-4" 
+                          onPress={() => console.log('Mic pressed')} 
+                          style={{ padding: 6 }}
+                        >
+                          <MaterialIcons name="mic" size={28} color={colors.icon} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                          onPress={() => console.log('Image pressed')} 
+                          style={{ padding: 6 }}
+                        >
+                          <MaterialIcons name="image" size={26} color={colors.icon} />
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
                 </View>
 
-                {/* Right action icons: show send when typing, otherwise more/mic/image */}
-                <View className="flex-row items-center">
-                  {messageText.trim().length > 0 ? (
-                    <TouchableOpacity 
-                      onPress={handleSend}
-                      disabled={creatingConversation}
-                      style={{ padding: 6, opacity: creatingConversation ? 0.5 : 1 }}
-                    >
-                      {creatingConversation ? (
-                        <ActivityIndicator size={28} color={colors.tint} />
-                      ) : (
-                        <MaterialIcons name="send" size={34} color={colors.tint} />
-                      )}
-                    </TouchableOpacity>
-                  ) : (
-                    <>
-                      <TouchableOpacity 
-                        className="mr-4" 
-                        onPress={() => { 
-                          inputRef.current?.blur?.(); 
-                          Keyboard.dismiss(); 
-                          setComposerVisible(v => !v); 
-                        }} 
-                        style={{ padding: 6 }}
-                      >
-                        <MaterialIcons 
-                          name="more-horiz" 
-                          size={24} 
-                          color={composerVisible ? colors.tint : colors.icon} 
-                        />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity 
-                        className="mr-4" 
-                        onPress={() => console.log('Mic pressed')} 
-                        style={{ padding: 6 }}
-                      >
-                        <MaterialIcons name="mic" size={28} color={colors.icon} />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity 
-                        onPress={() => console.log('Image pressed')} 
-                        style={{ padding: 6 }}
-                      >
-                        <MaterialIcons name="image" size={26} color={colors.icon} />
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
+                {/* Return to using a small spacer or insets for default state */}
+                <View style={{ height: insets.bottom / 2 }} />
               </View>
-
-              {/* Animated spacer that grows with keyboard height - pushes content up naturally */}
-              <Animated.View
-                style={[
-                  { 
-                    backgroundColor: colors.surface,
-                    paddingBottom: insets.bottom,
-                  },
-                  animatedSpacerStyle,
-                ]}
-              />
-            </View>
-          )}
+            )}
+          </Animated.View>
 
           {composerVisible && (
             <ComposerActionsSheet

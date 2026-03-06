@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useTheme } from '../context/themeContext';
+import { API_URL } from '../services/api';
 
 type ChatMessage = {
   id: string;
@@ -13,9 +14,12 @@ type ChatMessage = {
   contactAvatar?: string;
   contactAvatarColor?: string;
   reactions?: { emoji: string; count?: number }[];
+  seenBy?: { id: number; fullName?: string; avatar?: string }[];
+  isLastInGroup?: boolean;
+  status?: 'sending' | 'sent' | 'error';
 };
 
-export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void }) {
+export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean }) {
   const { colors } = useTheme();
 
   if (message.type === 'separator') {
@@ -109,7 +113,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
       <View className={`flex-row ${message.fromMe ? 'justify-end' : 'justify-start'} px-4 my-2`}> 
         {!message.fromMe && (
-          <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
+          <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ opacity: isLastInGroup ? 1 : 0 }}>
             <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant, overflow: 'hidden' }}>
               {message.contactAvatar ? (
                 <Image 
@@ -124,7 +128,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         )}
 
         <View style={{ maxWidth: '72%', marginLeft: isOutgoing ? 'auto' : 12 }} className={`${isOutgoing ? 'items-end' : 'items-start'}`}> 
-            <View style={{ backgroundColor: bubbleBg, borderWidth: 1, borderColor, padding: 12, borderRadius: 18 }}>
+            <View style={{ backgroundColor: bubbleBg, borderWidth: 1, borderColor, padding: 12, borderRadius: 18, marginBottom: isLastInGroup ? 0 : -8 }}>
             {message.type === 'sticker' ? (
               <Image source={{ uri: 'https://via.placeholder.com/120x120.png?text=STK' }} style={{ width: 120, height: 120, borderRadius: 12 }} />
             ) : (
@@ -132,14 +136,56 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
             )}
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, justifyContent: isOutgoing ? 'flex-end' : 'flex-start' }}>
-            <Text style={{ color: timeColor, fontSize: 12, marginRight: isOutgoing ? 0 : 8, marginLeft: isOutgoing ? 8 : 0 }}>{message.time}</Text>
-            {message.reactions && message.reactions.length > 0 && (
-              <View style={{ backgroundColor: colors.surfaceVariant, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-                <Text style={{ fontSize: 12, color: colors.text }}>{message.reactions[0].emoji} {message.reactions[0].count ?? ''}</Text>
-              </View>
-            )}
-          </View>
+          {isLastInGroup && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, justifyContent: isOutgoing ? 'flex-end' : 'flex-start' }}>
+              <Text style={{ color: timeColor, fontSize: 12, marginRight: isOutgoing ? 0 : 8, marginLeft: isOutgoing ? 8 : 0 }}>
+                {isOutgoing && isThreadLast ? (
+                   message.status === 'sending' ? 'Đang gửi' : 
+                   (message.seenBy && message.seenBy.length > 0) ? '' : 'Đã gửi'
+                ) : message.time}
+              </Text>
+              {message.reactions && message.reactions.length > 0 && (
+                <View style={{ backgroundColor: colors.surfaceVariant, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+                  <Text style={{ fontSize: 12, color: colors.text }}>{message.reactions[0].emoji} {message.reactions[0].count ?? ''}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Seen By Avatars - Only show for last message in entire thread */}
+          {isOutgoing && isThreadLast && message.seenBy && message.seenBy.length > 0 && (
+            <View style={{ flexDirection: 'row', marginTop: -12, justifyContent: 'flex-end', paddingBottom: 4 }}>
+              {message.seenBy.map((u, idx) => (
+                <View 
+                  key={u.id} 
+                  style={{ 
+                    width: 24, 
+                    height: 24, 
+                    borderRadius: 12, 
+                    backgroundColor: colors.surfaceVariant, 
+                    marginLeft: idx > 0 ? -8 : 0,
+                    borderWidth: 1.5,
+                    borderColor: colors.background,
+                    overflow: 'hidden'
+                  }}
+                >
+                  {u.avatar ? (
+                    <Image 
+                      source={{ uri: u.avatar.startsWith('http') ? u.avatar : `${API_URL}${u.avatar}` }} 
+                      style={{ width: 24, height: 24 }} 
+                      onError={(e) => console.log('Avatar load error:', e.nativeEvent.error)}
+                    />
+                  ) : (
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                        {u.fullName ? u.fullName.slice(0,1) : '?'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>

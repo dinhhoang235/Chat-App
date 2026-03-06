@@ -84,6 +84,14 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
           conversationId: convId,
           userId
         }
+      },
+      include: {
+        user: {
+          select: {
+            fullName: true,
+            avatar: true
+          }
+        }
       }
     });
 
@@ -105,6 +113,32 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
       }
     });
 
+    // Get participants to determine who has seen which messages
+    const participants = await prisma.conversationParticipant.findMany({
+      where: { conversationId: convId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            avatar: true
+          }
+        }
+      }
+    });
+
+    // Map messages to include seenBy info
+    const messagesWithSeen = messages.map(msg => {
+      const seenBy = participants
+        .filter(p => p.userId !== msg.senderId && p.lastReadAt >= msg.createdAt)
+        .map(p => ({
+          id: p.user.id,
+          fullName: p.user.fullName,
+          avatar: p.user.avatar ? (p.user.avatar.startsWith('http') ? p.user.avatar : p.user.avatar) : null
+        }));
+      return { ...msg, seenBy };
+    });
+
     // Update lastReadAt
     await prisma.conversationParticipant.update({
       where: {
@@ -116,10 +150,22 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
       data: { lastReadAt: new Date() }
     });
 
+    // Notify other participants that this user has seen the messages
+    io.to(`conversation:${convId}`).emit('message_seen', {
+      conversationId: convId,
+      userId,
+      seenAt: new Date(),
+      user: {
+        id: userId,
+        fullName: participant.user.fullName,
+        avatar: participant.user.avatar
+      }
+    });
+
     // Notify user to refresh conversation list unread count
     io.to(`user:${userId}`).emit('conversation_updated', { conversationId: convId });
 
-    return res.json(messages);
+    return res.json(messagesWithSeen);
   } catch (err) {
     console.error('Get messages error:', err);
     return res.status(500).json({ message: 'Error fetching messages' });

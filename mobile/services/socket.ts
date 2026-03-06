@@ -48,11 +48,22 @@ class SocketService {
   }
 
   on(event: string, callback: (data: any) => void) {
-    this.socket?.on(event, callback);
+    if (this.socket) {
+      this.socket.on(event, callback);
+    } else {
+      // If socket not connected yet, try connecting or wait
+      console.log(`Socket not connected, cannot listen to ${event}. Attempting connect...`);
+      this.connect();
+      // We could queue listeners here if needed, but for now just log
+    }
   }
 
-  off(event: string) {
-    this.socket?.off(event);
+  off(event: string, callback?: (data: any) => void) {
+    if (callback) {
+      this.socket?.off(event, callback);
+    } else {
+      this.socket?.off(event);
+    }
   }
 }
 

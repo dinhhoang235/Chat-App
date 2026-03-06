@@ -6,6 +6,8 @@ export const chatApi = {
     apiClient.get(`/chats/${id}/messages`, { params: { cursor, limit } }),
   sendMessage: (id: string | number, content: string, type: string = 'text') => 
     apiClient.post(`/chats/${id}/messages`, { content, type }),
+  markAsRead: (id: string | number) => 
+    apiClient.post(`/chats/${id}/read`),
   startConversation: (targetUserId: number, firstMessage?: string) => 
     apiClient.post('/chats/start', { targetUserId, firstMessage }),
 };

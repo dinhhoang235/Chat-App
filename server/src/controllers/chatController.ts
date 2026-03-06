@@ -164,6 +164,8 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
       bulkCacheMessages(convId, messagesWithSeen).catch(e => console.error(e));
     }
 
+    const now = new Date();
+
     // Update lastReadAt
     await prisma.conversationParticipant.update({
       where: {
@@ -172,14 +174,14 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
           userId
         }
       },
-      data: { lastReadAt: new Date() }
+      data: { lastReadAt: now }
     });
 
     // Notify other participants that this user has seen the messages
     io.to(`conversation:${convId}`).emit('message_seen', {
       conversationId: convId,
       userId,
-      seenAt: new Date(),
+      seenAt: now,
       user: {
         id: userId,
         fullName: participant.user.fullName,
@@ -187,13 +189,101 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
       }
     });
 
-    // Notify user to refresh conversation list unread count
-    io.to(`user:${userId}`).emit('conversation_updated', { conversationId: convId });
+    // Notify ALL participants to refresh conversation list unread count
+    const allParticipantsInConv = await prisma.conversationParticipant.findMany({
+      where: { conversationId: convId }
+    });
+
+    allParticipantsInConv.forEach(p => {
+      io.to(`user:${p.userId}`).emit('conversation_updated', { 
+        conversationId: convId,
+        userId: userId,
+        action: 'read'
+      });
+    });
 
     return res.json(messagesWithSeen);
   } catch (err) {
     console.error('Get messages error:', err);
     return res.status(500).json({ message: 'Error fetching messages' });
+  }
+};
+
+export const markAsRead = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
+  const { conversationId } = req.params;
+  const userId = req.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  try {
+    const convId = parseInt(Array.isArray(conversationId) ? conversationId[0] : conversationId);
+
+    // Check if user is participant
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId
+        }
+      },
+      include: {
+        user: {
+          select: {
+            fullName: true,
+            avatar: true
+          }
+        }
+      }
+    });
+
+    if (!participant) {
+      return res.status(403).json({ message: 'Not a member of this conversation' });
+    }
+
+    const now = new Date();
+
+    // Update lastReadAt
+    await prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId
+        }
+      },
+      data: { lastReadAt: now }
+    });
+
+    // Notify other participants that this user has seen the messages
+    io.to(`conversation:${convId}`).emit('message_seen', {
+      conversationId: convId,
+      userId,
+      seenAt: now,
+      user: {
+        id: userId,
+        fullName: participant.user.fullName,
+        avatar: participant.user.avatar
+      }
+    });
+
+    // Notify ALL participants to refresh conversation list unread count
+    const allParticipants = await prisma.conversationParticipant.findMany({
+      where: { conversationId: convId }
+    });
+
+    allParticipants.forEach(p => {
+      io.to(`user:${p.userId}`).emit('conversation_updated', { 
+        conversationId: convId,
+        userId: userId,
+        action: 'read'
+      });
+    });
+
+    return res.json({ success: true, seenAt: now });
+  } catch (err) {
+    console.error('Mark as read error:', err);
+    return res.status(500).json({ message: 'Error marking messages as read' });
   }
 };
 

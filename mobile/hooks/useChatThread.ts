@@ -173,12 +173,20 @@ export function useChatThread() {
   }, [conversationId, user?.id, hasMore, loadingMore, targetUserIdState]);
 
   useEffect(() => {
-    if (!isFocused || !conversationId || initialFetchDone) return;
-
-    fetchMessages(false);
+    if (!isFocused || !conversationId) return;
 
     const conversationIdNum = parseInt(conversationId, 10);
-    socketService.emit('join_conversation', conversationIdNum);
+    
+    // Join room and initial fetch
+    if (!initialFetchDone) {
+      fetchMessages(false);
+      socketService.emit('join_conversation', conversationIdNum);
+    }
+
+    // Always mark as read when focusing a conversation
+    chatApi.markAsRead(conversationIdNum).catch(err => {
+      console.error('Mark as read focus error:', err);
+    });
   }, [conversationId, isFocused, fetchMessages, initialFetchDone]);
 
   useEffect(() => {
@@ -212,6 +220,15 @@ export function useChatThread() {
 
     // Listen for new messages
     const handleNewMessage = (message: any) => {
+      // If we are currently in this conversation and it's from someone else, mark it as read immediately
+      if (isFocused && conversationId && message.conversationId === parseInt(conversationId, 10)) {
+        if (message.senderId !== user?.id) {
+          chatApi.markAsRead(message.conversationId).catch(err => {
+            console.error('Mark as read new message error:', err);
+          });
+        }
+      }
+
       setMessages(prev => {
         const isDuplicate = prev.find(m => m.id === message.id);
         if (isDuplicate) return prev;

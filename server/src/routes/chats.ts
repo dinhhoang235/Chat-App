@@ -4,7 +4,8 @@ import {
   getConversations, 
   getMessages, 
   sendMessage, 
-  startConversation 
+  startConversation,
+  markAsRead
 } from '../controllers/chatController.js';
 import { Server } from 'socket.io';
 
@@ -16,6 +17,7 @@ export const chatRoutes = (io: Server) => {
   router.get('/conversations', getConversations);
   router.get('/:conversationId/messages', getMessages(io));
   router.post('/:conversationId/messages', sendMessage(io));
+  router.post('/:conversationId/read', markAsRead(io));
   router.post('/start', startConversation(io));
 
   return router;

@@ -12,6 +12,7 @@ export interface ContactItem {
   phone: string;
   avatar?: string;
   bio?: string;
+  status?: string;
 }
 
 type Props = {
@@ -30,18 +31,35 @@ export function ContactRow({ contact, onPress, onCall, onVideo }: Props) {
   return (
     <TouchableOpacity onPress={onPress} className="px-4 py-3 flex-row items-center" style={{ paddingRight: 0 }}>
       <View className="flex-row items-center">
-        {contact.avatar ? (
-          <Image
-            source={{ uri: `${API_BASE_URL}${contact.avatar}` }}
-            style={{ width: 48, height: 48, borderRadius: 24 }}
-          />
-        ) : (
-          <View
-            style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{initials.toUpperCase()}</Text>
-          </View>
-        )}
+        <View>
+          {contact.avatar ? (
+            <Image
+              source={{ uri: `${API_BASE_URL}${contact.avatar}` }}
+              style={{ width: 48, height: 48, borderRadius: 24 }}
+            />
+          ) : (
+            <View
+              style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{initials.toUpperCase()}</Text>
+            </View>
+          )}
+          {contact.status === 'online' && (
+            <View 
+              style={{ 
+                position: 'absolute', 
+                bottom: 0, 
+                right: 0, 
+                width: 14, 
+                height: 14, 
+                borderRadius: 7, 
+                backgroundColor: '#4CAF50', 
+                borderWidth: 2, 
+                borderColor: colors.header 
+              }} 
+            />
+          )}
+        </View>
 
         <View style={{ marginLeft: 12, flex: 1 }}>
           <Text style={{ color: colors.text, fontSize: 16 }}>{contact.fullName}</Text>

@@ -5,9 +5,11 @@ import { Header } from "../../components/Header";
 import { useTheme } from "../../context/themeContext";
 import { useTabBar } from '../../context/tabBarContext';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { ContactRow, ContactItem } from '../../components/ContactRow';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getFriendsList, getPendingFriendRequests } from '../../services/friendship';
+import { socketService } from '../../services/socket';
 
 type Section = {
   title: string;
@@ -19,6 +21,7 @@ export default function Contacts() {
   const insets = useSafeAreaInsets();
   const { tabBarHeight } = useTabBar();
   const router = useRouter();
+  const isFocused = useIsFocused();
   
   const [contacts, setContacts] = React.useState<ContactItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -46,6 +49,21 @@ export default function Contacts() {
       setLoading(false);
     }
   };
+
+  React.useEffect(() => {
+    if (!isFocused) return;
+
+    const handleStatusChanged = (data: { userId: number; status: string }) => {
+      setContacts(prev => prev.map(c => 
+        Number(c.id) === data.userId ? { ...c, status: data.status } : c
+      ));
+    };
+
+    socketService.on('user_status_changed', handleStatusChanged);
+    return () => {
+      socketService.off('user_status_changed', handleStatusChanged);
+    };
+  }, [isFocused]);
 
   const loadPendingCount = async () => {
     try {

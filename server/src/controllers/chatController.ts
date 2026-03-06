@@ -2,7 +2,7 @@ import { Response } from 'express';
 import prisma from '../db.js';
 import { Server } from 'socket.io';
 import { AuthRequest } from '../middleware/auth.js';
-import { getCachedMessages, bulkCacheMessages, cacheMessage } from '../utils/redis.js';
+import { getCachedMessages, bulkCacheMessages, cacheMessage, getUserStatus } from '../utils/redis.js';
 
 export const getConversations = async (req: AuthRequest, res: Response): Promise<any> => {
   const userId = req.userId;
@@ -41,7 +41,7 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
       }
     });
 
-    // Manually calculate unread count for each conversation
+    // Manually calculate unread count and add user status for each conversation
     const mappedConversations = await Promise.all(conversations.map(async (conv) => {
       const participant = conv.participants.find(p => p.userId === userId);
       const unreadCount = await prisma.message.count({
@@ -52,8 +52,24 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
         }
       });
 
+      // Add status for the other participant
+      const participantsWithStatus = await Promise.all(conv.participants.map(async (p) => {
+        if (p.userId !== userId) {
+          const status = await getUserStatus(p.userId);
+          return {
+            ...p,
+            user: {
+              ...p.user,
+              status: status === 'online' ? 'online' : 'offline'
+            }
+          };
+        }
+        return p;
+      }));
+
       return {
         ...conv,
+        participants: participantsWithStatus,
         _count: {
           messages: unreadCount
         }

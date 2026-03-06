@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../db.js';
 import { generateTokens, verifyRefreshToken } from '../utils/jwt.js';
+import { getUserStatus } from '../utils/redis.js';
 import fs from 'fs';
 
 export const login = async (req: Request, res: Response): Promise<void> => {
@@ -109,7 +110,16 @@ export const getAllUsers = async (_req: Request, res: Response): Promise<void> =
         updatedAt: true
       }
     });
-    res.json(users);
+
+    const usersWithStatus = await Promise.all(users.map(async (u) => {
+      const status = await getUserStatus(u.id);
+      return {
+        ...u,
+        status: status === 'online' ? 'online' : 'offline'
+      };
+    }));
+
+    res.json(usersWithStatus);
   } catch (err) {
     console.error('Error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -140,7 +150,16 @@ export const getUserById = async (req: Request, res: Response): Promise<void> =>
       return;
     }
     
-    res.json(user);
+    // Get real-time status from Redis
+    const status = await getUserStatus(user.id);
+    const isOnline = status === 'online';
+    const lastSeen = !isOnline && status ? parseInt(status) : null;
+
+    res.json({ 
+      ...user, 
+      status: isOnline ? 'online' : 'offline',
+      lastSeen 
+    });
   } catch (err) {
     console.error('Error:', err);
     res.status(500).json({ error: 'Failed to fetch user' });

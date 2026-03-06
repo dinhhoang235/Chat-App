@@ -9,6 +9,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatApi } from '../services/chat';
 import { socketService } from '../services/socket';
+import { userAPI } from '../services/user';
 import { useAuth } from '../context/authContext';
 import { API_URL } from '../services/api';
 import { useTyping } from './useTyping';
@@ -35,6 +36,9 @@ export function useChatThread() {
   const [creatingConversation, setCreatingConversation] = useState(false);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   const { isTyping, typingUser, handleType } = useTyping(conversationId, user?.id);
+  
+  const [targetUserStatus, setTargetUserStatus] = useState<{status: string, lastSeen: number | null} | null>(null);
+  const [targetUser, setTargetUser] = useState<any>(null);
 
   // Derive which avatar to show: if typingUser has an avatar, use it; otherwise fallback to params.avatar
   const displayTypingAvatar = typingUser?.avatar
@@ -123,6 +127,40 @@ export function useChatThread() {
       keyboardHeight.value = event.height;
     },
   });
+
+  const getTargetUserStatus = useCallback(async () => {
+    if (!targetUserIdState) return;
+    try {
+      const data = await userAPI.getUserById(Number(targetUserIdState));
+      if (data) {
+        setTargetUserStatus({ status: data.status, lastSeen: data.lastSeen });
+        setTargetUser(data);
+      }
+    } catch (err) {
+      console.error('Fetch target user status error:', err);
+    }
+  }, [targetUserIdState]);
+
+  useEffect(() => {
+    if (isFocused && targetUserIdState) {
+      getTargetUserStatus();
+    }
+  }, [isFocused, targetUserIdState, getTargetUserStatus]);
+
+  useEffect(() => {
+    if (!isFocused) return;
+
+    const handleStatusChanged = (data: { userId: number; status: string; lastSeen?: number }) => {
+      if (targetUserIdState && data.userId === Number(targetUserIdState)) {
+        setTargetUserStatus({ status: data.status, lastSeen: data.lastSeen || null });
+      }
+    };
+
+    socketService.on('user_status_changed', handleStatusChanged);
+    return () => {
+      socketService.off('user_status_changed', handleStatusChanged);
+    };
+  }, [isFocused, targetUserIdState]);
 
   const fetchMessages = useCallback(async (isLoadMore = false) => {
     if (!conversationId) return;
@@ -399,5 +437,7 @@ export function useChatThread() {
     animatedContentStyle,
     fetchMessages,
     handleSend,
+    targetUserStatus,
+    targetUser,
   };
 }

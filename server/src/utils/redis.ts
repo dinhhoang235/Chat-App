@@ -19,7 +19,39 @@ export const connectRedis = async () => {
 };
 
 const MESSAGE_CACHE_KEY_PREFIX = 'chat:messages:';
+const USER_STATUS_KEY_PREFIX = 'user:status:';
 const CACHE_LIMIT = 50; // Cache 50 messages per conversation
+
+/**
+ * Set user online status in Redis
+ */
+export const setUserStatus = async (userId: number, status: 'online' | 'offline') => {
+  try {
+    const key = `${USER_STATUS_KEY_PREFIX}${userId}`;
+    if (status === 'online') {
+      await redisClient.set(key, 'online');
+    } else {
+      // Store current timestamp when going offline
+      await redisClient.set(key, Date.now().toString());
+    }
+  } catch (err) {
+    console.error('Redis Set User Status Error:', err);
+  }
+};
+
+/**
+ * Get user online status from Redis
+ */
+export const getUserStatus = async (userId: number): Promise<string | null> => {
+  try {
+    const key = `${USER_STATUS_KEY_PREFIX}${userId}`;
+    const status = await redisClient.get(key);
+    return status;
+  } catch (err) {
+    console.error('Redis Get User Status Error:', err);
+    return null;
+  }
+};
 
 /**
  * Cache new messages into Redis List (LPUSH)

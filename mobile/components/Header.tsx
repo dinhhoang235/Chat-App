@@ -22,6 +22,7 @@ interface HeaderProps {
   showBack?: boolean;
   onBackPress?: () => void;
   onTitlePress?: () => void;
+  leftElement?: React.ReactNode;
   variant?: "light" | "dark";
   /** Render header transparent (no background/border). Useful to overlay over cover images. */
   transparent?: boolean;
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   showBack = false,
   onBackPress,
   onTitlePress,
+  leftElement,
   variant,
   transparent = false,
   overlay = false,
@@ -89,18 +91,23 @@ export const Header: React.FC<HeaderProps> = ({
                   <MaterialIcons name="arrow-back" color={iconColor} size={28} />
                 </TouchableOpacity>
               )}
+              {leftElement && (
+                <View className="mr-2 mt-1">
+                  {leftElement}
+                </View>
+              )}
               <View>
                 {title ? (
                   <TouchableOpacity 
                     disabled={!onTitlePress} 
                     onPress={() => onTitlePress?.()}
-                    style={{ paddingVertical: 4, paddingRight: 40 }}
+                    style={{ paddingRight: 40 }}
                   >
                     <Text style={titleStyle} numberOfLines={1}>{title}</Text>
                   </TouchableOpacity>
                 ) : null}
                 {subtitle ? (
-                  <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{subtitle}</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>{subtitle}</Text>
                 ) : null}
               </View>
             </View>

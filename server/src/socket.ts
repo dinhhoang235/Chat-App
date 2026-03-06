@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { TokenPayload } from './utils/jwt.js';
 import prisma from './db.js';
+import { setUserStatus } from './utils/redis.js';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -32,7 +33,14 @@ export const setupSocket = (io: Server) => {
 
     // Join personal room for private notifications/messages
     if (socket.user) {
-      socket.join(`user:${socket.user.userId}`);
+      const userId = Number(socket.user.userId);
+      socket.join(`user:${userId}`);
+      
+      // Update status to online in Redis
+      setUserStatus(userId, 'online');
+      
+      // Notify all connected clients about user status change
+      io.emit('user_status_changed', { userId, status: 'online' });
     }
 
     // Join conversation rooms
@@ -78,6 +86,18 @@ export const setupSocket = (io: Server) => {
 
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.user?.userId}`);
+      if (socket.user) {
+        const userId = Number(socket.user.userId);
+        // Mark as offline in Redis (this stores the current timestamp)
+        setUserStatus(userId, 'offline');
+        
+        // Broadcast the change to all other users
+        io.emit('user_status_changed', { 
+          userId, 
+          status: 'offline', 
+          lastSeen: Date.now() 
+        });
+      }
     });
   });
 };

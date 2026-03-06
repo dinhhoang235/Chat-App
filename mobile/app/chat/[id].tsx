@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, FlatList, ActivityIndicator, Image } from 'react-native';
+import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Header } from '../../components/Header';
 import InThreadSearch from '../../components/InThreadSearch';
@@ -9,6 +9,7 @@ import ChatComposer from '../../components/ChatComposer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TypingDots } from '../../components/TypingDots';
 import { useChatThread } from '../../hooks/useChatThread';
+import { ChatAvatar } from '../../components/ChatAvatar';
 
 export default function ChatThread() {
   const {
@@ -43,7 +44,23 @@ export default function ChatThread() {
     animatedContentStyle,
     fetchMessages,
     handleSend,
+    targetUserStatus,
+    targetUser,
   } = useChatThread();
+
+  const getStatusText = () => {
+    if (!targetUserStatus) return null;
+    if (targetUserStatus.status === 'online') return 'Đang hoạt động';
+    if (targetUserStatus.lastSeen) {
+      const diff = Math.floor((Date.now() - targetUserStatus.lastSeen) / 60000);
+      if (diff < 1) return 'Hoạt động vừa xong';
+      if (diff < 60) return `Hoạt động ${diff} phút trước`;
+      const hours = Math.floor(diff / 60);
+      if (hours < 24) return `Hoạt động ${hours} giờ trước`;
+      return `Hoạt động ${Math.floor(hours / 24)} ngày trước`;
+    }
+    return null;
+  };
 
   return (
     <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: colors.surface }}>
@@ -63,15 +80,39 @@ export default function ChatThread() {
             />
           ) : (
             <Header
-              title={paramName || 'Chat'}
               showBack
+              leftElement={
+                <TouchableOpacity 
+                  onPress={() => {
+                    const finalTargetUserId = targetUserIdState;
+                    if (finalTargetUserId) {
+                      router.push(`/profile/${finalTargetUserId}`);
+                    }
+                  }}
+                  activeOpacity={1}
+                  className="flex-row items-center"
+                >
+                  <ChatAvatar
+                    avatar={targetUser?.avatar || (params.avatar as string)}
+                    name={paramName || targetUser?.fullName}
+                    online={targetUserStatus?.status === 'online'}
+                    size={44}
+                    tintColor={colors.tint}
+                    borderColor={colors.header}
+                  />
+                  <View style={{ marginLeft: 8 }}>
+                    <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }} numberOfLines={1}>
+                      {paramName || targetUser?.fullName || 'Chat'}
+                    </Text>
+                    {getStatusText() && (
+                      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>
+                        {getStatusText()}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              }
               onBackPress={() => router.back()}
-              onTitlePress={() => {
-                const finalTargetUserId = targetUserIdState;
-                if (finalTargetUserId) {
-                  router.push(`/profile/${finalTargetUserId}`);
-                }
-              }}
               rightActions={[
                 { icon: 'call', onPress: () => console.log('Call pressed') },
                 { icon: 'videocam', onPress: () => console.log('Video call pressed') },

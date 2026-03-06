@@ -17,6 +17,7 @@ type Props = {
     color?: string;
     avatar?: string;
     isGroup?: boolean;
+    status?: string;
   };
   onPress?: () => void;
   onAction?: (action: string) => void;
@@ -99,23 +100,52 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
               )}
             </TouchableOpacity>
 
-            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280', marginLeft: 8, overflow: 'hidden' }}>
+            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280', marginLeft: 8 }}>
               {message.avatar ? (
-                <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48 }} />
+                <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
               ) : (
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+              )}
+              {!isGroup && message.status === 'online' && (
+                <View 
+                  style={{ 
+                    position: 'absolute', 
+                    bottom: 0, 
+                    right: 0, 
+                    width: 14, 
+                    height: 14, 
+                    borderRadius: 7, 
+                    backgroundColor: '#4CAF50', 
+                    borderWidth: 2, 
+                    borderColor: colors.header 
+                  }} 
+                />
               )}
             </View>
           </View>
         ) : (
           <View
-            className="w-12 h-12 rounded-full items-center justify-center overflow-hidden"
-            style={{ backgroundColor: message.color || '#6B7280' }}
+            style={{ width: 48, height: 48, borderRadius: 24, itemsCenter: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280' }}
           >
             {message.avatar ? (
-              <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48 }} />
+              <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
             ) : (
               <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+            )}
+            {!isGroup && message.status === 'online' && (
+              <View 
+                style={{ 
+                  position: 'absolute', 
+                  bottom: 0, 
+                  right: 0, 
+                  width: 14, 
+                  height: 14, 
+                  borderRadius: 7, 
+                  backgroundColor: '#4CAF50', 
+                  borderWidth: 2, 
+                  borderColor: colors.header 
+                }} 
+              />
             )}
           </View>
         )}

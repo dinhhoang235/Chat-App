@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../db.js';
+import { getUserStatus } from '../utils/redis.js';
 
 // Gửi lời mời kết bạn
 export const sendFriendRequest = async (req: Request, res: Response): Promise<void> => {
@@ -352,9 +353,17 @@ export const getFriendsList = async (req: Request, res: Response): Promise<void>
 
     const friends = friendships.map(f => f.friend);
 
+    const friendsWithStatus = await Promise.all(friends.map(async (f) => {
+      const status = await getUserStatus(f.id);
+      return {
+        ...f,
+        status: status === 'online' ? 'online' : 'offline'
+      };
+    }));
+
     res.json({
       success: true,
-      data: friends
+      data: friendsWithStatus
     });
   } catch (err) {
     console.error('Error fetching friends:', err);

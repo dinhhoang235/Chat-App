@@ -42,7 +42,8 @@ export function useConversations() {
           color: conv.isGroup ? colors.tint : (otherParticipant?.user.avatar ? undefined : colors.tint),
           avatar: otherParticipant?.user.avatar ? `${API_URL}${otherParticipant.user.avatar}` : undefined,
           isGroup: conv.isGroup,
-          targetUserId: otherParticipant?.userId.toString()
+          targetUserId: otherParticipant?.userId.toString(),
+          status: otherParticipant?.user.status || 'offline'
         };
       });
       setData(mapped);
@@ -62,12 +63,23 @@ export function useConversations() {
       fetchConversations();
     };
 
+    const handleStatusChanged = (data: { userId: number; status: string }) => {
+      setData(prev => prev.map(conv => {
+        if (conv.targetUserId === data.userId.toString()) {
+          return { ...conv, status: data.status };
+        }
+        return conv;
+      }));
+    };
+
     socketService.on('conversation_updated', handleUpdate);
     socketService.on('new_message', handleUpdate);
+    socketService.on('user_status_changed', handleStatusChanged);
 
     return () => {
       socketService.off('conversation_updated', handleUpdate);
       socketService.off('new_message', handleUpdate);
+      socketService.off('user_status_changed', handleStatusChanged);
     };
   }, [fetchConversations, isFocused]);
 

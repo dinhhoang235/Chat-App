@@ -15,9 +15,11 @@ const ensureUploadDir = (uploadDir: string) => {
 // Configure multer storage
 const storage = multer.diskStorage({
   destination: (_req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../media', 
-      file.fieldname === 'avatar' ? 'avatars' : 'covers'
-    );
+    let folder = 'avatars';
+    if (file.fieldname === 'cover') folder = 'covers';
+    if (file.fieldname === 'group_avatar') folder = 'groups';
+
+    const uploadDir = path.join(__dirname, '../../media', folder);
     // Ensure directory exists before writing
     ensureUploadDir(uploadDir);
     cb(null, uploadDir);

@@ -15,6 +15,7 @@ import LeaveGroupSheet from '../../../components/LeaveGroupSheet';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GroupAvatar } from '../../../components/GroupAvatar';
 import { contacts } from '../../../constants/mockData';
 import { useAuth } from '../../../context/authContext';
 import { API_URL } from '../../../services/api';
@@ -59,6 +60,14 @@ export default function ChatOptions() {
   const rawAvatar = (params as any).avatar as string | undefined;
   const avatar = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${API_URL}${rawAvatar}`) : undefined;
   const targetUserId = (params as any).targetUserId as string | undefined;
+  
+  // Use useMemo to ensure isGroup is correctly calculated and doesn't cause unnecessary re-renders
+  const isGroup = React.useMemo(() => {
+    return (params as any).isGroup === 'true' || (params as any).isGroup === true;
+  }, [params]);
+
+  const membersCount = (params as any).membersCount ? parseInt((params as any).membersCount as string) : 0;
+  const groupAvatars = (params as any).avatars ? ((params as any).avatars as string).split(',') : [];
   
   const [currentStatus, setCurrentStatus] = useState<string | undefined>((params as any).status);
   const isOnline = currentStatus === 'online';
@@ -110,12 +119,6 @@ export default function ChatOptions() {
   const { user } = useAuth();
   const isOwner = !!contact?.ownerPhone && user?.phone === contact?.ownerPhone;
 
-  // determine if this chat is a group (explicit flag wins)
-  const isGroup = !!contact?.isGroup || (params as any).isGroup === '1' || (params as any).group === '1' ||
-    ((name || '').toLowerCase().includes('nhóm') || (name || '').toLowerCase().includes('team'));
-  // Note: callers can explicitly opt-in by passing `?isGroup=1` or `?group=1` in the route
-
-
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header title="Tùy chọn" showBack onBackPress={() => router.back()} />
@@ -123,8 +126,10 @@ export default function ChatOptions() {
       <ScrollView>
         <View className="items-center px-4 py-3" >
           <View>
-            <View className="w-24 h-24 rounded-full overflow-hidden mb-3 items-center justify-center" style={{ backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.surfaceVariant }}>
-              {avatar ? (
+            <View className="w-24 h-24 rounded-full mb-3 items-center justify-center" style={{ backgroundColor: isGroup ? 'transparent' : colors.surfaceVariant }}>
+              {isGroup ? (
+                <GroupAvatar avatars={groupAvatars} membersCount={membersCount} size={96} />
+              ) : avatar ? (
                 <Image source={{ uri: avatar }} style={{ width: 96, height: 96, borderRadius: 48 }} resizeMode="cover" />
               ) : (
                 <View style={{ width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }}>
@@ -132,7 +137,7 @@ export default function ChatOptions() {
                 </View>
               )}
             </View>
-            {isOnline && (
+            {!isGroup && isOnline && (
               <View 
                 className="absolute right-1 bottom-3 w-6 h-6 rounded-full border-4" 
                 style={{ 
@@ -211,7 +216,7 @@ export default function ChatOptions() {
               <Row icon="push-pin" title="Tin nhắn đã ghim" onPress={() => router.push(`/chat/${id}/pinned`)} showChevron />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
-              <Row icon="people" title={`Xem thành viên`} subtitle={`(${contact?.membersCount ?? 0})`} onPress={() => router.push(`/chat/${id}/members`)} showChevron />
+              <Row icon="people" title={`Xem thành viên`} subtitle={`(${membersCount || (contact?.membersCount ?? 0)})`} onPress={() => router.push(`/chat/${id}/members`)} showChevron />
 
               <Row icon="link" title="Link nhóm" subtitle="https://zalo.me/g/wftfeh870" onPress={() => router.push(`/chat/${id}/link`)} showChevron />
             </View>
@@ -230,7 +235,7 @@ export default function ChatOptions() {
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="flag" title="Báo xấu" onPress={() => setReportVisible(true)} />
               <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} titleColor={colors.danger} iconColor={colors.danger} />
-              <Row icon="exit-to-app" title="Rời nhóm" onPress={() => setLeaveVisible(true)} titleColor={colors.danger} />
+              <Row icon="exit-to-app" title="Rời nhóm" onPress={() => setLeaveVisible(true)} titleColor={colors.danger} iconColor={colors.danger} />
             </View>
           </>
         ) : (

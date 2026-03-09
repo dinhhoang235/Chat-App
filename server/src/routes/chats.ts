@@ -6,8 +6,10 @@ import {
   sendMessage, 
   startConversation,
   markAsRead,
-  deleteConversation
+  deleteConversation,
+  createGroup
 } from '../controllers/chatController.js';
+import { upload } from '../middleware/upload.js';
 import { Server } from 'socket.io';
 
 export const chatRoutes = (io: Server) => {
@@ -16,6 +18,7 @@ export const chatRoutes = (io: Server) => {
   router.use(authMiddleware);
 
   router.get('/conversations', getConversations);
+  router.post('/group', upload.any(), createGroup(io));
   router.get('/:conversationId/messages', getMessages(io));
   router.post('/:conversationId/messages', sendMessage(io));
   router.post('/:conversationId/read', markAsRead(io));

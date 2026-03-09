@@ -31,6 +31,10 @@ export function useConversations() {
         const lastMessageText = lastMsg 
           ? (isFromMe ? `Bạn: ${lastMsg.content}` : lastMsg.content)
           : 'Chưa có tin nhắn';
+
+        const avatars = conv.participants
+          .map((p: any) => p.user.avatar ? `${API_URL}${p.user.avatar}` : null)
+          .filter(Boolean);
         
         return {
           id: conv.id.toString(),
@@ -40,7 +44,9 @@ export function useConversations() {
           unread: conv._count?.messages || 0,
           initials: (conv.name || otherParticipant?.user.fullName || 'Z')[0],
           color: conv.isGroup ? colors.tint : (otherParticipant?.user.avatar ? undefined : colors.tint),
-          avatar: otherParticipant?.user.avatar ? `${API_URL}${otherParticipant.user.avatar}` : undefined,
+          avatar: conv.avatar ? `${API_URL}${conv.avatar}` : (otherParticipant?.user.avatar ? `${API_URL}${otherParticipant.user.avatar}` : undefined),
+          avatars: avatars,
+          membersCount: conv.membersCount || conv.participants.length,
           isGroup: conv.isGroup,
           targetUserId: otherParticipant?.userId.toString(),
           status: otherParticipant?.user.status || 'offline'

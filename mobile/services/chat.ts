@@ -12,4 +12,22 @@ export const chatApi = {
     apiClient.post('/chats/start', { targetUserId, firstMessage }),
   deleteConversation: (id: string | number) => 
     apiClient.delete(`/chats/${id}`),
+  createGroup: (name: string, participantIds: (string | number)[], avatarUri?: string) => {
+    if (avatarUri) {
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('participantIds', JSON.stringify(participantIds));
+      formData.append('group_avatar', {
+        uri: avatarUri,
+        type: 'image/jpeg',
+        name: 'group_avatar.jpg',
+      } as any);
+
+      return apiClient.post('/chats/group', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      });
+    }
+    return apiClient.post('/chats/group', { name, participantIds });
+  }
 };

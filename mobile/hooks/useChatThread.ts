@@ -42,6 +42,12 @@ export function useChatThread() {
 
   // Derive which avatar to show: if typingUser has an avatar, use it; otherwise fallback to params.avatar
   const avatarParam = Array.isArray(params.avatar) ? params.avatar[0] : params.avatar;
+  const isGroup = params.isGroup === 'true';
+  const groupAvatars = params.avatars 
+    ? (Array.isArray(params.avatars) ? params.avatars : (typeof params.avatars === 'string' && params.avatars.includes(',') ? params.avatars.split(',') : [params.avatars as string])) 
+    : [];
+  const membersCount = params.membersCount ? Number(params.membersCount) : undefined;
+
   const displayTypingAvatar = typingUser?.avatar
     ? (typingUser.avatar.startsWith('http') ? typingUser.avatar : `${API_URL}${typingUser.avatar}`)
     : (avatarParam
@@ -438,7 +444,10 @@ export function useChatThread() {
     animatedContentStyle,
     fetchMessages,
     handleSend,
-    targetUserStatus,
     targetUser,
+    targetUserStatus,
+    isGroup,
+    groupAvatars,
+    membersCount
   };
 }

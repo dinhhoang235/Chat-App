@@ -5,6 +5,7 @@ import { useTheme } from "../context/themeContext";
 import MenuModal from './MenuModal';
 import MuteOptionsSheet from './MuteOptionsSheet';
 import MuteSettingsModal from './MuteSettingsModal';
+import { GroupAvatar } from './GroupAvatar';
 
 type Props = {
   message: {
@@ -16,7 +17,9 @@ type Props = {
     initials?: string;
     color?: string;
     avatar?: string;
+    avatars?: string[]; // for groups
     isGroup?: boolean;
+    membersCount?: number;
     status?: string;
   };
   onPress?: () => void;
@@ -35,7 +38,7 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
   const rowRef = useRef<any>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const initials = message.initials ?? message.name.split(' ').map(n => n[0]).slice(0, 2).join('');
-  const isGroup = !!message.isGroup;
+  const isGroupConversation = !!message.isGroup;
 
   const menuItems = [
     { key: 'mark_unread', label: 'Đánh dấu chưa đọc', icon: 'drafts' },
@@ -89,6 +92,19 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
         className="px-4 py-3 flex-row items-center"
         style={selectionMode && (selected ? { backgroundColor: colors.surface, borderRadius: 8 } : { borderRadius: 8 })}
       >
+        <MenuModal 
+          visible={menuVisible} 
+          menuPos={menuPos} 
+          onClose={() => setMenuVisible(false)} 
+          onAction={(action) => handleAction(action)} 
+          items={menuItems} 
+          message={{
+            ...message,
+            groupAvatars: message.avatars, 
+            isGroup: isGroupConversation,
+            membersCount: message.membersCount
+          } as any}
+        />
         {/* Left: checkbox + avatar in selection mode, otherwise avatar */}
         {selectionMode ? (
           <View style={{ width: 92, flexDirection: 'row', alignItems: 'center' }}>
@@ -100,13 +116,15 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
               )}
             </TouchableOpacity>
 
-            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280', marginLeft: 8 }}>
-              {message.avatar ? (
+            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: isGroupConversation ? 'transparent' : (message.color || '#6B7280'), marginLeft: 8 }}>
+              {isGroupConversation ? (
+                <GroupAvatar avatars={message.avatars} size={48} membersCount={message.membersCount} />
+              ) : message.avatar ? (
                 <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
               ) : (
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
               )}
-              {!isGroup && message.status === 'online' && (
+              {!isGroupConversation && message.status === 'online' && (
                 <View 
                   style={{ 
                     position: 'absolute', 
@@ -125,14 +143,16 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
           </View>
         ) : (
           <View
-            style={{ width: 48, height: 48, borderRadius: 24, itemsCenter: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280' }}
+            style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: isGroupConversation ? 'transparent' : (message.color || '#6B7280') }}
           >
-            {message.avatar ? (
+            {isGroupConversation ? (
+              <GroupAvatar avatars={message.avatars} size={48} membersCount={message.membersCount} />
+            ) : message.avatar ? (
               <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
             ) : (
               <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
             )}
-            {!isGroup && message.status === 'online' && (
+            {!isGroupConversation && message.status === 'online' && (
               <View 
                 style={{ 
                   position: 'absolute', 
@@ -152,8 +172,8 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
 
         <View style={{ marginLeft: 12, flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700', marginRight: isGroup ? 8 : 0 }}>{message.name}</Text>
-            {isGroup ? <MaterialIcons name="groups" size={16} color={colors.textSecondary} /> : null}
+            <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700', marginRight: isGroupConversation ? 8 : 0 }}>{message.name}</Text>
+            {isGroupConversation ? <MaterialIcons name="groups" size={16} color={colors.textSecondary} /> : null}
           </View>
           <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{message.lastMessage}</Text>
         </View>
@@ -168,7 +188,19 @@ export function MessageRow({ message, onPress, onAction, selectionMode = false, 
         </View>
       </TouchableOpacity>
 
-      <MenuModal visible={menuVisible} menuPos={menuPos} onClose={() => setMenuVisible(false)} onAction={handleAction} items={menuItems} message={message} />
+      <MenuModal 
+        visible={menuVisible} 
+        menuPos={menuPos} 
+        onClose={() => setMenuVisible(false)} 
+        onAction={handleAction} 
+        items={menuItems} 
+        message={{
+          ...message,
+          groupAvatars: message.avatars, 
+          isGroup: isGroupConversation,
+          membersCount: message.membersCount
+        } as any} 
+      />
 
       <MuteOptionsSheet
         visible={muteVisible}

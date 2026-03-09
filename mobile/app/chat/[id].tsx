@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TypingDots } from '../../components/TypingDots';
 import { useChatThread } from '../../hooks/useChatThread';
 import { ChatAvatar } from '../../components/ChatAvatar';
+import { GroupAvatar } from '../../components/GroupAvatar';
 
 export default function ChatThread() {
   const {
@@ -46,9 +47,13 @@ export default function ChatThread() {
     handleSend,
     targetUserStatus,
     targetUser,
+    isGroup,
+    groupAvatars,
+    membersCount
   } = useChatThread();
 
   const getStatusText = () => {
+    if (isGroup) return null;
     if (!targetUserStatus) return null;
     if (targetUserStatus.status === 'online') return 'Đang hoạt động';
     if (targetUserStatus.lastSeen) {
@@ -85,21 +90,43 @@ export default function ChatThread() {
                 <TouchableOpacity 
                   onPress={() => {
                     const finalTargetUserId = targetUserIdState;
-                    if (finalTargetUserId) {
+                    if (isGroup) {
+                      router.push({
+                        pathname: '/chat/[id]/options',
+                        params: { 
+                          id,
+                          name: paramName || targetUser?.fullName, 
+                          avatar: targetUser?.avatar || params.avatar,
+                          targetUserId: targetUserId,
+                          status: targetUserStatus?.status,
+                          isGroup: 'true',
+                          membersCount: membersCount,
+                          avatars: Array.isArray(groupAvatars) ? groupAvatars.join(',') : groupAvatars
+                        }
+                      } as any);
+                    } else if (finalTargetUserId) {
                       router.push(`/profile/${finalTargetUserId}`);
                     }
                   }}
                   activeOpacity={1}
                   className="flex-row items-center"
                 >
-                  <ChatAvatar
-                    avatar={targetUser?.avatar || (params.avatar as string)}
-                    name={paramName || targetUser?.fullName}
-                    online={targetUserStatus?.status === 'online'}
-                    size={44}
-                    tintColor={colors.tint}
-                    borderColor={colors.header}
-                  />
+                  {isGroup ? (
+                    <GroupAvatar 
+                      avatars={groupAvatars} 
+                      size={44} 
+                      membersCount={membersCount} 
+                    />
+                  ) : (
+                    <ChatAvatar
+                      avatar={targetUser?.avatar || (params.avatar as string)}
+                      name={paramName || targetUser?.fullName}
+                      online={!isGroup && targetUserStatus?.status === 'online'}
+                      size={44}
+                      tintColor={colors.tint}
+                      borderColor={colors.header}
+                    />
+                  )}
                   <View style={{ marginLeft: 8 }}>
                     <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }} numberOfLines={1}>
                       {paramName || targetUser?.fullName || 'Chat'}
@@ -125,7 +152,10 @@ export default function ChatThread() {
                       name: paramName || targetUser?.fullName, 
                       avatar: targetUser?.avatar || params.avatar,
                       targetUserId: targetUserId,
-                      status: targetUserStatus?.status
+                      status: targetUserStatus?.status,
+                      isGroup: isGroup ? 'true' : 'false',
+                      membersCount: membersCount,
+                      avatars: Array.isArray(groupAvatars) ? groupAvatars.join(',') : groupAvatars
                     }
                   } as any) 
                 },

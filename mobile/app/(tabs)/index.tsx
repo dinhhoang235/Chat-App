@@ -97,12 +97,22 @@ export default function Messages() {
                     params: { 
                       id: item.id, 
                       name: item.name,
-                      targetUserId: item.targetUserId 
+                      targetUserId: item.targetUserId,
+                      avatar: item.avatar,
+                      isGroup: item.isGroup ? 'true' : 'false',
+                      membersCount: item.membersCount,
+                      avatars: Array.isArray(item.avatars) ? item.avatars.join(',') : (item.avatars || '')
                     } 
                   }); 
                 } 
               }}
-              onAction={(action) => handleRowAction(action, item.id)}
+              onAction={(action) => {
+                if (action === 'select') {
+                  setSelectionMode(true);
+                  setSelectedIds([item.id]);
+                }
+                console.log('Row action', action, item.id);
+              }}
               selectionMode={selectionMode}
               selected={selectedIds.includes(item.id)}
               onToggleSelect={(id) => toggleSelect(id)}

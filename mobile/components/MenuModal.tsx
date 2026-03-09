@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/themeContext';
+import { GroupAvatar } from './GroupAvatar';
 
 export type MenuItem = { key: string; label: string; icon: string; destructive?: boolean };
 
@@ -14,6 +15,10 @@ type Message = {
   initials?: string;
   color?: string;
   avatar?: string;
+  isGroup?: boolean;
+  groupAvatars?: string[];
+  avatars?: string[];
+  membersCount?: number;
 };
 
 type Props = {
@@ -48,15 +53,21 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
               alignItems: 'center',
               backgroundColor: rowBg,
               shadowColor: '#000',
-              shadowOpacity: 0.25,
-              shadowRadius: 8,
-              elevation: 8,
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              elevation: 5,
             }}
             pointerEvents="none"
           >
-            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: message.color || '#6B7280', overflow: 'hidden' }}>
-              {message.avatar ? (
-                <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48 }} />
+            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: message.isGroup ? 'transparent' : (message.color || '#6B7280') }}>
+              {message.isGroup ? (
+                <GroupAvatar 
+                  avatars={message.groupAvatars || message.avatars || []} 
+                  membersCount={message.membersCount} 
+                  size={48} 
+                />
+              ) : message.avatar ? (
+                <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
               ) : (
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{(message.initials ?? message.name.split(' ').map((n: string) => n[0]).slice(0,2).join(''))}</Text>
               )}

@@ -10,6 +10,7 @@ import MemberActionsSheet from '../../../components/MemberActionsSheet';
 import AddToGroupModal from '../../../components/AddToGroupModal';
 import { chatApi } from '../../../services/chat';
 import { API_URL } from '../../../services/api';
+import { getInitials } from '../../../utils/contacts';
 
 export default function MembersScreen() {
   const { colors } = useTheme();
@@ -36,13 +37,7 @@ export default function MembersScreen() {
       setIsOwner(currentUserPart?.role === 'owner');
 
       setMembers(data.participants.map((p: any) => ({
-        id: p.user.id.toString(),
-        name: p.user.fullName,
-        phone: p.user.phone,
-        avatar: p.user.avatar ? `${API_URL}${p.user.avatar}` : null,
-        status: p.user.status,
-        initials: getInitials(p.user.fullName),
-        isAdmin: p.role === 'owner' || p.role === 'admin',
+        ...p.user,
         role: p.role
       })));
     } catch (err) {
@@ -65,24 +60,18 @@ export default function MembersScreen() {
   // Filter members based on role
   const filteredOwners = members.filter(m => m.role === 'owner' || m.role === 'admin');
 
-  // helper: derive initials from full name (used when showing current user's name)
-  const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    return name.split(' ').filter(Boolean).map(n => n[0]).slice(0,2).join('').toUpperCase();
-  };
-
-  const removeMember = (mid: string) => {
+  const removeMember = (mid: number) => {
     if (!isOwner) {
       Alert.alert('Lỗi', 'Chỉ trưởng nhóm mới có quyền xóa thành viên');
       return;
     }
     
     // Don't allow removing yourself
-    if (mid === user?.id?.toString()) {
+    if (mid.toString() === user?.id?.toString()) {
       return;
     }
 
-    Alert.alert('Xác nhận', `Bạn có chắc muốn xóa ${members.find(m => m.id === mid)?.name} khỏi nhóm?`, [
+    Alert.alert('Xác nhận', `Bạn có chắc muốn xóa ${members.find(m => m.id === mid)?.fullName} khỏi nhóm?`, [
       { text: 'Hủy', style: 'cancel' },
       { text: 'Xóa', style: 'destructive', onPress: async () => {
         try {
@@ -95,7 +84,7 @@ export default function MembersScreen() {
     ]);
   };
 
-  const addMembers = async (selectedIds: string[]) => {
+  const addMembers = async (selectedIds: (string | number)[]) => {
     try {
       await chatApi.addMembers(id, selectedIds);
       Alert.alert('Thành công', 'Đã thêm thành viên vào nhóm');
@@ -174,36 +163,41 @@ export default function MembersScreen() {
         ) : (
           <FlatList
             data={displayed}
-            keyExtractor={(i: any) => i.id}
-            renderItem={({ item }: any) => (
-              <TouchableOpacity onPress={() => { setSelectedMember(item); setMemberModalVisible(true); }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWidth: 1, borderColor: '#fff' }}>
-                    {item.avatar ? (
-                      <Image source={{ uri: item.avatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                    ) : (
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>{item.initials ?? 'U'}</Text>
-                    )}
-                  </View>
-                  <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={{ color: colors.text, fontWeight: '600' }}>{item.phone === user?.phone ? 'Bạn' : item.name}</Text>
-                      {item.role === 'owner' && (
-                        <View style={{ marginLeft: 6, backgroundColor: colors.tint + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                          <Text style={{ color: colors.tint, fontSize: 10, fontWeight: '700' }}>Trưởng nhóm</Text>
-                        </View>
-                      )}
-                      {item.role === 'admin' && (
-                        <View style={{ marginLeft: 6, backgroundColor: colors.success + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                          <Text style={{ color: colors.success, fontSize: 10, fontWeight: '700' }}>Phó nhóm</Text>
-                        </View>
+            keyExtractor={(i: any) => i.id.toString()}
+            renderItem={({ item }: any) => {
+              const avatarUrl = item.avatar ? (item.avatar.startsWith('http') ? item.avatar : `${API_URL}${item.avatar}`) : null;
+              const initials = getInitials(item.fullName);
+
+              return (
+                <TouchableOpacity onPress={() => { setSelectedMember(item); setMemberModalVisible(true); }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWidth: 1, borderColor: '#fff' }}>
+                      {avatarUrl ? (
+                        <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                      ) : (
+                        <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
                       )}
                     </View>
-                    <Text style={{ color: colors.textSecondary }}>{item.phone ?? ''}</Text>
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ color: colors.text, fontWeight: '600' }}>{item.phone === user?.phone ? 'Bạn' : item.fullName}</Text>
+                        {item.role === 'owner' && (
+                          <View style={{ marginLeft: 6, backgroundColor: colors.tint + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ color: colors.tint, fontSize: 10, fontWeight: '700' }}>Trưởng nhóm</Text>
+                          </View>
+                        )}
+                        {item.role === 'admin' && (
+                          <View style={{ marginLeft: 6, backgroundColor: colors.success + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ color: colors.success, fontSize: 10, fontWeight: '700' }}>Phó nhóm</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={{ color: colors.textSecondary }}>{item.phone ?? ''}</Text>
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            )}
+                </TouchableOpacity>
+              );
+            }}
           />
         )}
 
@@ -213,10 +207,10 @@ export default function MembersScreen() {
           member={selectedMember}
           isOwner={isOwner}
           onPromote={(id) => {
-            Alert.alert('Phó nhóm', `${members.find(m => m.id === id)?.name} đã được bổ nhiệm làm phó nhóm (mock)`);
+            Alert.alert('Phó nhóm', `${members.find(m => m.id === id)?.fullName} đã được bổ nhiệm làm phó nhóm (mock)`);
           }}
           onBlock={(id) => {
-            Alert.alert('Chặn', `${members.find(m => m.id === id)?.name} đã bị chặn (mock)`);
+            Alert.alert('Chặn', `${members.find(m => m.id === id)?.fullName} đã bị chặn (mock)`);
           }}
           onRemove={(id) => {
             removeMember(id);

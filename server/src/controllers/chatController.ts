@@ -920,6 +920,11 @@ export const removeMember = (io: Server) => async (req: AuthRequest, res: Respon
           conversationId: convId,
           userId: requesterId
         }
+      },
+      include: {
+        user: {
+          select: { fullName: true }
+        }
       }
     });
 
@@ -933,6 +938,11 @@ export const removeMember = (io: Server) => async (req: AuthRequest, res: Respon
         conversationId_userId: {
           conversationId: convId,
           userId: targetUserId
+        }
+      },
+      include: {
+        user: {
+          select: { fullName: true }
         }
       }
     });
@@ -951,6 +961,32 @@ export const removeMember = (io: Server) => async (req: AuthRequest, res: Respon
       if (target.role === 'admin') {
         return res.status(403).json({ message: 'Admins cannot remove other admins' });
       }
+    }
+
+    // Create a "removed from group" system message BEFORE removing the participant
+    const systemMessage = await prisma.message.create({
+      data: {
+        content: `${requester.user.fullName} đã xóa ${target.user.fullName} khỏi nhóm`,
+        type: 'system',
+        conversationId: convId,
+        senderId: null
+      }
+    });
+
+    // Broadcast system message to everyone in the conversation room
+    io.to(`conversation:${convId}`).emit('new_message', {
+      ...systemMessage,
+      sender: null,
+      fromMe: false,
+      time: new Date(systemMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      contactName: 'Hệ thống'
+    });
+
+    // Clear cache to include system message
+    // @ts-ignore
+    if (typeof clearCachedMessages === 'function') {
+      // @ts-ignore
+      clearCachedMessages(convId).catch(e => console.error('Clear cache error:', e));
     }
 
     // 4. Delete the participant

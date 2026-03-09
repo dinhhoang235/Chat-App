@@ -35,6 +35,11 @@ export function getLetter(name: string): string {
   return '#';
 }
 
+export function getInitials(name?: string): string {
+  if (!name) return 'U';
+  return name.split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase();
+}
+
 export function buildContactSections(contacts: Contact[]): { title: string; data: Contact[] }[] {
   const groups = new Map<string, Contact[]>();
 

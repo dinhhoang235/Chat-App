@@ -53,6 +53,7 @@ export default function ChatOptions() {
     performClearChat,
     performLeaveGroup,
     isOwner,
+    fetchGroupDetails,
   } = useChatOptions();
 
   return (
@@ -72,11 +73,12 @@ export default function ChatOptions() {
         />
 
         <QuickActions
+          conversationId={id}
           isGroup={isGroup}
           isMuted={isMuted}
           onSearch={() => { open(id); router.back(); }}
-          onAddMember={() => setAddModalVisible(true)}
           onToggleMute={() => setMuteVisible(true)}
+          onMemberAdded={fetchGroupDetails}
           colors={colors}
         />
 

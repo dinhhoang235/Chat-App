@@ -173,5 +173,6 @@ export function useChatOptions() {
     performClearChat,
     performLeaveGroup,
     isOwner,
+    fetchGroupDetails,
   };
 }

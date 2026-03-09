@@ -51,6 +51,7 @@ export default function ChatOptions() {
     leaveVisible, setLeaveVisible,
     isMuted,
     performClearChat,
+    performLeaveGroup,
     isOwner,
   } = useChatOptions();
 
@@ -194,7 +195,7 @@ export default function ChatOptions() {
       <LeaveGroupSheet
         visible={leaveVisible}
         onClose={() => setLeaveVisible(false)}
-        onLeave={() => { setLeaveVisible(false); Alert.alert('Đã rời nhóm', 'Bạn đã rời nhóm (mock)'); }}
+        onLeave={() => performLeaveGroup()}
       />
 
       <AddToGroupModal

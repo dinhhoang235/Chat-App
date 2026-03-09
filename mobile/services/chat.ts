@@ -37,4 +37,6 @@ export const chatApi = {
     apiClient.delete(`/chats/${id}/members/${userId}`),
   disbandGroup: (id: string | number) =>
     apiClient.delete(`/chats/${id}/disband`),
+  leaveGroup: (id: string | number) =>
+    apiClient.delete(`/chats/${id}/leave`),
 };

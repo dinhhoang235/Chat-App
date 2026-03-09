@@ -2,7 +2,7 @@ import { Response } from 'express';
 import prisma from '../db.js';
 import { Server } from 'socket.io';
 import { AuthRequest } from '../middleware/auth.js';
-import { getCachedMessages, bulkCacheMessages, cacheMessage, getUserStatus } from '../utils/redis.js';
+import { getCachedMessages, bulkCacheMessages, cacheMessage, getUserStatus, clearCachedMessages } from '../utils/redis.js';
 
 export const getConversations = async (req: AuthRequest, res: Response): Promise<any> => {
   const userId = req.userId;
@@ -193,13 +193,13 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
 
     // Map messages to include seenBy info - ALWAYS recompute from current DB state
     const messagesWithSeen = messages.map(msg => {
-      const seenBy = participants
+      const seenBy = msg.senderId ? participants
         .filter(p => p.userId !== msg.senderId && new Date(p.lastReadAt).getTime() >= new Date(msg.createdAt).getTime())
         .map(p => ({
           id: p.user.id,
           fullName: p.user.fullName,
           avatar: p.user.avatar ? (p.user.avatar.startsWith('http') ? p.user.avatar : p.user.avatar) : null
-        }));
+        })) : [];
       return { ...msg, seenBy, fromMe: msg.senderId === userId };
     });
 
@@ -798,8 +798,7 @@ export const addMembers = (io: Server) => async (req: AuthRequest, res: Response
       where: {
         conversationId: convId,
         userId: { in: userIds.map(id => parseInt(id)) }
-      },
-      select: { userId: true }
+      }
     });
 
     const existingUserIds = existingParticipants.map(p => p.userId);
@@ -811,13 +810,18 @@ export const addMembers = (io: Server) => async (req: AuthRequest, res: Response
       return res.status(400).json({ message: 'All selected users are already in the group' });
     }
 
-    // Add new participants
-    await prisma.conversationParticipant.createMany({
-      data: newUserIds.map(id => ({
-        conversationId: convId,
-        userId: id,
-        role: 'member'
-      }))
+    // Use a transaction to ensure clean state for new members
+    await prisma.$transaction(async (tx) => {
+      // Add new participants
+      await tx.conversationParticipant.createMany({
+        data: newUserIds.map(id => ({
+          conversationId: convId,
+          userId: id,
+          role: 'member',
+          joinedAt: new Date(),
+          deletedAt: new Date() // Sét trực tiếp ở đây cho thành viên MỚI
+        }))
+      });
     });
 
     // Fetch the updated group details to notify users
@@ -840,7 +844,42 @@ export const addMembers = (io: Server) => async (req: AuthRequest, res: Response
     });
 
     if (updatedConversation) {
-      // Notify all current participants about the new members
+      // 1. Get the names of added users to create system messages
+      const newMembers = await prisma.user.findMany({
+        where: { id: { in: newUserIds } },
+        select: { fullName: true }
+      });
+
+      const requesterRecord = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { fullName: true }
+      });
+
+      // 2. Create system messages for each added member
+      for (const member of newMembers) {
+        const systemMessage = await prisma.message.create({
+          data: {
+            content: `${member.fullName} đã được ${requesterRecord?.fullName || 'trưởng nhóm'} thêm vào nhóm`,
+            type: 'system',
+            conversationId: convId,
+            senderId: null // System message has no sender
+          }
+        });
+
+        // Broadcast each system message
+        io.to(`conversation:${convId}`).emit('new_message', {
+          ...systemMessage,
+          sender: null,
+          fromMe: false,
+          time: new Date(systemMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          contactName: 'Hệ thống'
+        });
+      }
+
+      // 3. Clear cache so the next getMessages call fetches new system messages
+      clearCachedMessages(convId).catch(e => console.error('Clear cache error:', e));
+
+      // 4. Notify all current participants about the new members (for UI updates like member list)
       updatedConversation.participants.forEach(p => {
         io.to(`user:${p.userId}`).emit('conversation_updated', {
           conversationId: convId,
@@ -948,5 +987,146 @@ export const removeMember = (io: Server) => async (req: AuthRequest, res: Respon
   } catch (err) {
     console.error('Remove member error:', err);
     return res.status(500).json({ message: 'Error removing member' });
+  }
+};
+
+export const leaveGroup = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
+  const { conversationId } = req.params;
+  const userId = req.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  try {
+    const convId = parseInt(Array.isArray(conversationId) ? conversationId[0] : conversationId);
+
+    // 1. Get user details and conversation info
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId
+        }
+      },
+      include: {
+        conversation: true,
+        user: {
+          select: {
+            fullName: true
+          }
+        }
+      }
+    });
+
+    if (!participant) {
+      return res.status(403).json({ message: 'Not a member of this group' });
+    }
+
+    if (!participant.conversation.isGroup) {
+      return res.status(400).json({ message: 'Only groups can be left' });
+    }
+
+    // Create a "left group" system message BEFORE removing the participant
+    const systemMessage = await prisma.message.create({
+      data: {
+        content: `${participant.user.fullName} đã rời nhóm`,
+        type: 'system',
+        conversationId: convId,
+        senderId: null // System message
+      }
+    });
+
+    // Broadcast system message to everyone in the conversation room
+    io.to(`conversation:${convId}`).emit('new_message', {
+      ...systemMessage,
+      sender: null,
+      fromMe: false,
+      time: new Date(systemMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      contactName: 'Hệ thống'
+    });
+
+    // Clear cache to include system message
+    clearCachedMessages(convId).catch(e => console.error('Clear cache error:', e));
+
+    // 2. If user is owner, transfer ownership to another member
+    if (participant.role === 'owner') {
+      const otherParticipants = await prisma.conversationParticipant.findMany({
+        where: {
+          conversationId: convId,
+          userId: { not: userId }
+        },
+        orderBy: [
+          { joinedAt: 'asc' } // oldest member first
+        ]
+      });
+
+      if (otherParticipants.length > 0) {
+        // Transfer to the oldest member
+        await prisma.conversationParticipant.update({
+          where: { id: otherParticipants[0].id },
+          data: { role: 'owner' }
+        });
+
+        // Notify the new owner
+        io.to(`user:${otherParticipants[0].userId}`).emit('conversation_updated', {
+          conversationId: convId,
+          action: 'role_changed',
+          newRole: 'owner',
+          userId: otherParticipants[0].userId
+        });
+      }
+    }
+
+    const now = new Date();
+
+    // 3. Delete the participant record (leaving the group)
+    // AND update their deletedAt to clear history for them
+    await prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId
+        }
+      },
+      data: {
+        deletedAt: now,
+        hiddenAt: now
+      }
+    });
+
+    // Actually remove them after marking deletedAt
+    await prisma.conversationParticipant.delete({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId
+        }
+      }
+    });
+
+    // 4. Notify remaining members
+    const remainingParticipants = await prisma.conversationParticipant.findMany({
+      where: { conversationId: convId }
+    });
+
+    remainingParticipants.forEach(p => {
+      io.to(`user:${p.userId}`).emit('conversation_updated', {
+        conversationId: convId,
+        action: 'member_left',
+        leftUserId: userId
+      });
+    });
+
+    // 5. Notify the leaving member (to remove from their UI)
+    io.to(`user:${userId}`).emit('conversation_removed', {
+      conversationId: convId,
+      reason: 'left_group'
+    });
+
+    return res.json({ success: true, message: 'Left group successfully' });
+  } catch (err) {
+    console.error('Leave group error:', err);
+    return res.status(500).json({ message: 'Error leaving group' });
   }
 };

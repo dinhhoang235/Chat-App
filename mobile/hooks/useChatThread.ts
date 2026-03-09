@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { FlatList } from 'react-native';
 import { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
@@ -227,9 +227,9 @@ export function useChatThread() {
 
       const mapped = newMessages.map((m: any) => ({
         ...m,
-        fromMe: m.senderId === user?.id,
+        fromMe: m.senderId ? m.senderId === user?.id : false,
         time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        contactName: m.sender?.fullName,
+        contactName: m.sender?.id ? m.sender.fullName : (m.type === 'system' ? 'Hệ thống' : undefined),
         contactAvatar: m.sender?.avatar ? `${API_URL}${m.sender.avatar}` : undefined,
         seenBy: m.seenBy || [],
       }));
@@ -263,11 +263,9 @@ export function useChatThread() {
 
     const conversationIdNum = parseInt(conversationId, 10);
     
-    // Join room and initial fetch
-    if (!initialFetchDone) {
-      fetchMessages(false);
-      socketService.emit('join_conversation', conversationIdNum);
-    }
+    // Join room and always fetch messages to ensure sync
+    fetchMessages(false);
+    socketService.emit('join_conversation', conversationIdNum);
 
     // Always mark as read when focusing a conversation
     chatApi.markAsRead(conversationIdNum).catch(err => {
@@ -302,8 +300,6 @@ export function useChatThread() {
 
     socketService.on('message_seen', handleMessageSeen);
 
-    const userId = user?.id;
-
     // Listen for new messages
     const handleNewMessage = (message: any) => {
       // If we are currently in this conversation and it's from someone else, mark it as read immediately
@@ -325,9 +321,9 @@ export function useChatThread() {
 
         const mappedMessage = {
           ...message,
-          fromMe: message.senderId === userId,
+          fromMe: message.senderId ? message.senderId === user?.id : false,
           time: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          contactName: message.sender?.fullName,
+          contactName: message.sender?.id ? message.sender.fullName : (message.type === 'system' ? 'Hệ thống' : undefined),
           contactAvatar: message.sender?.avatar ? `${API_URL}${message.sender.avatar}` : undefined,
           seenBy: message.seenBy || [],
           status: 'sent',
@@ -349,12 +345,27 @@ export function useChatThread() {
 
     socketService.on('new_message', handleNewMessage);
 
+    // Also listen for system notifications that might not be 'new_message'
+    const handleConversationUpdated = (data: any) => {
+      if (data.conversationId?.toString() === conversationId?.toString()) {
+        if (data.action === 'members_added' || data.action === 'member_left') {
+          // Re-fetch messages to get the system messages created on backend
+          fetchMessages(false);
+          // If it was group details update, fetch that too
+          if (isGroup) fetchGroupDetails();
+        }
+      }
+    };
+
+    socketService.on('conversation_updated', handleConversationUpdated);
+
     return () => {
       if (conversationIdNum) socketService.emit('leave_conversation', conversationIdNum);
       socketService.off('new_message');
       socketService.off('message_seen');
+      socketService.off('conversation_updated', handleConversationUpdated);
     };
-  }, [conversationId, user?.id, isFocused]);
+  }, [conversationId, user?.id, isFocused, fetchMessages, fetchGroupDetails, isGroup]);
 
   const handleSend = async () => {
     if (!messageText.trim()) return;

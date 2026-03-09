@@ -178,7 +178,7 @@ export default function MembersScreen() {
             renderItem={({ item }: any) => (
               <TouchableOpacity onPress={() => { setSelectedMember(item); setMemberModalVisible(true); }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWeight: 1, borderColor: '#fff' }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWidth: 1, borderColor: '#fff' }}>
                     {item.avatar ? (
                       <Image source={{ uri: item.avatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                     ) : (

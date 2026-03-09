@@ -9,7 +9,7 @@ type ChatMessage = {
   content?: string;
   time?: string;
   fromMe?: boolean;
-  type?: 'text' | 'sticker' | 'contact' | 'separator';
+  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system';
   contactName?: string;
   contactAvatar?: string;
   contactAvatarColor?: string;
@@ -22,11 +22,12 @@ type ChatMessage = {
 export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean }) {
   const { colors } = useTheme();
 
-  if (message.type === 'separator') {
+  if (message.type === 'separator' || message.type === 'system') {
+    const textToShow = message.text || message.content;
     return (
-      <View className="w-full items-center my-4">
+      <View className="w-full items-center my-2">
         <View style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, backgroundColor: colors.surfaceVariant }}>
-          <Text style={{ fontSize: 12, color: colors.textSecondary }}>{message.text}</Text>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' }}>{textToShow}</Text>
         </View>
       </View>
     );

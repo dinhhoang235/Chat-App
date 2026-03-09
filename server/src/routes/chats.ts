@@ -11,7 +11,8 @@ import {
   createGroup,
   getConversationDetails,
   addMembers,
-  removeMember
+  removeMember,
+  leaveGroup
 } from '../controllers/chatController.js';
 import { upload } from '../middleware/upload.js';
 import { Server } from 'socket.io';
@@ -30,6 +31,7 @@ export const chatRoutes = (io: Server) => {
   router.post('/start', startConversation(io));
   router.delete('/:conversationId', deleteConversation(io));
   router.delete('/:conversationId/disband', disbandGroup(io));
+  router.delete('/:conversationId/leave', leaveGroup(io));
   
   // Group member management
   router.post('/:conversationId/members', addMembers(io));

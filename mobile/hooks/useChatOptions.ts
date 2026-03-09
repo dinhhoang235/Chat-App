@@ -124,10 +124,23 @@ export function useChatOptions() {
     }
   };
 
+  const performLeaveGroup = async () => {
+    setLeaveVisible(false);
+    try {
+      await chatApi.leaveGroup(id);
+      Alert.alert('Đã rời nhóm', 'Bạn đã rời khỏi nhóm thành công.');
+      // Quay lại màn hình tin nhắn cũ (tabs/index) hoặc màn hình chính
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Leave group error:', error);
+      Alert.alert('Lỗi', 'Không thể rời nhóm. Vui lòng thử lại sau.');
+    }
+  };
+
   const isOwner = useMemo(() => {
     if (!isGroup || !groupDetails || !user) return false;
     const currentUserParticipant = groupDetails.participants?.find((p: any) => p.userId === user.id);
-    return currentUserParticipant?.role === 'owner' || currentUserParticipant?.role === 'admin';
+    return currentUserParticipant?.role === 'owner';
   }, [isGroup, groupDetails, user]);
 
   return {
@@ -158,6 +171,7 @@ export function useChatOptions() {
     leaveVisible, setLeaveVisible,
     isMuted,
     performClearChat,
+    performLeaveGroup,
     isOwner,
   };
 }

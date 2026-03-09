@@ -41,10 +41,11 @@ export function useChatThread() {
   const [targetUser, setTargetUser] = useState<any>(null);
 
   // Derive which avatar to show: if typingUser has an avatar, use it; otherwise fallback to params.avatar
+  const avatarParam = Array.isArray(params.avatar) ? params.avatar[0] : params.avatar;
   const displayTypingAvatar = typingUser?.avatar
     ? (typingUser.avatar.startsWith('http') ? typingUser.avatar : `${API_URL}${typingUser.avatar}`)
-    : (params.avatar
-        ? (params.avatar.startsWith('http') ? params.avatar : `${API_URL}${params.avatar}`)
+    : (avatarParam
+        ? (avatarParam.startsWith('http') ? avatarParam : `${API_URL}${avatarParam}`)
         : undefined);
 
   const messagesRef = useRef<any[]>([]);

@@ -7,7 +7,10 @@ import {
   startConversation,
   markAsRead,
   deleteConversation,
-  createGroup
+  createGroup,
+  getConversationDetails,
+  addMembers,
+  removeMember
 } from '../controllers/chatController.js';
 import { upload } from '../middleware/upload.js';
 import { Server } from 'socket.io';
@@ -19,11 +22,16 @@ export const chatRoutes = (io: Server) => {
 
   router.get('/conversations', getConversations);
   router.post('/group', upload.any(), createGroup(io));
+  router.get('/:conversationId', getConversationDetails);
   router.get('/:conversationId/messages', getMessages(io));
   router.post('/:conversationId/messages', sendMessage(io));
   router.post('/:conversationId/read', markAsRead(io));
   router.post('/start', startConversation(io));
   router.delete('/:conversationId', deleteConversation(io));
+  
+  // Group member management
+  router.post('/:conversationId/members', addMembers(io));
+  router.delete('/:conversationId/members/:userId', removeMember(io));
 
   return router;
 };

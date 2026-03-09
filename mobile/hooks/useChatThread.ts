@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { FlatList } from 'react-native';
 import { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
@@ -40,13 +40,54 @@ export function useChatThread() {
   const [targetUserStatus, setTargetUserStatus] = useState<{status: string, lastSeen: number | null} | null>(null);
   const [targetUser, setTargetUser] = useState<any>(null);
 
+  const [groupDetails, setGroupDetails] = useState<any>(null);
+
+  const fetchGroupDetails = useCallback(async () => {
+    if (!id || params.isGroup !== 'true') return;
+    try {
+      const response = await chatApi.getConversationDetails(id);
+      setGroupDetails(response.data);
+    } catch (error) {
+      console.error('Fetch group details error:', error);
+    }
+  }, [id, params.isGroup]);
+
+  useEffect(() => {
+    fetchGroupDetails();
+  }, [fetchGroupDetails]);
+
+  // Listen for member updates
+  useEffect(() => {
+    if (params.isGroup !== 'true') return;
+
+    const handleUpdate = (data: any) => {
+      if (data.conversationId?.toString() === id?.toString()) {
+        fetchGroupDetails();
+      }
+    };
+
+    socketService.on('conversation_updated', handleUpdate);
+    return () => {
+      socketService.off('conversation_updated', handleUpdate);
+    };
+  }, [id, params.isGroup, fetchGroupDetails]);
+
   // Derive which avatar to show: if typingUser has an avatar, use it; otherwise fallback to params.avatar
   const avatarParam = Array.isArray(params.avatar) ? params.avatar[0] : params.avatar;
   const isGroup = params.isGroup === 'true';
-  const groupAvatars = params.avatars 
-    ? (Array.isArray(params.avatars) ? params.avatars : (typeof params.avatars === 'string' && params.avatars.includes(',') ? params.avatars.split(',') : [params.avatars as string])) 
-    : [];
-  const membersCount = params.membersCount ? Number(params.membersCount) : undefined;
+  const groupAvatars = useMemo(() => {
+    if (groupDetails?.participants) {
+      return groupDetails.participants
+        .map((p: any) => p.user.avatar)
+        .filter(Boolean)
+        .map((a: string) => `${API_URL}${a}`);
+    }
+    return params.avatars 
+      ? (Array.isArray(params.avatars) ? params.avatars : (typeof params.avatars === 'string' && params.avatars.includes(',') ? params.avatars.split(',') : [params.avatars as string])) 
+      : [];
+  }, [groupDetails, params.avatars]);
+
+  const membersCount = groupDetails?.participants?.length || (params.membersCount ? Number(params.membersCount) : undefined);
 
   const displayTypingAvatar = typingUser?.avatar
     ? (typingUser.avatar.startsWith('http') ? typingUser.avatar : `${API_URL}${typingUser.avatar}`)

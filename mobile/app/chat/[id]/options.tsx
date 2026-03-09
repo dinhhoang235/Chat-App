@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Image, Switch, ScrollView, Alert } from 'react-native';
 import { useTheme } from '../../../context/themeContext';
 import { useSearch } from '../../../context/searchContext';
@@ -67,10 +67,51 @@ export default function ChatOptions() {
   }, [params]);
 
   const membersCount = (params as any).membersCount ? parseInt((params as any).membersCount as string) : 0;
-  const groupAvatars = (params as any).avatars ? ((params as any).avatars as string).split(',') : [];
+  const groupAvatars = React.useMemo(() => {
+    if (groupDetails?.participants) {
+      return groupDetails.participants
+        .map((p: any) => p.user.avatar)
+        .filter(Boolean)
+        .map((a: string) => `${API_URL}${a}`);
+    }
+    return (params as any).avatars ? ((params as any).avatars as string).split(',') : [];
+  }, [groupDetails, params]);
   
   const [currentStatus, setCurrentStatus] = useState<string | undefined>((params as any).status);
   const isOnline = currentStatus === 'online';
+
+  const [groupDetails, setGroupDetails] = useState<any>(null);
+
+  const fetchGroupDetails = useCallback(async () => {
+    if (!isGroup) return;
+    try {
+      const response = await chatApi.getConversationDetails(id);
+      setGroupDetails(response.data);
+    } catch (error) {
+      console.error('Fetch group details error:', error);
+    }
+  }, [id, isGroup]);
+
+  useEffect(() => {
+    fetchGroupDetails();
+  }, [fetchGroupDetails]);
+
+  // Listen for member updates
+  useEffect(() => {
+    if (!isGroup) return;
+
+    const handleUpdate = (data: any) => {
+      // If the update is for this conversation, refetch
+      if (data.conversationId?.toString() === id.toString()) {
+        fetchGroupDetails();
+      }
+    };
+
+    socketService.on('conversation_updated', handleUpdate);
+    return () => {
+      socketService.off('conversation_updated', handleUpdate);
+    };
+  }, [id, isGroup, fetchGroupDetails]);
 
   useEffect(() => {
     if (!targetUserId) return;
@@ -128,7 +169,7 @@ export default function ChatOptions() {
           <View>
             <View className="w-24 h-24 rounded-full mb-3 items-center justify-center" style={{ backgroundColor: isGroup ? 'transparent' : colors.surfaceVariant }}>
               {isGroup ? (
-                <GroupAvatar avatars={groupAvatars} membersCount={membersCount} size={96} />
+                <GroupAvatar avatars={groupAvatars} membersCount={groupDetails?.participants?.length || membersCount} size={96} />
               ) : avatar ? (
                 <Image source={{ uri: avatar }} style={{ width: 96, height: 96, borderRadius: 48 }} resizeMode="cover" />
               ) : (
@@ -216,7 +257,13 @@ export default function ChatOptions() {
               <Row icon="push-pin" title="Tin nhắn đã ghim" onPress={() => router.push(`/chat/${id}/pinned`)} showChevron />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
-              <Row icon="people" title={`Xem thành viên`} subtitle={`(${membersCount || (contact?.membersCount ?? 0)})`} onPress={() => router.push(`/chat/${id}/members`)} showChevron />
+              <Row 
+                icon="people" 
+                title={`Xem thành viên`} 
+                subtitle={`(${groupDetails?.participants?.length || membersCount || (contact?.membersCount ?? 0)})`} 
+                onPress={() => router.push(`/chat/${id}/members`)} 
+                showChevron 
+              />
 
               <Row icon="link" title="Link nhóm" subtitle="https://zalo.me/g/wftfeh870" onPress={() => router.push(`/chat/${id}/link`)} showChevron />
             </View>

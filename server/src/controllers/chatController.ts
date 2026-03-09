@@ -555,6 +555,72 @@ export const deleteConversation = (io: Server) => async (req: AuthRequest, res: 
   }
 };
 
+export const getConversationDetails = async (req: AuthRequest, res: Response): Promise<any> => {
+  const { conversationId } = req.params;
+  const userId = req.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  try {
+    const convId = parseInt(Array.isArray(conversationId) ? conversationId[0] : conversationId);
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: convId },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatar: true,
+                phone: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+
+    // Check if user is participant
+    const isParticipant = conversation.participants.some(p => p.userId === userId);
+    if (!isParticipant) {
+      return res.status(403).json({ message: 'Not a member of this conversation' });
+    }
+
+    // Add status for each participant
+    const participantsWithStatus = await Promise.all(conversation.participants.map(async (p) => {
+      const status = await getUserStatus(p.userId);
+      return {
+        id: p.id,
+        userId: p.userId,
+        role: p.role,
+        lastReadAt: p.lastReadAt,
+        joinedAt: p.joinedAt,
+        user: {
+          ...p.user,
+          status: status === 'online' ? 'online' : 'offline'
+        }
+      };
+    }));
+
+    return res.json({
+      ...conversation,
+      participants: participantsWithStatus,
+      membersCount: conversation.participants.length
+    });
+  } catch (err) {
+    console.error('Get conversation details error:', err);
+    return res.status(500).json({ message: 'Error fetching conversation details' });
+  }
+};
+
 export const createGroup = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { name, participantIds } = req.body;
   const userId = req.userId;
@@ -593,7 +659,8 @@ export const createGroup = (io: Server) => async (req: AuthRequest, res: Respons
         avatar: avatarPath,
         participants: {
           create: allParticipantIds.map(id => ({
-            userId: id
+            userId: id,
+            role: id === userId ? 'owner' : 'member'
           }))
         }
       },
@@ -630,5 +697,200 @@ export const createGroup = (io: Server) => async (req: AuthRequest, res: Respons
   } catch (err) {
     console.error('Create group error:', err);
     return res.status(500).json({ message: 'Error creating group' });
+  }
+};
+
+export const addMembers = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
+  const { conversationId } = req.params;
+  const { userIds } = req.body;
+  const userId = req.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({ message: 'Invalid or empty userIds' });
+  }
+
+  try {
+    const convId = parseInt(Array.isArray(conversationId) ? conversationId[0] : conversationId);
+
+    // Check if group exists and if requester is owner/admin
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId
+        }
+      },
+      include: {
+        conversation: true
+      }
+    });
+
+    if (!participant || !participant.conversation.isGroup) {
+      return res.status(403).json({ message: 'Only group members can add new members' });
+    }
+
+    if (participant.role !== 'owner' && participant.role !== 'admin') {
+      return res.status(403).json({ message: 'Permission denied. Only owners or admins can add members.' });
+    }
+
+    // Filter out existing participants
+    const existingParticipants = await prisma.conversationParticipant.findMany({
+      where: {
+        conversationId: convId,
+        userId: { in: userIds.map(id => parseInt(id)) }
+      },
+      select: { userId: true }
+    });
+
+    const existingUserIds = existingParticipants.map(p => p.userId);
+    const newUserIds = userIds
+      .map(id => parseInt(id))
+      .filter(id => !existingUserIds.includes(id));
+
+    if (newUserIds.length === 0) {
+      return res.status(400).json({ message: 'All selected users are already in the group' });
+    }
+
+    // Add new participants
+    await prisma.conversationParticipant.createMany({
+      data: newUserIds.map(id => ({
+        conversationId: convId,
+        userId: id,
+        role: 'member'
+      }))
+    });
+
+    // Fetch the updated group details to notify users
+    const updatedConversation = await prisma.conversation.findUnique({
+      where: { id: convId },
+      include: {
+        participants: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatar: true,
+                phone: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (updatedConversation) {
+      // Notify all current participants about the new members
+      updatedConversation.participants.forEach(p => {
+        io.to(`user:${p.userId}`).emit('conversation_updated', {
+          conversationId: convId,
+          action: 'members_added',
+          conversation: updatedConversation,
+          newMemberIds: newUserIds
+        });
+      });
+    }
+
+    return res.status(200).json({ success: true, addedCount: newUserIds.length });
+  } catch (err) {
+    console.error('Add members error:', err);
+    return res.status(500).json({ message: 'Error adding members' });
+  }
+};
+
+export const removeMember = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
+  const { conversationId, userId: targetUserIdStr } = req.params;
+  const requesterId = req.userId;
+
+  if (!requesterId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  try {
+    const convId = parseInt(Array.isArray(conversationId) ? conversationId[0] : conversationId);
+    const targetUserId = parseInt(Array.isArray(targetUserIdStr) ? targetUserIdStr[0] : targetUserIdStr);
+
+    if (requesterId === targetUserId) {
+      return res.status(400).json({ message: 'Cannot remove yourself using this endpoint' });
+    }
+
+    // 1. Get requester role
+    const requester = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId: requesterId
+        }
+      }
+    });
+
+    if (!requester || (requester.role !== 'owner' && requester.role !== 'admin')) {
+      return res.status(403).json({ message: 'Permission denied. Only owners or admins can remove members.' });
+    }
+
+    // 2. Get target role and info
+    const target = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId: targetUserId
+        }
+      }
+    });
+
+    if (!target) {
+      return res.status(404).json({ message: 'Member not found in this group' });
+    }
+
+    // 3. Check permissions
+    // Owner can remove anyone except themselves
+    // Admin can remove members, but NOT owner or other admins (based on requirements: "Only the 'owner' can remove other 'admins'")
+    if (requester.role === 'admin') {
+      if (target.role === 'owner') {
+        return res.status(403).json({ message: 'Admins cannot remove the owner' });
+      }
+      if (target.role === 'admin') {
+        return res.status(403).json({ message: 'Admins cannot remove other admins' });
+      }
+    }
+
+    // 4. Delete the participant
+    await prisma.conversationParticipant.delete({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId: targetUserId
+        }
+      }
+    });
+
+    // 5. Notify participants
+    const participants = await prisma.conversationParticipant.findMany({
+      where: { conversationId: convId }
+    });
+
+    // Notify remaining members
+    participants.forEach(p => {
+      io.to(`user:${p.userId}`).emit('conversation_updated', {
+        conversationId: convId,
+        action: 'member_removed',
+        removedUserId: targetUserId
+      });
+    });
+
+    // Notify the removed member
+    io.to(`user:${targetUserId}`).emit('conversation_removed', {
+      conversationId: convId,
+      reason: 'removed_by_admin'
+    });
+
+    return res.json({ success: true, message: 'Member removed successfully' });
+  } catch (err) {
+    console.error('Remove member error:', err);
+    return res.status(500).json({ message: 'Error removing member' });
   }
 };

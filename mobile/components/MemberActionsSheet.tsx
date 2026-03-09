@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, Pressable, ScrollView } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, Pressable, ScrollView, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/themeContext';
 import type { Contact } from '../constants/mockData';
@@ -7,7 +7,7 @@ import type { Contact } from '../constants/mockData';
 type Props = {
   visible: boolean;
   onClose: () => void;
-  member: Contact | null;
+  member: (Contact & { avatar?: string | null }) | null;
   isOwner?: boolean;
   onPromote?: (id: string) => void;
   onBlock?: (id: string) => void;
@@ -29,11 +29,13 @@ export default function MemberActionsSheet({ visible, onClose, member, isOwner, 
 
           <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
             <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              {member?.initials ? (
-                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: member.color ?? colors.surfaceVariant, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>{member.initials}</Text>
-                </View>
-              ) : null}
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center' }}>
+                {member.avatar ? (
+                  <Image source={{ uri: member.avatar }} style={{ width: 56, height: 56, borderRadius: 28 }} />
+                ) : (
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>{member.initials ?? 'U'}</Text>
+                )}
+              </View>
               <Text style={{ color: colors.text, fontWeight: '700', marginTop: 8 }}>{member.name}</Text>
             </View>
 
@@ -55,18 +57,20 @@ export default function MemberActionsSheet({ visible, onClose, member, isOwner, 
             </View>
 
             <View style={{ borderTopWidth: 1, borderTopColor: colors.surfaceVariant, paddingTop: 12 }}>
-              {isOwner ? (
-                <TouchableOpacity onPress={() => { onPromote?.(member.id); onClose(); }} style={{ paddingVertical: 12 }}>
-                  <Text style={{ color: colors.text, fontWeight: '600' }}>Bổ nhiệm làm phó nhóm</Text>
-                </TouchableOpacity>
+              {isOwner && member.role !== 'owner' ? (
+                <>
+                  <TouchableOpacity onPress={() => { onPromote?.(member.id); onClose(); }} style={{ paddingVertical: 12 }}>
+                    <Text style={{ color: colors.text, fontWeight: '600' }}>Bổ nhiệm làm phó nhóm</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => { onRemove?.(member.id); onClose(); }} style={{ paddingVertical: 12 }}>
+                    <Text style={{ color: colors.danger, fontWeight: '700' }}>Xóa khỏi nhóm</Text>
+                  </TouchableOpacity>
+                </>
               ) : null}
 
               <TouchableOpacity onPress={() => { onBlock?.(member.id); onClose(); }} style={{ paddingVertical: 12 }}>
                 <Text style={{ color: colors.text, fontWeight: '600' }}>Chặn thành viên</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => { onRemove?.(member.id); onClose(); }} style={{ paddingVertical: 12 }}>
-                <Text style={{ color: colors.danger, fontWeight: '700' }}>Xóa khỏi nhóm</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

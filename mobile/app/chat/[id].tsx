@@ -131,7 +131,11 @@ export default function ChatThread() {
                     <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }} numberOfLines={1}>
                       {paramName || targetUser?.fullName || 'Chat'}
                     </Text>
-                    {getStatusText() && (
+                    {isGroup ? (
+                      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>
+                        {membersCount} thành viên
+                      </Text>
+                    ) : getStatusText() && (
                       <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>
                         {getStatusText()}
                       </Text>

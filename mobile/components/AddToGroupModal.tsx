@@ -1,23 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, TouchableOpacity, Text, ScrollView, Switch, TextInput, FlatList } from 'react-native';
+import { Modal, View, TouchableOpacity, Text, ScrollView, Switch, TextInput, FlatList, Image, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/themeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { contacts } from '../constants/mockData';
+import { getFriendsList } from '../services/friendship';
+import { API_URL } from '../services/api';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
   onSave?: (selectedIds: string[]) => void;
   initialSelected?: string[];
+  conversationId?: string | number;
 };
 
-export default function AddToGroupModal({ visible, onClose, onSave, initialSelected = [] }: Props) {
+export default function AddToGroupModal({ visible, onClose, onSave, initialSelected = [], conversationId }: Props) {
   const { scheme, colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState<string[]>(initialSelected);
   const [query, setQuery] = useState('');
   const [excludeRecent, setExcludeRecent] = useState(false);
+  const [allFriends, setAllFriends] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  
   const rowBg = colors.surface;
   const overlayColor = scheme === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.55)';
 
@@ -26,14 +31,49 @@ export default function AddToGroupModal({ visible, onClose, onSave, initialSelec
       setSelected(initialSelected);
       setQuery('');
       setExcludeRecent(false);
+      fetchFriends();
     }
-  }, [visible, initialSelected]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const fetchFriends = async () => {
+    try {
+      setLoading(true);
+      const data = await getFriendsList();
+      
+      // The data might be an array of friends or an object with data property
+      const friendsArray = Array.isArray(data) ? data : (data?.data || []);
+      
+      const formatted = friendsArray
+        .filter((f: any) => f && (f.friend || f.id)) // Ensure f is not null and has info
+        .map((f: any) => {
+          // Handling both { friend: { ... } } and direct user objects
+          const userInfo = f.friend || f;
+          return {
+            id: userInfo.id?.toString() || Math.random().toString(),
+            name: userInfo.fullName || 'Người dùng',
+            phone: userInfo.phone || '',
+            avatar: userInfo.avatar ? `${API_URL}${userInfo.avatar}` : null,
+            initials: (userInfo.fullName || 'U').split(' ').filter(Boolean).map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(),
+            color: '#6B7280'
+          };
+        });
+      setAllFriends(formatted);
+    } catch (error) {
+      console.error('Fetch friends error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleSelect = (id: string) => {
     setSelected(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
   };
 
-  const filtered = contacts.filter(c => (c.name || '').toLowerCase().includes(query.toLowerCase()));
+  const filtered = allFriends.filter(c => 
+    (c.name || '').toLowerCase().includes(query.toLowerCase()) || 
+    (c.phone || '').includes(query)
+  );
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -72,10 +112,21 @@ export default function AddToGroupModal({ visible, onClose, onSave, initialSelec
               data={filtered}
               keyExtractor={i => i.id}
               contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}
+              ListEmptyComponent={
+                loading ? (
+                  <ActivityIndicator style={{ marginTop: 20 }} color={colors.tint} />
+                ) : (
+                  <Text style={{ textAlign: 'center', marginTop: 20, color: colors.textSecondary }}>Không tìm thấy bạn bè</Text>
+                )
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity onPress={() => toggleSelect(item.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: item.color ?? colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>{item.initials ?? 'U'}</Text>
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    {item.avatar ? (
+                      <Image source={{ uri: item.avatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                    ) : (
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>{item.initials ?? 'U'}</Text>
+                    )}
                   </View>
 
                   <View style={{ flex: 1 }}>
@@ -102,12 +153,16 @@ export default function AddToGroupModal({ visible, onClose, onSave, initialSelec
               <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.header, paddingHorizontal: 12, paddingVertical: 10, paddingBottom: insets.bottom + 12 }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
                   {selected.map(id => {
-                    const c = contacts.find(cc => cc.id === id);
+                    const c = allFriends.find(cc => cc.id === id);
                     if (!c) return null;
                     return (
                       <View key={id} style={{ marginRight: 8, position: 'relative' }}>
-                        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.color ?? '#6B7280', alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ color: '#fff', fontWeight: '700' }}>{c.initials}</Text>
+                        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center' }}>
+                          {c.avatar ? (
+                            <Image source={{ uri: c.avatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                          ) : (
+                            <Text style={{ color: '#fff', fontWeight: '700' }}>{c.initials}</Text>
+                          )}
                         </View>
                         <TouchableOpacity onPress={() => toggleSelect(id)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>
                           <MaterialIcons name="close" size={12} color={colors.text} />

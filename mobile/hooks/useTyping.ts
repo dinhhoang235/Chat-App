@@ -4,7 +4,7 @@ import { socketService } from '../services/socket';
 export const useTyping = (conversationId: string | null, userId: number | undefined) => {
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState<{ id: number, avatar?: string } | null>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingEventRef = useRef<number>(0);
 
   // Listen for typing events from other users

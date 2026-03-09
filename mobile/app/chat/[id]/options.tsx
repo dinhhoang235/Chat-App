@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Image, Switch, ScrollView, Alert } from 'react-native';
+import React from 'react';
+import { ScrollView, Switch, Alert, View, Image  } from 'react-native';
 import { useTheme } from '../../../context/themeContext';
 import { useSearch } from '../../../context/searchContext';
 import { Header } from '../../../components/Header';
@@ -12,227 +12,73 @@ import ChatOptionRow from '../../../components/ChatOptionRow';
 import ReportModal from '../../../components/ReportModal';
 import ConfirmModal from '../../../components/ConfirmModal';
 import LeaveGroupSheet from '../../../components/LeaveGroupSheet';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GroupAvatar } from '../../../components/GroupAvatar';
-import { contacts } from '../../../constants/mockData';
-import { useAuth } from '../../../context/authContext';
-import { API_URL } from '../../../services/api';
-import { socketService } from '../../../services/socket';
-import { chatApi } from '../../../services/chat';
+import { useChatOptions } from '../../../hooks/useChatOptions';
+import { ChatOptionsHeaderInfo } from '../../../components/ChatOptionsHeaderInfo';
+import { QuickActions } from '../../../components/QuickActions';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const Row = ChatOptionRow;
 
 export default function ChatOptions() {
   const { colors } = useTheme();
-  const router = useRouter();
-  const params = useLocalSearchParams();
   const { open } = useSearch();
-  const [pinned, setPinned] = useState(false);
-  const [eyeOff, setEyeOff] = useState(false);
-  const [muteVisible, setMuteVisible] = useState(false);
-  const [muteSettingsVisible, setMuteSettingsVisible] = useState(false);
-  const [selectedMuteOption, setSelectedMuteOption] = useState<string>('Không tắt');
-  const [excludeReminders, setExcludeReminders] = useState<boolean>(false);
-  const [addModalVisible, setAddModalVisible] = useState(false);
 
-  // block settings
-  const [blockVisible, setBlockVisible] = useState(false);
-  const [blockMessages, setBlockMessages] = useState<boolean>(false);
-  const [blockCalls, setBlockCalls] = useState<boolean>(false);
-
-  // edit display name
-  const [displayNameModalVisible, setDisplayNameModalVisible] = useState(false);
-  const [displayName, setDisplayName] = useState<string | undefined>(undefined);
-
-  // report modal state
-  const [reportVisible, setReportVisible] = useState(false);
-  // confirm clear chat modal
-  const [confirmVisible, setConfirmVisible] = useState(false);
-  // leave group modal
-  const [leaveVisible, setLeaveVisible] = useState(false);
-
-  // resolve id / contact so we can detect groups reliably
-  const id = (params as any).id as string;
-  const contact = contacts.find(c => c.id === id);
-  const name = (params as any).name || contact?.name || 'Người dùng';
-  const rawAvatar = (params as any).avatar as string | undefined;
-  const avatar = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${API_URL}${rawAvatar}`) : undefined;
-  const targetUserId = (params as any).targetUserId as string | undefined;
-  
-  // Use useMemo to ensure isGroup is correctly calculated and doesn't cause unnecessary re-renders
-  const isGroup = React.useMemo(() => {
-    return (params as any).isGroup === 'true' || (params as any).isGroup === true;
-  }, [params]);
-
-  const membersCount = (params as any).membersCount ? parseInt((params as any).membersCount as string) : 0;
-  const groupAvatars = React.useMemo(() => {
-    if (groupDetails?.participants) {
-      return groupDetails.participants
-        .map((p: any) => p.user.avatar)
-        .filter(Boolean)
-        .map((a: string) => `${API_URL}${a}`);
-    }
-    return (params as any).avatars ? ((params as any).avatars as string).split(',') : [];
-  }, [groupDetails, params]);
-  
-  const [currentStatus, setCurrentStatus] = useState<string | undefined>((params as any).status);
-  const isOnline = currentStatus === 'online';
-
-  const [groupDetails, setGroupDetails] = useState<any>(null);
-
-  const fetchGroupDetails = useCallback(async () => {
-    if (!isGroup) return;
-    try {
-      const response = await chatApi.getConversationDetails(id);
-      setGroupDetails(response.data);
-    } catch (error) {
-      console.error('Fetch group details error:', error);
-    }
-  }, [id, isGroup]);
-
-  useEffect(() => {
-    fetchGroupDetails();
-  }, [fetchGroupDetails]);
-
-  // Listen for member updates
-  useEffect(() => {
-    if (!isGroup) return;
-
-    const handleUpdate = (data: any) => {
-      // If the update is for this conversation, refetch
-      if (data.conversationId?.toString() === id.toString()) {
-        fetchGroupDetails();
-      }
-    };
-
-    socketService.on('conversation_updated', handleUpdate);
-    return () => {
-      socketService.off('conversation_updated', handleUpdate);
-    };
-  }, [id, isGroup, fetchGroupDetails]);
-
-  useEffect(() => {
-    if (!targetUserId) return;
-
-    const handleStatusChanged = (data: { userId: number; status: string }) => {
-      if (data.userId.toString() === targetUserId) {
-        setCurrentStatus(data.status);
-      }
-    };
-
-    socketService.on('user_status_changed', handleStatusChanged);
-    return () => {
-      socketService.off('user_status_changed', handleStatusChanged);
-    };
-  }, [targetUserId]);
-  
-  const getInitials = (n: string) => {
-    const parts = n.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
-
-  const isMuted = selectedMuteOption !== 'Không tắt';
-
-  const confirmClearChat = () => {
-    setConfirmVisible(true);
-  };
-
-  const performClearChat = async () => {
-    setConfirmVisible(false);
-    try {
-      await chatApi.deleteConversation(id);
-      Alert.alert('Đã xóa', 'Lịch sử trò chuyện đã được xóa');
-      router.replace('/(tabs)');
-    } catch (error) {
-      console.error('Delete conversation error:', error);
-      Alert.alert('Lỗi', 'Không thể xóa cuộc trò chuyện. Vui lòng thử lại sau.');
-    }
-  };
-
-  const performLeaveGroup = () => {
-    setLeaveVisible(false);
-    // TODO: call API to leave group
-    Alert.alert('Đã rời nhóm', 'Bạn đã rời nhóm (mock)');
-  };
-  const { user } = useAuth();
-  const isOwner = !!contact?.ownerPhone && user?.phone === contact?.ownerPhone;
+  const {
+    router,
+    id,
+    name,
+    avatar,
+    isGroup,
+    membersCount,
+    groupAvatars,
+    isOnline,
+    groupDetails,
+    pinned, setPinned,
+    eyeOff, setEyeOff,
+    muteVisible, setMuteVisible,
+    muteSettingsVisible, setMuteSettingsVisible,
+    selectedMuteOption, setSelectedMuteOption,
+    excludeReminders, setExcludeReminders,
+    addModalVisible, setAddModalVisible,
+    blockVisible, setBlockVisible,
+    blockMessages, setBlockMessages,
+    blockCalls, setBlockCalls,
+    displayNameModalVisible, setDisplayNameModalVisible,
+    displayName, setDisplayName,
+    reportVisible, setReportVisible,
+    confirmVisible, setConfirmVisible,
+    leaveVisible, setLeaveVisible,
+    isMuted,
+    performClearChat,
+    isOwner,
+  } = useChatOptions();
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       <Header title="Tùy chọn" showBack onBackPress={() => router.back()} />
 
       <ScrollView>
-        <View className="items-center px-4 py-3" >
-          <View>
-            <View className="w-24 h-24 rounded-full mb-3 items-center justify-center" style={{ backgroundColor: isGroup ? 'transparent' : colors.surfaceVariant }}>
-              {isGroup ? (
-                <GroupAvatar avatars={groupAvatars} membersCount={groupDetails?.participants?.length || membersCount} size={96} />
-              ) : avatar ? (
-                <Image source={{ uri: avatar }} style={{ width: 96, height: 96, borderRadius: 48 }} resizeMode="cover" />
-              ) : (
-                <View style={{ width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }}>
-                  <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700' }}>{getInitials(name)}</Text>
-                </View>
-              )}
-            </View>
-            {!isGroup && isOnline && (
-              <View 
-                className="absolute right-1 bottom-3 w-6 h-6 rounded-full border-4" 
-                style={{ 
-                  backgroundColor: '#4ade80', 
-                  borderColor: colors.background 
-                }} 
-              />
-            )}
-          </View>
-          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{displayName ?? name}</Text>
-        </View>
+        <ChatOptionsHeaderInfo
+          isGroup={isGroup}
+          groupAvatars={groupAvatars}
+          membersCount={groupDetails?.participants?.length || membersCount}
+          avatar={avatar}
+          isOnline={isOnline}
+          name={name}
+          displayName={displayName}
+          colors={colors}
+        />
 
-        <View className="px-4 py-4 flex-row items-center justify-around">
-          {isGroup ? (
-            <>
-              <TouchableOpacity className="items-center" onPress={() => { const id = (params as any).id; open(id); router.back(); }}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
-                  <MaterialIcons name="search" size={20} color={colors.text} />
-                </View>
-                <Text style={{ color: colors.text }}>Tìm tin nhắn</Text>
-              </TouchableOpacity>
+        <QuickActions
+          isGroup={isGroup}
+          isMuted={isMuted}
+          onSearch={() => { open(id); router.back(); }}
+          onAddMember={() => setAddModalVisible(true)}
+          onToggleMute={() => setMuteVisible(true)}
+          colors={colors}
+        />
 
-              <TouchableOpacity className="items-center" onPress={() => setAddModalVisible(true)}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
-                  <MaterialIcons name="person-add" size={20} color={colors.text} />
-                </View>
-                <Text style={{ color: colors.text }}>Thêm thành viên</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity className="items-center" onPress={() => setMuteVisible(true)}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: isMuted ? colors.tint : colors.surface, borderWidth: 1, borderColor: isMuted ? colors.tint : colors.border }}>
-                  <MaterialIcons name="notifications-off" size={20} color={isMuted ? '#fff' : colors.text} />
-                </View>
-                <Text style={{ color: colors.text }}>{isMuted ? 'Đã tắt' : 'Tắt thông báo'}</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity className="items-center" onPress={() => { const id = (params as any).id; open(id); router.back(); }}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
-                  <MaterialIcons name="search" size={20} color={colors.text} />
-                </View>
-                <Text style={{ color: colors.text }}>Tìm tin nhắn</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity className="items-center" onPress={() => setMuteVisible(true)}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: isMuted ? colors.tint : colors.surface, borderWidth: 1, borderColor: isMuted ? colors.tint : colors.border }}>
-                  <MaterialIcons name="notifications-off" size={20} color={isMuted ? '#fff' : colors.text} />
-                </View>
-                <Text style={{ color: colors.text }}>{isMuted ? 'Đã tắt' : 'Tắt thông báo'}</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
         {isGroup ? (
           <>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
@@ -260,7 +106,7 @@ export default function ChatOptions() {
               <Row 
                 icon="people" 
                 title={`Xem thành viên`} 
-                subtitle={`(${groupDetails?.participants?.length || membersCount || (contact?.membersCount ?? 0)})`} 
+                subtitle={`(${groupDetails?.participants?.length || membersCount})`} 
                 onPress={() => router.push(`/chat/${id}/members`)} 
                 showChevron 
               />
@@ -271,7 +117,7 @@ export default function ChatOptions() {
               {isOwner ? (
                 <>
                   <Row icon="settings" title="Cài đặt nhóm" onPress={() => router.push(`/chat/${id}/settings`)} showChevron />
-                  <Row icon="how-to-reg" title="Phê duyệt thành viên" subtitle={`(${contact?.pendingMembers?.length ?? 0})`} onPress={() => router.push(`/chat/${id}/members?mode=pending`)} showChevron />
+                  <Row icon="how-to-reg" title="Phê duyệt thành viên" subtitle={`(${groupDetails?.pendingMembers?.length ?? 0})`} onPress={() => router.push(`/chat/${id}/members?mode=pending`)} showChevron />
                 </>
               ) : null}
             </View>
@@ -281,7 +127,7 @@ export default function ChatOptions() {
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="flag" title="Báo xấu" onPress={() => setReportVisible(true)} />
-              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} titleColor={colors.danger} iconColor={colors.danger} />
+              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => setConfirmVisible(true)} titleColor={colors.danger} iconColor={colors.danger} />
               <Row icon="exit-to-app" title="Rời nhóm" onPress={() => setLeaveVisible(true)} titleColor={colors.danger} iconColor={colors.danger} />
             </View>
           </>
@@ -325,7 +171,7 @@ export default function ChatOptions() {
                 subtitle={blockMessages && blockCalls ? 'Chặn tin nhắn, cuộc gọi' : blockMessages ? 'Chặn tin nhắn' : blockCalls ? 'Chặn cuộc gọi' : 'Không chặn'}
                 onPress={() => setBlockVisible(true)}
               />
-              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} titleColor={colors.danger} iconColor={colors.danger} />
+              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => setConfirmVisible(true)} titleColor={colors.danger} iconColor={colors.danger} />
             </View>
           </>
         )}
@@ -348,7 +194,7 @@ export default function ChatOptions() {
       <LeaveGroupSheet
         visible={leaveVisible}
         onClose={() => setLeaveVisible(false)}
-        onLeave={() => { setLeaveVisible(false); performLeaveGroup(); }}
+        onLeave={() => { setLeaveVisible(false); Alert.alert('Đã rời nhóm', 'Bạn đã rời nhóm (mock)'); }}
       />
 
       <AddToGroupModal
@@ -399,7 +245,6 @@ export default function ChatOptions() {
           setDisplayName(newName || undefined);
         }}
       />
-
     </SafeAreaView>
   );
 }

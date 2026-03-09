@@ -35,4 +35,6 @@ export const chatApi = {
     apiClient.post(`/chats/${id}/members`, { userIds }),
   removeMember: (id: string | number, userId: string | number) =>
     apiClient.delete(`/chats/${id}/members/${userId}`),
+  disbandGroup: (id: string | number) =>
+    apiClient.delete(`/chats/${id}/disband`),
 };

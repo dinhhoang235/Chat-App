@@ -7,6 +7,7 @@ import {
   startConversation,
   markAsRead,
   deleteConversation,
+  disbandGroup,
   createGroup,
   getConversationDetails,
   addMembers,
@@ -28,6 +29,7 @@ export const chatRoutes = (io: Server) => {
   router.post('/:conversationId/read', markAsRead(io));
   router.post('/start', startConversation(io));
   router.delete('/:conversationId', deleteConversation(io));
+  router.delete('/:conversationId/disband', disbandGroup(io));
   
   // Group member management
   router.post('/:conversationId/members', addMembers(io));

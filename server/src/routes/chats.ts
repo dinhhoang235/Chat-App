@@ -13,7 +13,7 @@ import {
   addMembers,
   removeMember,
   leaveGroup
-} from '../controllers/chatController.js';
+} from '../controllers/chat/index.js';
 import { upload } from '../middleware/upload.js';
 import { Server } from 'socket.io';
 

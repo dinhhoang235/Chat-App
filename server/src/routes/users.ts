@@ -13,7 +13,7 @@ import {
   getSearchHistory,
   deleteSearchHistory,
   clearSearchHistory
-} from '../controllers/userController.js';
+} from '../controllers/user/index.js';
 import {
   sendFriendRequest,
   acceptFriendRequest,
@@ -25,7 +25,7 @@ import {
   removeFriend,
   checkFriendshipStatus,
   searchFriendByPhone
-} from '../controllers/friendshipController.js';
+} from '../controllers/friendship/index.js';
 import { upload } from '../middleware/upload.js';
 import { authMiddleware } from '../middleware/auth.js';
 

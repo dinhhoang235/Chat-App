@@ -60,6 +60,8 @@ model ConversationParticipant {
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastReadAt     DateTime     @default(now())
   joinedAt       DateTime     @default(now())
+  deletedAt      DateTime?
+  hiddenAt       DateTime?
 
   @@unique([conversationId, userId])
   @@map("conversation_participants")

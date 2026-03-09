@@ -106,13 +106,7 @@ export default function Messages() {
                   }); 
                 } 
               }}
-              onAction={(action) => {
-                if (action === 'select') {
-                  setSelectionMode(true);
-                  setSelectedIds([item.id]);
-                }
-                console.log('Row action', action, item.id);
-              }}
+              onAction={(action) => handleRowAction(action, item.id)}
               selectionMode={selectionMode}
               selected={selectedIds.includes(item.id)}
               onToggleSelect={(id) => toggleSelect(id)}

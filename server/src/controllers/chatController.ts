@@ -2,7 +2,7 @@ import { Response } from 'express';
 import prisma from '../db.js';
 import { Server } from 'socket.io';
 import { AuthRequest } from '../middleware/auth.js';
-import { getCachedMessages, bulkCacheMessages, cacheMessage, getUserStatus, clearCachedMessages } from '../utils/redis.js';
+import { getCachedMessages, bulkCacheMessages, cacheMessage, getUserStatus } from '../utils/redis.js';
 
 export const getConversations = async (req: AuthRequest, res: Response): Promise<any> => {
   const userId = req.userId;
@@ -15,7 +15,10 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
     const conversations = await prisma.conversation.findMany({
       where: {
         participants: {
-          some: { userId }
+          some: { 
+            userId,
+            hiddenAt: null
+          }
         }
       },
       include: {
@@ -44,11 +47,22 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
     // Manually calculate unread count and add user status for each conversation
     const mappedConversations = await Promise.all(conversations.map(async (conv) => {
       const participant = conv.participants.find(p => p.userId === userId);
+      const deletedAt = participant?.deletedAt || new Date(0);
+
+      // Filter messages to only show those created after deletedAt
+      const lastMessage = conv.messages.length > 0 && conv.messages[0].createdAt > deletedAt
+        ? conv.messages
+        : [];
+
       const unreadCount = await prisma.message.count({
         where: {
           conversationId: conv.id,
           senderId: { not: userId },
-          createdAt: { gt: participant?.lastReadAt || new Date(0) }
+          createdAt: { 
+            gt: participant?.lastReadAt && participant.lastReadAt > deletedAt 
+              ? participant.lastReadAt 
+              : deletedAt 
+          }
         }
       });
 
@@ -66,6 +80,7 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
 
       return {
         ...conv,
+        messages: lastMessage,
         participants: participantsWithStatus,
         membersCount: conv.participants.length,
         _count: {
@@ -124,16 +139,28 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
     // 1. Try to get from Cache if it's the first page (no cursor)
     if (!cursor) {
       const cached = await getCachedMessages(convId, take);
+      // Filter cached messages by deletedAt
       if (cached && cached.length > 0) {
-        console.log('Serving messages from Redis cache');
-        messages = cached;
-        fromCache = true;
+        const filteredCached = participant.deletedAt 
+          ? cached.filter((m: any) => new Date(m.createdAt) > (participant.deletedAt as Date))
+          : cached;
+          
+        if (filteredCached.length > 0) {
+          console.log('Serving filtered messages from Redis cache');
+          messages = filteredCached;
+          fromCache = true;
+        }
       }
     }
 
     if (!messages) {
       messages = await prisma.message.findMany({
-        where: { conversationId: convId },
+        where: { 
+          conversationId: convId,
+          createdAt: {
+            gt: participant.deletedAt || new Date(0)
+          }
+        },
         take: take,
         skip: cursorId ? 1 : 0,
         cursor: cursorId ? { id: cursorId } : undefined,
@@ -323,6 +350,20 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
     // 3. Cache the new message
     cacheMessage(convId, message).catch(e => console.error(e));
     
+    // Reactivate for all OTHER participants who previously "hid" it
+    // We reset hiddenAt to make conversation visible again,
+    // but KEEP deletedAt to ensure they don't see older messages.
+    await prisma.conversationParticipant.updateMany({
+      where: {
+        conversationId: convId,
+        userId: { not: userId },
+        hiddenAt: { not: null }
+      },
+      data: {
+        hiddenAt: null
+      }
+    });
+
     // Also notify users who might not be in the conversation room currently 
     // but should see an updated list of conversations
     const participants = await prisma.conversationParticipant.findMany({
@@ -472,6 +513,15 @@ export const deleteConversation = (io: Server) => async (req: AuthRequest, res: 
           conversationId: convId,
           userId
         }
+      },
+      include: {
+        user: {
+          select: {
+            fullName: true,
+            avatar: true
+          }
+        },
+        conversation: true
       }
     });
 
@@ -479,24 +529,24 @@ export const deleteConversation = (io: Server) => async (req: AuthRequest, res: 
       return res.status(403).json({ message: 'Not a member of this conversation' });
     }
 
-    // Get all participants before deleting to notify them
-    const participants = await prisma.conversationParticipant.findMany({
-      where: { conversationId: convId },
-      select: { userId: true }
+    const now = new Date();
+    const isGroup = !!(participant as any).conversation?.isGroup;
+
+    await prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId
+        }
+      },
+      data: {
+        deletedAt: now,
+        hiddenAt: isGroup ? null : now // Nếu là nhóm, không ẩn khỏi danh sách (hiddenAt = null)
+      }
     });
 
-    // Delete conversation (cascade deletes participants and messages)
-    await prisma.conversation.delete({
-      where: { id: convId }
-    });
-
-    // Clear Redis cache
-    await clearCachedMessages(convId);
-
-    // Notify all participants
-    participants.forEach(p => {
-      io.to(`user:${p.userId}`).emit('conversation_deleted', { conversationId: convId });
-    });
+    // Notify ONLY the current user that the conversation is "hidden" or "cleared" on their side
+    io.to(`user:${userId}`).emit('conversation_deleted', { conversationId: convId, isGroup });
 
     return res.json({ success: true, message: 'Conversation deleted successfully' });
   } catch (err) {

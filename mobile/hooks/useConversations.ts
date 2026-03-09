@@ -36,6 +36,10 @@ export function useConversations() {
           .map((p: any) => p.user.avatar ? `${API_URL}${p.user.avatar}` : null)
           .filter(Boolean);
         
+        const updatedAt = lastMsg 
+          ? new Date(lastMsg.createdAt).getTime() 
+          : new Date(conv.updatedAt || conv.createdAt).getTime();
+        
         return {
           id: conv.id.toString(),
           name: conv.name || otherParticipant?.user.fullName || 'Người dùng',
@@ -49,9 +53,10 @@ export function useConversations() {
           membersCount: conv.membersCount || conv.participants.length,
           isGroup: conv.isGroup,
           targetUserId: otherParticipant?.userId.toString(),
-          status: otherParticipant?.user.status || 'offline'
+          status: otherParticipant?.user.status || 'offline',
+          updatedAt: updatedAt
         };
-      });
+      }).sort((a: any, b: any) => b.updatedAt - a.updatedAt);
       setData(mapped);
     } catch (err) {
       console.error("Fetch conversations error:", err);
@@ -69,6 +74,11 @@ export function useConversations() {
       fetchConversations();
     };
 
+    const handleNewMessage = (message: any) => {
+      // Trigger a re-fetch to get the latest order and message text
+      fetchConversations();
+    };
+
     const handleStatusChanged = (data: { userId: number; status: string }) => {
       setData(prev => prev.map(conv => {
         if (conv.targetUserId === data.userId.toString()) {
@@ -79,12 +89,12 @@ export function useConversations() {
     };
 
     socketService.on('conversation_updated', handleUpdate);
-    socketService.on('new_message', handleUpdate);
+    socketService.on('new_message', handleNewMessage);
     socketService.on('user_status_changed', handleStatusChanged);
 
     return () => {
       socketService.off('conversation_updated', handleUpdate);
-      socketService.off('new_message', handleUpdate);
+      socketService.off('new_message', handleNewMessage);
       socketService.off('user_status_changed', handleStatusChanged);
     };
   }, [fetchConversations, isFocused]);

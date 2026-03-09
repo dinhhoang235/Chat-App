@@ -122,9 +122,10 @@ export default function ChatThread() {
                     pathname: '/chat/[id]/options',
                     params: { 
                       id,
-                      name: paramName, 
-                      avatar: params.avatar,
-                      targetUserId: targetUserId
+                      name: paramName || targetUser?.fullName, 
+                      avatar: targetUser?.avatar || params.avatar,
+                      targetUserId: targetUserId,
+                      status: targetUserStatus?.status
                     }
                   } as any) 
                 },

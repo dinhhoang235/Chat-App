@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, Switch, ScrollView, Alert } from 'react-native';
 import { useTheme } from '../../../context/themeContext';
 import { useSearch } from '../../../context/searchContext';
@@ -17,6 +17,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { contacts } from '../../../constants/mockData';
 import { useAuth } from '../../../context/authContext';
+import { API_URL } from '../../../services/api';
+import { socketService } from '../../../services/socket';
 
 const Row = ChatOptionRow;
 
@@ -54,7 +56,26 @@ export default function ChatOptions() {
   const contact = contacts.find(c => c.id === id);
   const name = (params as any).name || contact?.name || 'Người dùng';
   const rawAvatar = (params as any).avatar as string | undefined;
-  const avatar = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${process.env.EXPO_PUBLIC_API_URL}${rawAvatar}`) : undefined;
+  const avatar = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${API_URL}${rawAvatar}`) : undefined;
+  const targetUserId = (params as any).targetUserId as string | undefined;
+  
+  const [currentStatus, setCurrentStatus] = useState<string | undefined>((params as any).status);
+  const isOnline = currentStatus === 'online';
+
+  useEffect(() => {
+    if (!targetUserId) return;
+
+    const handleStatusChanged = (data: { userId: number; status: string }) => {
+      if (data.userId.toString() === targetUserId) {
+        setCurrentStatus(data.status);
+      }
+    };
+
+    socketService.on('user_status_changed', handleStatusChanged);
+    return () => {
+      socketService.off('user_status_changed', handleStatusChanged);
+    };
+  }, [targetUserId]);
   
   const getInitials = (n: string) => {
     const parts = n.trim().split(/\s+/);
@@ -93,13 +114,24 @@ export default function ChatOptions() {
 
       <ScrollView>
         <View className="items-center px-4 py-3" >
-          <View className="w-24 h-24 rounded-full overflow-hidden mb-3 items-center justify-center" style={{ backgroundColor: colors.surfaceVariant }}>
-            {avatar ? (
-              <Image source={{ uri: avatar }} style={{ width: 96, height: 96, borderRadius: 48 }} resizeMode="cover" />
-            ) : (
-              <View style={{ width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }}>
-                <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700' }}>{getInitials(name)}</Text>
-              </View>
+          <View>
+            <View className="w-24 h-24 rounded-full overflow-hidden mb-3 items-center justify-center" style={{ backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.surfaceVariant }}>
+              {avatar ? (
+                <Image source={{ uri: avatar }} style={{ width: 96, height: 96, borderRadius: 48 }} resizeMode="cover" />
+              ) : (
+                <View style={{ width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }}>
+                  <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700' }}>{getInitials(name)}</Text>
+                </View>
+              )}
+            </View>
+            {isOnline && (
+              <View 
+                className="absolute right-1 bottom-3 w-6 h-6 rounded-full border-4" 
+                style={{ 
+                  backgroundColor: '#4ade80', 
+                  borderColor: colors.background 
+                }} 
+              />
             )}
           </View>
           <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{displayName ?? name}</Text>

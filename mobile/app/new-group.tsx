@@ -10,7 +10,6 @@ export default function NewGroup() {
   const { colors } = useTheme();
   const [name, setName] = useState('');
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState<'recent' | 'contacts'>('recent');
   const [selected, setSelected] = useState<string[]>([]);
   const insets = useSafeAreaInsets();
 
@@ -19,11 +18,11 @@ export default function NewGroup() {
     .filter((c): c is typeof mockContacts[0] => !!c);
 
   const filtered = useMemo(() => {
-    const base = tab === 'recent' ? mockContacts.slice(0, 10) : mockContacts;
+    const base = mockContacts;
     if (!query) return base;
     const q = query.toLowerCase();
     return base.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q));
-  }, [query, tab]);
+  }, [query]);
 
   const toggle = (id: string) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -84,18 +83,6 @@ export default function NewGroup() {
             </View>
           </View>
         </View>
-      </View>
-
-      <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.background }}>
-        <TouchableOpacity onPress={() => setTab('recent')} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
-          <Text style={{ color: tab === 'recent' ? colors.text : colors.textSecondary, fontWeight: tab === 'recent' ? '700' : '600' }}>GẦN ĐÂY</Text>
-          {tab === 'recent' && <View style={{ height: 2, backgroundColor: colors.tint || '#34D399', marginTop: 6, borderRadius: 1 }} />}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setTab('contacts')} style={{ paddingHorizontal: 12, paddingVertical: 6, marginLeft: 12 }}>
-          <Text style={{ color: tab === 'contacts' ? colors.text : colors.textSecondary, fontWeight: tab === 'contacts' ? '700' : '600' }}>DANH BẠ</Text>
-          {tab === 'contacts' && <View style={{ height: 2, backgroundColor: colors.tint || '#34D399', marginTop: 6, borderRadius: 1 }} />}
-        </TouchableOpacity>
       </View>
 
       <FlatList

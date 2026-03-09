@@ -3,7 +3,6 @@ import { View, Text, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../context/themeContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import SearchBar from '../components/SearchBar';
 import SearchHistory from '../components/SearchHistory';
 import ResultsList from '../components/ResultsList';
@@ -80,7 +79,7 @@ export default function GlobalSearch() {
             userAPI.saveSearchHistoryDB(parseInt(id)).catch(e => {
                 console.error('Failed to save search history:', e);
             });
-        } catch (e) {}
+        } catch {}
         router.push(`/profile/${id}`);
     };
 

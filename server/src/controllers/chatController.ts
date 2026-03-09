@@ -2,7 +2,7 @@ import { Response } from 'express';
 import prisma from '../db.js';
 import { Server } from 'socket.io';
 import { AuthRequest } from '../middleware/auth.js';
-import { getCachedMessages, bulkCacheMessages, cacheMessage, getUserStatus } from '../utils/redis.js';
+import { getCachedMessages, bulkCacheMessages, cacheMessage, getUserStatus, clearCachedMessages } from '../utils/redis.js';
 
 export const getConversations = async (req: AuthRequest, res: Response): Promise<any> => {
   const userId = req.userId;
@@ -453,5 +453,56 @@ export const startConversation = (io: Server) => async (req: AuthRequest, res: R
   } catch (err) {
     console.error('Start conversation error:', err);
     return res.status(500).json({ message: 'Error starting conversation' });
+  }
+};
+
+export const deleteConversation = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
+  const { conversationId } = req.params;
+  const userId = req.userId;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
+  try {
+    const convId = parseInt(Array.isArray(conversationId) ? conversationId[0] : conversationId);
+
+    // Check if user is participant
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: convId,
+          userId
+        }
+      }
+    });
+
+    if (!participant) {
+      return res.status(403).json({ message: 'Not a member of this conversation' });
+    }
+
+    // Get all participants before deleting to notify them
+    const participants = await prisma.conversationParticipant.findMany({
+      where: { conversationId: convId },
+      select: { userId: true }
+    });
+
+    // Delete conversation (cascade deletes participants and messages)
+    await prisma.conversation.delete({
+      where: { id: convId }
+    });
+
+    // Clear Redis cache
+    await clearCachedMessages(convId);
+
+    // Notify all participants
+    participants.forEach(p => {
+      io.to(`user:${p.userId}`).emit('conversation_deleted', { conversationId: convId });
+    });
+
+    return res.json({ success: true, message: 'Conversation deleted successfully' });
+  } catch (err) {
+    console.error('Delete conversation error:', err);
+    return res.status(500).json({ message: 'Error deleting conversation' });
   }
 };

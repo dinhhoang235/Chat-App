@@ -11,15 +11,16 @@ interface Props {
   onPress?: () => void;
   showChevron?: boolean;
   titleColor?: string;
+  iconColor?: string;
 }
 
-export default function ChatOptionRow({ icon, title, subtitle, rightNode, onPress, showChevron = false, titleColor }: Props) {
+export default function ChatOptionRow({ icon, title, subtitle, rightNode, onPress, showChevron = false, titleColor, iconColor }: Props) {
   const { colors } = useTheme();
   return (
     <TouchableOpacity onPress={onPress} className="py-4 flex-row items-center justify-between" style={{ paddingLeft: 8, paddingRight: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
       <View className="flex-row items-center">
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.surfaceVariant }}>
-          <MaterialIcons name={icon as any} size={20} color={colors.textSecondary} />
+          <MaterialIcons name={icon as any} size={20} color={iconColor ?? colors.textSecondary} />
         </View>
         <View style={{ justifyContent: 'center' }}>
           <Text style={{ color: titleColor ?? colors.text, fontWeight: '600' }}>{title}</Text>

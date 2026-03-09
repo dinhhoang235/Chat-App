@@ -10,4 +10,6 @@ export const chatApi = {
     apiClient.post(`/chats/${id}/read`),
   startConversation: (targetUserId: number, firstMessage?: string) => 
     apiClient.post('/chats/start', { targetUserId, firstMessage }),
+  deleteConversation: (id: string | number) => 
+    apiClient.delete(`/chats/${id}`),
 };

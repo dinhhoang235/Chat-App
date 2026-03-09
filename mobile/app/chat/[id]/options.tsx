@@ -19,6 +19,7 @@ import { contacts } from '../../../constants/mockData';
 import { useAuth } from '../../../context/authContext';
 import { API_URL } from '../../../services/api';
 import { socketService } from '../../../services/socket';
+import { chatApi } from '../../../services/chat';
 
 const Row = ChatOptionRow;
 
@@ -89,9 +90,16 @@ export default function ChatOptions() {
     setConfirmVisible(true);
   };
 
-  const performClearChat = () => {
+  const performClearChat = async () => {
     setConfirmVisible(false);
-    Alert.alert('Đã xóa', 'Lịch sử trò chuyện đã được xóa (mock)');
+    try {
+      await chatApi.deleteConversation(id);
+      Alert.alert('Đã xóa', 'Lịch sử trò chuyện đã được xóa');
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Delete conversation error:', error);
+      Alert.alert('Lỗi', 'Không thể xóa cuộc trò chuyện. Vui lòng thử lại sau.');
+    }
   };
 
   const performLeaveGroup = () => {
@@ -221,7 +229,7 @@ export default function ChatOptions() {
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="flag" title="Báo xấu" onPress={() => setReportVisible(true)} />
-              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} />
+              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} titleColor={colors.danger} iconColor={colors.danger} />
               <Row icon="exit-to-app" title="Rời nhóm" onPress={() => setLeaveVisible(true)} titleColor={colors.danger} />
             </View>
           </>
@@ -265,7 +273,7 @@ export default function ChatOptions() {
                 subtitle={blockMessages && blockCalls ? 'Chặn tin nhắn, cuộc gọi' : blockMessages ? 'Chặn tin nhắn' : blockCalls ? 'Chặn cuộc gọi' : 'Không chặn'}
                 onPress={() => setBlockVisible(true)}
               />
-              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} />
+              <Row icon="delete" title="Xóa lịch sử trò chuyện" onPress={() => confirmClearChat()} titleColor={colors.danger} iconColor={colors.danger} />
             </View>
           </>
         )}

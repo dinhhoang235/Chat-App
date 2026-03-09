@@ -100,3 +100,15 @@ export const bulkCacheMessages = async (conversationId: number, messages: any[])
     console.error('Redis Bulk Cache Error:', err);
   }
 };
+
+/**
+ * Clear cached messages for a conversation
+ */
+export const clearCachedMessages = async (conversationId: number) => {
+  try {
+    const key = `${MESSAGE_CACHE_KEY_PREFIX}${conversationId}`;
+    await redisClient.del(key);
+  } catch (err) {
+    console.error('Redis Clear Cached Messages Error:', err);
+  }
+};

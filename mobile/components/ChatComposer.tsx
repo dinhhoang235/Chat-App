@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, Keyboard, ActivityIndicator } from 'react-native';
+import { View, TextInput, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface ChatComposerProps {
@@ -12,6 +12,7 @@ interface ChatComposerProps {
   setComposerVisible: React.Dispatch<React.SetStateAction<boolean>>;
   colors: any;
   insets: { bottom: number };
+  onImagePress?: () => void;
 }
 
 export default function ChatComposer({
@@ -24,6 +25,7 @@ export default function ChatComposer({
   setComposerVisible,
   colors,
   insets,
+  onImagePress,
 }: ChatComposerProps) {
   return (
     <View
@@ -45,31 +47,34 @@ export default function ChatComposer({
           <MaterialIcons name="emoji-emotions" size={26} color={colors.icon} />
         </TouchableOpacity>
 
-        <View
-          className="flex-1 px-2 py-2 mr-3"
-          style={{
-            backgroundColor: colors.surface,
-            borderRadius: 10,
-            minHeight: 40,
-            maxHeight: 100,
-            justifyContent: 'center',
-          }}
-        >
-          <TextInput
-            ref={inputRef}
-            value={messageText}
-            onChangeText={onTextChange}
-            placeholder="Tin nhắn"
-            placeholderTextColor={colors.textSecondary}
+        <TouchableWithoutFeedback onPress={() => setComposerVisible(false)}>
+          <View
+            className="flex-1 px-2 py-2 mr-3"
             style={{
-              color: colors.text,
-              fontSize: 16,
-              paddingVertical: 8,
-              textAlignVertical: 'center',
+              backgroundColor: colors.surface,
+              borderRadius: 10,
+              minHeight: 40,
+              maxHeight: 100,
+              justifyContent: 'center',
             }}
-            multiline
-          />
-        </View>
+          >
+            <TextInput
+              ref={inputRef}
+              value={messageText}
+              onChangeText={onTextChange}
+              onFocus={() => setComposerVisible(false)}
+              placeholder="Tin nhắn"
+              placeholderTextColor={colors.textSecondary}
+              style={{
+                color: colors.text,
+                fontSize: 16,
+                paddingVertical: 8,
+                textAlignVertical: 'center',
+              }}
+              multiline
+            />
+          </View>
+        </TouchableWithoutFeedback>
 
         {/* Right action icons: show send when typing, otherwise more/mic/image */}
         <View className="flex-row items-center">
@@ -112,7 +117,13 @@ export default function ChatComposer({
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => console.log('Image pressed')}
+                onPress={() => {
+                  if (onImagePress) {
+                    onImagePress();
+                  } else {
+                    console.log('Image pressed');
+                  }
+                }}
                 style={{ padding: 6 }}
               >
                 <MaterialIcons name="image" size={26} color={colors.icon} />

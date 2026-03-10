@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import * as FileSystem from 'expo-file-system';
 import { FlatList } from 'react-native';
 import { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
@@ -225,14 +226,28 @@ export function useChatThread() {
       const response = await chatApi.getMessages(Number(conversationId), cursor, 20);
       const newMessages = response.data;
 
-      const mapped = newMessages.map((m: any) => ({
-        ...m,
-        fromMe: m.senderId ? m.senderId === user?.id : false,
-        time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        contactName: m.sender?.id ? m.sender.fullName : (m.type === 'system' ? 'Hệ thống' : undefined),
-        contactAvatar: m.sender?.avatar ? `${API_URL}${m.sender.avatar}` : undefined,
-        seenBy: m.seenBy || [],
-      }));
+      const mapped = newMessages.map((m: any) => {
+        const base: any = {
+          ...m,
+          fromMe: m.senderId ? m.senderId === user?.id : false,
+          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          contactName: m.sender?.id ? m.sender.fullName : (m.type === 'system' ? 'Hệ thống' : undefined),
+          contactAvatar: m.sender?.avatar ? `${API_URL}${m.sender.avatar}` : undefined,
+          seenBy: m.seenBy || [],
+        };
+        if (m.type === 'file' || m.type === 'image') {
+          try {
+            const info = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
+            base.fileInfo = info;
+          } catch {
+            // content might already be a string path for image
+            if (m.type === 'image') {
+              base.fileInfo = { url: m.content };
+            }
+          }
+        }
+        return base;
+      });
 
       if (isLoadMore) {
         setMessages(prev => [...prev, ...mapped]);
@@ -315,11 +330,31 @@ export function useChatThread() {
         const isDuplicate = prev.find(m => m.id === message.id);
         if (isDuplicate) return prev;
 
-        const tempIdx = prev.findIndex(
-          m => m.status === 'sending' && m.content === message.content && m.senderId === message.senderId
-        );
+        // prepare parsed version of incoming message so we can compare
+        let incomingFileName: string | undefined;
+        if (message.type === 'file' || message.type === 'image') {
+          try {
+            const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
+            incomingFileName = info?.name;
+          } catch {
+            if (message.type === 'image') {
+              incomingFileName = undefined;
+            }
+          }
+        }
 
-        const mappedMessage = {
+        let tempIdx = -1;
+        if (message.type === 'file' || message.type === 'image') {
+          tempIdx = prev.findIndex(
+            m => m.status === 'sending' && m.type === message.type && m.fileName && incomingFileName && m.fileName === incomingFileName && m.senderId === message.senderId
+          );
+        } else {
+          tempIdx = prev.findIndex(
+            m => m.status === 'sending' && m.content === message.content && m.senderId === message.senderId
+          );
+        }
+
+        const mappedMessage: any = {
           ...message,
           fromMe: message.senderId ? message.senderId === user?.id : false,
           time: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -328,6 +363,14 @@ export function useChatThread() {
           seenBy: message.seenBy || [],
           status: 'sent',
         };
+        if (message.type === 'file' || message.type === 'image') {
+          try {
+            const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
+            mappedMessage.fileInfo = info;
+          } catch {
+            if (message.type === 'image') mappedMessage.fileInfo = { url: message.content };
+          }
+        }
 
         if (tempIdx !== -1) {
           const newMessages = [...prev];
@@ -369,7 +412,10 @@ export function useChatThread() {
 
   const handleSend = async () => {
     if (!messageText.trim()) return;
-    const text = messageText.trim();
+    await handleSendText(messageText.trim());
+  };
+
+  const handleSendText = async (text: string) => {
     setMessageText('');
 
     // Scroll to bottom (index 0 in inverted list)
@@ -396,10 +442,9 @@ export function useChatThread() {
         try {
           const response = await chatApi.startConversation(Number(targetUserIdState), text);
           const conv = response.data;
-          targetConversationId = conv.id || conv.conversationId;
-
-          if (targetConversationId) {
-            setConversationId(targetConversationId.toString());
+          const convId = conv.id || conv.conversationId;
+          if (convId) {
+            setConversationId(convId.toString());
             const lastMessage = conv.messages?.[0];
             if (lastMessage) {
               setMessages([{
@@ -424,13 +469,90 @@ export function useChatThread() {
       setMessages(prev => [tempMessage, ...prev]);
 
       await chatApi.sendMessage(Number(targetConversationId), text);
-
-      // We don't manually set 'sent' here because the socket 'new_message'
-      // will arrive and replace this temp message or add the real one.
     } catch (err) {
       console.error('Send error:', err);
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setMessageText(text);
+    }
+  };
+
+  const handleSendAttachment = async (
+    file: { uri: string; name: string; type: string; size?: number },
+    caption?: string
+  ) => {
+    if (!file) return;
+    if (file.size && file.size > 5 * 1024 * 1024) {
+      alert('File must be smaller than 5MB');
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    const tempMessage: any = {
+      id: tempId,
+      content: file.uri,
+      fromMe: true,
+      senderId: user?.id,
+      createdAt: new Date().toISOString(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sending',
+      type: file.type.startsWith('image/') ? 'image' : 'file',
+      fileName: file.name,
+    };
+
+    try {
+      let targetConversationId = conversationId;
+
+      // ensure conversation exists
+      if (isNewConversation && !conversationId) {
+        setMessages([tempMessage]);
+        setCreatingConversation(true);
+        try {
+          const response = await chatApi.startConversation(Number(targetUserIdState), caption || '', file);
+          const conv = response.data;
+          const convId = conv.id || conv.conversationId;
+          if (convId) {
+            targetConversationId = convId.toString(); // <--- update variable
+            setConversationId(targetConversationId);
+            const lastMessage = conv.messages?.[0];
+            if (lastMessage) {
+              setMessages([{
+                ...lastMessage,
+                fromMe: true,
+                time: new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                status: 'sent',
+              }]);
+            }
+          }
+          // after creating the conversation we've already sent the file
+          return;
+        } catch (err) {
+          console.error('Error creating conversation on attachment send:', err);
+          setMessages([]);
+          return;
+        } finally {
+          setCreatingConversation(false);
+        }
+      }
+
+      setMessages(prev => [tempMessage, ...prev]);
+
+      // prepare upload file; convert content:// to file:// via copy
+      let uploadFile = file;
+      if (file.uri && file.uri.startsWith('content://')) {
+        try {
+          const dest = `${(FileSystem as any).cacheDirectory}${file.name}`;
+          await (FileSystem as any).copyAsync({ from: file.uri, to: dest });
+          uploadFile = { uri: dest, name: file.name, type: file.type };
+        } catch (e) {
+          console.warn('Failed to copy content URI, using original', e);
+        }
+      }
+
+      await chatApi.sendMessage(Number(targetConversationId), caption || '', '', uploadFile);
+    } catch (err) {
+      console.error('Attachment send error:', err);
+      alert('Không thể gửi tệp, vui lòng thử lại');
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
 
@@ -496,6 +618,7 @@ export function useChatThread() {
     animatedContentStyle,
     fetchMessages,
     handleSend,
+    handleSendAttachment,
     targetUser,
     targetUserStatus,
     isGroup,

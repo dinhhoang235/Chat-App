@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Linking, useWindowDimensions } from 'react-native';
 import { useTheme } from '../context/themeContext';
+import { MaterialIcons } from '@expo/vector-icons';
 import { API_URL } from '../services/api';
 
 type ChatMessage = {
@@ -9,7 +10,7 @@ type ChatMessage = {
   content?: string;
   time?: string;
   fromMe?: boolean;
-  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system';
+  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'file';
   contactName?: string;
   contactAvatar?: string;
   contactAvatarColor?: string;
@@ -17,10 +18,13 @@ type ChatMessage = {
   seenBy?: { id: number; fullName?: string; avatar?: string }[];
   isLastInGroup?: boolean;
   status?: 'sending' | 'sent' | 'error';
+  fileInfo?: { url: string; name?: string; size?: number; mime?: string };
 };
 
 export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean }) {
   const { colors } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const [imgSize, setImgSize] = React.useState<{width:number;height:number} | null>(null);
 
   if (message.type === 'separator' || message.type === 'system') {
     const textToShow = message.text || message.content;
@@ -32,6 +36,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       </View>
     );
   }
+
 
   const isOutgoing = !!message.fromMe;
   let bubbleBg = colors.bubbleOther;
@@ -74,6 +79,75 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       </Text>
     );
   };
+
+  // after computing styles/render helper we decide what content to show
+  let contentElement: React.ReactNode = null;
+
+  if (message.type === 'sticker') {
+    contentElement = (
+      <Image source={{ uri: 'https://via.placeholder.com/120x120.png?text=STK' }} style={{ width: 120, height: 120, borderRadius: 12 }} />
+    );
+  } else if (message.type === 'image' && message.fileInfo) {
+    let uri = message.fileInfo.url;
+    if (!uri.startsWith('http')) {
+      // ensure /media prefix
+      if (!uri.startsWith('/media')) uri = `/media${uri}`;
+      uri = `${API_URL}${uri}`;
+    }
+    const maxWidth = screenWidth * 0.7; // 70% of screen
+    const onLoad = (e: any) => {
+      const { width, height } = e.nativeEvent.source;
+      let w = width;
+      let h = height;
+      if (w > maxWidth) {
+        const ratio = maxWidth / w;
+        w = maxWidth;
+        h = h * ratio;
+      }
+      setImgSize({ width: w, height: h });
+    };
+    contentElement = (
+      <Image
+        source={{ uri }}
+        style={{
+          width: imgSize ? imgSize.width : maxWidth,
+          height: imgSize ? imgSize.height : maxWidth,
+          borderRadius: 12,
+          resizeMode: 'contain'
+        }}
+        onLoad={onLoad}
+      />
+    );
+  } else if (message.type === 'file' && message.fileInfo) {
+    let { url, name, size, mime } = message.fileInfo;
+    let uri = url;
+    if (!uri.startsWith('http')) {
+      if (!uri.startsWith('/media')) uri = `/media${uri}`;
+      uri = `${API_URL}${uri}`;
+    }
+
+    const filename = name || 'File';
+    const ext = mime ? mime.split('/')[1] : filename.split('.').pop();
+    const readableSize = size != null ? `${(size / 1024 / 1024).toFixed(1)} MB` : '';
+
+
+    contentElement = (
+      <TouchableOpacity onPress={() => Linking.openURL(uri)} activeOpacity={0.8}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <MaterialIcons name="download" size={24} color={textColor} />
+          <View style={{ marginLeft: 8, maxWidth: 200 }}>
+            <Text style={{ color: textColor, fontWeight: '500' }} numberOfLines={1}>{filename}</Text>
+            <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>
+              {ext ? ext.toUpperCase() : ''}{readableSize ? ` · ${readableSize}` : ''}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  } else {
+    // default text rendering
+    contentElement = renderHighlighted(message.text);
+  }
 
   // Contact card style
   if (message.type === 'contact') {
@@ -129,12 +203,16 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         )}
 
         <View style={{ maxWidth: '72%', marginLeft: isOutgoing ? 'auto' : 12 }} className={`${isOutgoing ? 'items-end' : 'items-start'}`}> 
-            <View style={{ backgroundColor: bubbleBg, borderWidth: 1, borderColor, padding: 12, borderRadius: 18, marginBottom: isLastInGroup ? 0 : -8 }}>
-            {message.type === 'sticker' ? (
-              <Image source={{ uri: 'https://via.placeholder.com/120x120.png?text=STK' }} style={{ width: 120, height: 120, borderRadius: 12 }} />
-            ) : (
-              renderHighlighted(message.text)
-            )}
+            {/* for image attachments we don’t show the standard bubble styling */}
+        <View style={{
+            backgroundColor: message.type === 'image' ? 'transparent' : bubbleBg,
+            borderWidth: message.type === 'image' ? 0 : 1,
+            borderColor,
+            padding: message.type === 'image' ? 0 : 12,
+            borderRadius: 18,
+            marginBottom: isLastInGroup ? 0 : -8
+          }}>
+            {contentElement}
           </View>
 
           {isLastInGroup && (

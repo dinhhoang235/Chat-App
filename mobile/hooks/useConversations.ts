@@ -28,9 +28,23 @@ export function useConversations() {
         
         const isFromMe = lastMsg && user && (lastMsg.senderId === user.id);
         
-        const lastMessageText = lastMsg 
-          ? (isFromMe ? `Bạn: ${lastMsg.content}` : lastMsg.content)
-          : 'Chưa có tin nhắn';
+        let lastMessageText: string;
+        if (!lastMsg) {
+          lastMessageText = 'Chưa có tin nhắn';
+        } else if (lastMsg.type === 'image') {
+          lastMessageText = isFromMe ? 'Bạn: [Hình ảnh]' : '[Hình ảnh]';
+        } else if (lastMsg.type === 'file') {
+          // show name if available
+          let fileName = '';
+          try {
+            const info = typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
+            fileName = info?.name ? ` ${info.name}` : '';
+          } catch {}
+          lastMessageText = isFromMe ? `Bạn: [File]${fileName}` : `[File]${fileName}`;
+        } else {
+          // fallback to raw text content
+          lastMessageText = isFromMe ? `Bạn: ${lastMsg.content}` : lastMsg.content;
+        }
 
         const avatars = conv.participants
           .map((p: any) => p.user.avatar ? `${API_URL}${p.user.avatar}` : null)

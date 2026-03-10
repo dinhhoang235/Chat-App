@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text } from 'react-native';
+import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, Alert } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Header } from '../../components/Header';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import InThreadSearch from '../../components/InThreadSearch';
 import MessageBubble from '../../components/MessageBubble';
 import ComposerActionsSheet from '../../components/ComposerActionsSheet';
@@ -45,12 +47,75 @@ export default function ChatThread() {
     animatedContentStyle,
     fetchMessages,
     handleSend,
+    handleSendAttachment,
     targetUserStatus,
     targetUser,
     isGroup,
     groupAvatars,
     membersCount
   } = useChatThread();
+
+  const pickImageFromLibrary = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.granted === false) {
+        Alert.alert('Permission required', 'Please allow access to your photos.');
+        return;
+      }
+      const result: any = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        allowsMultipleSelection: false,
+      });
+      // new API returns { canceled: boolean; assets: Asset[] }
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const uri = asset.uri;
+        const name = uri.split('/').pop() || 'photo.jpg';
+        const match = /\.(\w+)$/.exec(name);
+        const type = match ? `image/${match[1]}` : asset.type || 'image/jpeg';
+        handleSendAttachment({ uri, name, type });
+      }
+    } catch (err) {
+      console.error('Image picker error', err);
+    }
+  };
+
+  const pickDocument = async () => {
+    try {
+      const res: any = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+      // handle both legacy and new expo-document-picker shapes
+      let uri: string | undefined;
+      let name: string | undefined;
+      let mime: string | undefined;
+      let size: number | undefined;
+
+      if (res.uri) {
+        uri = res.uri;
+        name = res.name;
+        mime = res.mimeType;
+        size = res.size;
+      } else if (res.assets && res.assets.length > 0) {
+        const asset = res.assets[0];
+        uri = asset.uri;
+        name = asset.name;
+        mime = asset.mimeType;
+        size = asset.size;
+      }
+
+      if (uri) {
+        if (size && size > 5 * 1024 * 1024) {
+          Alert.alert('File too large', 'Please select a file smaller than 5MB.');
+          return;
+        }
+        handleSendAttachment({ uri, name: name || 'file', type: mime || 'application/octet-stream', size });
+      } else {
+        console.log('Document picker returned no uri, result:', res);
+      }
+    } catch (err) {
+      console.error('Document picker error', err);
+    }
+  };
 
   const getStatusText = () => {
     if (isGroup) return null;
@@ -282,6 +347,7 @@ export default function ChatThread() {
                 setComposerVisible={setComposerVisible}
                 colors={colors}
                 insets={insets}
+                onImagePress={pickImageFromLibrary}
               />
             )}
           </Animated.View>
@@ -291,9 +357,18 @@ export default function ChatThread() {
               inline
               visible={composerVisible}
               onClose={() => setComposerVisible(false)}
-              onAction={(key) => { 
-                console.log('Composer action:', key); 
-                setComposerVisible(false); 
+              onAction={(key) => {
+                console.log('composer action selected', key);
+                setComposerVisible(false);
+                if (key === 'document') {
+                  pickDocument();
+                } else if (key === 'location') {
+                  // TODO: implement location share
+                } else if (key === 'gif') {
+                  // TODO: open GIF picker
+                } else {
+                  console.log('Composer action:', key);
+                }
               }}
             />
           )}

@@ -26,9 +26,11 @@ export const chatRoutes = (io: Server) => {
   router.post('/group', upload.any(), createGroup(io));
   router.get('/:conversationId', getConversationDetails);
   router.get('/:conversationId/messages', getMessages(io));
-  router.post('/:conversationId/messages', sendMessage(io));
+  // messages can include a file attachment under fieldname 'file'
+  router.post('/:conversationId/messages', upload.single('file'), sendMessage(io));
   router.post('/:conversationId/read', markAsRead(io));
-  router.post('/start', startConversation(io));
+  // starting a conversation may also include an initial attachment
+  router.post('/start', upload.single('file'), startConversation(io));
   router.delete('/:conversationId', deleteConversation(io));
   router.delete('/:conversationId/disband', disbandGroup(io));
   router.delete('/:conversationId/leave', leaveGroup(io));

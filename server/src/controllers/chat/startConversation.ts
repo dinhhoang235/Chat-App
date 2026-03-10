@@ -1,10 +1,13 @@
 import { Response } from 'express';
 import { Server } from 'socket.io';
+import fs from 'fs';
+import path from 'path';
 import prisma from '../../db.js';
 import { AuthRequest } from '../../middleware/auth.js';
 
 export const startConversation = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { targetUserId } = req.body;
+  let { firstMessage } = req.body;
   const userId = req.userId;
 
   if (!userId) {
@@ -51,10 +54,31 @@ export const startConversation = (io: Server) => async (req: AuthRequest, res: R
       return res.json(existing);
     }
 
-    // NEW LOGIC: If a message is provided, create the conversation. 
-    // If NOT, we just return a 404 or empty response so the frontend knows it doesn't exist yet.
-    const { firstMessage } = req.body;
-    
+    // If there is a file we need to handle it similarly to sendMessage
+    let messageType = 'text';
+    if (req.file) {
+      // enforce size limit
+      if (req.file.size > 5 * 1024 * 1024) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(400).json({ message: 'File must be under 5MB' });
+      }
+      const folder = path.basename(path.dirname(req.file.path));
+      const relPath = `/${folder}/${req.file.filename}`;
+      const info = {
+        url: relPath,
+        name: req.file.originalname,
+        size: req.file.size,
+        mime: req.file.mimetype
+      };
+      firstMessage = JSON.stringify(info);
+      if (req.file.mimetype.startsWith('image/')) {
+        messageType = 'image';
+      } else {
+        messageType = 'file';
+      }
+    }
+
+    // if there is no message text and no file, respond with 404 so frontend knows it doesn't exist
     if (!firstMessage) {
       return res.status(404).json({ message: 'No existing conversation' });
     }
@@ -72,6 +96,7 @@ export const startConversation = (io: Server) => async (req: AuthRequest, res: R
         messages: {
           create: {
             content: firstMessage,
+            type: messageType,
             senderId: userId
           }
         }

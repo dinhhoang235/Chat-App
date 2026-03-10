@@ -1,16 +1,57 @@
 import apiClient from './api';
+import { Platform } from 'react-native';
 
 export const chatApi = {
   getConversations: () => apiClient.get('/chats/conversations'),
   getConversationDetails: (id: string | number) => apiClient.get(`/chats/${id}`),
   getMessages: (id: string | number, cursor?: number, limit: number = 20) => 
     apiClient.get(`/chats/${id}/messages`, { params: { cursor, limit } }),
-  sendMessage: (id: string | number, content: string, type: string = 'text') => 
-    apiClient.post(`/chats/${id}/messages`, { content, type }),
+  sendMessage: (id: string | number, content: string, type: string = 'text', file?: any) => {
+    if (file) {
+      const formData = new FormData();
+      if (content) formData.append('content', content);
+      // ensure file object is proper for RN
+      let upload = file;
+      if (file.uri) {
+        upload = {
+          uri: Platform.OS === 'ios' && file.uri.startsWith('file://') ? file.uri.replace('file://', '') : file.uri,
+          name: file.name || 'upload',
+          type: file.type || 'application/octet-stream',
+        };
+      }
+      formData.append('file', upload as any);
+      // type will be inferred on server
+      return apiClient.post(`/chats/${id}/messages`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      });
+    }
+    return apiClient.post(`/chats/${id}/messages`, { content, type });
+  },
+
   markAsRead: (id: string | number) => 
     apiClient.post(`/chats/${id}/read`),
-  startConversation: (targetUserId: number, firstMessage?: string) => 
-    apiClient.post('/chats/start', { targetUserId, firstMessage }),
+  startConversation: (targetUserId: number, firstMessage?: string, file?: any) => {
+    if (file) {
+      const formData = new FormData();
+      formData.append('targetUserId', targetUserId.toString());
+      if (firstMessage) formData.append('firstMessage', firstMessage);
+      let upload = file;
+      if (file.uri) {
+        upload = {
+          uri: Platform.OS === 'ios' && file.uri.startsWith('file://') ? file.uri.replace('file://', '') : file.uri,
+          name: file.name || 'upload',
+          type: file.type || 'application/octet-stream',
+        };
+      }
+      formData.append('file', upload as any);
+      return apiClient.post('/chats/start', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      });
+    }
+    return apiClient.post('/chats/start', { targetUserId, firstMessage });
+  },
   deleteConversation: (id: string | number) => 
     apiClient.delete(`/chats/${id}`),
   createGroup: (name: string, participantIds: (string | number)[], avatarUri?: string) => {

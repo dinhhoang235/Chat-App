@@ -15,25 +15,35 @@ const ensureUploadDir = (uploadDir: string) => {
 // Configure multer storage
 const storage = multer.diskStorage({
   destination: (_req, file, cb) => {
+    // decide folder based on field name
     let folder = 'avatars';
     if (file.fieldname === 'cover') folder = 'covers';
     if (file.fieldname === 'group_avatar') folder = 'groups';
+    if (file.fieldname === 'file' || file.fieldname === 'attachment') folder = 'attachments';
 
     const uploadDir = path.join(__dirname, '../../media', folder);
     // Ensure directory exists before writing
     ensureUploadDir(uploadDir);
     cb(null, uploadDir);
   },
-  filename: (req, _file, cb) => {
+  filename: (req, file, cb) => {
     const userId = (req.params.id || 'unknown');
     const timestamp = Date.now();
-    const filename = `${userId}_${timestamp}.jpg`;
+    // preserve original extension when available
+    const ext = path.extname(file.originalname) || '.dat';
+    const filename = `${userId}_${timestamp}${ext}`;
     cb(null, filename);
   }
 });
 
 const fileFilter = (_req: any, file: any, cb: any) => {
-  // Only accept image files
+  // attachments may be any type
+  if (file.fieldname === 'file' || file.fieldname === 'attachment') {
+    cb(null, true);
+    return;
+  }
+
+  // otherwise only accept images for avatars/group covers
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {

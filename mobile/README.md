@@ -35,6 +35,10 @@ npm run reset-project
 
 This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
+## Attachment support
+
+The chat interface now supports sending images and arbitrary files (up to 5 MB). Images can be picked via the image icon next to the input, and files via the document/file button in the composer action sheet.
+
 ## Learn more
 
 To learn more about developing your project with Expo, look at the following resources:

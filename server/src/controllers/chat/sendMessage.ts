@@ -1,12 +1,14 @@
 import { Response } from 'express';
 import { Server } from 'socket.io';
+import fs from 'fs';
+import path from 'path';
 import prisma from '../../db.js';
 import { AuthRequest } from '../../middleware/auth.js';
 import { cacheMessage } from '../../utils/redis.js';
 
 export const sendMessage = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { conversationId } = req.params;
-  const { content, type = 'text' } = req.body;
+  let { content, type = 'text' } = req.body;
   const userId = req.userId;
 
   if (!userId) {
@@ -15,6 +17,30 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
 
   try {
     const convId = parseInt(Array.isArray(conversationId) ? conversationId[0] : conversationId);
+
+    // if a file was uploaded, override content and type accordingly
+    if (req.file) {
+      // enforce <5MB for attachments
+      if (req.file.size > 5 * 1024 * 1024) {
+        // remove oversize file
+        fs.unlink(req.file.path, () => {});
+        return res.status(400).json({ message: 'File must be under 5MB' });
+      }
+      const folder = path.basename(path.dirname(req.file.path)); // attachments, etc
+      const relPath = `/${folder}/${req.file.filename}`;
+      const info = {
+        url: relPath,
+        name: req.file.originalname,
+        size: req.file.size,
+        mime: req.file.mimetype
+      };
+      content = JSON.stringify(info);
+      if (req.file.mimetype.startsWith('image/')) {
+        type = 'image';
+      } else {
+        type = 'file';
+      }
+    }
 
     // 1. Create message in DB
     const message = await prisma.message.create({

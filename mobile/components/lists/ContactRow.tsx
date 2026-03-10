@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/themeContext';
+import { getInitials } from '@/utils/initials';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -26,7 +27,7 @@ export default function ContactRow({ contact, onPress, onCall, onVideo }: Props)
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const iconColor = colors.icon;
-  const initials = contact.fullName.split(' ').map(n => n[0]).slice(0, 2).join('');
+  const initials = getInitials(contact.fullName);
 
   return (
     <TouchableOpacity onPress={onPress} className="px-4 py-3 flex-row items-center" style={{ paddingRight: 0 }}>

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { API_URL } from '@/services/api';
+import { getInitials } from '@/utils/initials';
 
 type Contact = {
   id: string;
@@ -43,14 +44,7 @@ type Props = {
 };
 
 export default function ResultsList({ contactResults, messageResults, query, sentRequests, searchResultsData = [], onOpenChat, onOpenProfile, onSendFriendRequest, onAcceptFriendRequest, onRejectFriendRequest, onCancelFriendRequest, colors }: Props) {
-  const getInitials = (fullName: string) => {
-    return fullName
-      .split(' ')
-      .map((n: string) => n[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
-  };
+  
 
   return (
     <View>

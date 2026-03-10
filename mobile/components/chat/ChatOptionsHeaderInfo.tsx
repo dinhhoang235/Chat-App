@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image } from 'react-native';
 import { GroupAvatar } from '@/components/avatars';
+import { getInitials } from '@/utils/initials';
 
 interface ChatOptionsHeaderInfoProps {
   isGroup: boolean;
@@ -22,11 +23,7 @@ const ChatOptionsHeaderInfo = ({
   displayName,
   colors,
 }: ChatOptionsHeaderInfoProps) => {
-  const getInitials = (n: string) => {
-    const parts = n.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
+  
 
   return (
     <View className="items-center px-4 py-3">

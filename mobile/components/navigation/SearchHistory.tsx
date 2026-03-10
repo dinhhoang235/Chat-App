@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { API_URL } from '@/services/api';
+import { getInitials } from '@/utils/initials';
 
 type SearchUser = {
   id: number;
@@ -19,14 +20,7 @@ type Props = {
 };
 
 export default function SearchHistory({ history, onSelect, onRemove, onClear, colors }: Props) {
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  
 
   return (
     <View>

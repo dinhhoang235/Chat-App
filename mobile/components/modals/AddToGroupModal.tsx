@@ -5,6 +5,7 @@ import { useTheme } from '@/context/themeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFriendsList } from '@/services/friendship';
 import { API_URL } from '@/services/api';
+import { getInitials } from '@/utils/initials';
 
 type Props = {
   visible: boolean;
@@ -54,7 +55,7 @@ export default function AddToGroupModal({ visible, onClose, onSave, initialSelec
             name: userInfo.fullName || 'Người dùng',
             phone: userInfo.phone || '',
             avatar: userInfo.avatar ? `${API_URL}${userInfo.avatar}` : null,
-            initials: (userInfo.fullName || 'U').split(' ').filter(Boolean).map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(),
+            initials: getInitials(userInfo.fullName, userInfo.id?.toString()),
             color: '#6B7280'
           };
         });

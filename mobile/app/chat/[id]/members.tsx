@@ -8,7 +8,7 @@ import { useAuth } from '@/context/authContext';
 import { Header, MemberActionsSheet, AddToGroupModal } from '@/components';
 import { chatApi } from '@/services/chat';
 import { API_URL } from '@/services/api';
-import { getInitials } from '@/utils/contacts';
+import { getInitials } from '@/utils/initials';
 
 export default function MembersScreen() {
   const { colors } = useTheme();

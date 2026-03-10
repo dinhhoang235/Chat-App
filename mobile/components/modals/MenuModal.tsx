@@ -3,6 +3,7 @@ import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions, Im
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import { GroupAvatar } from '@/components/avatars';
+import { getInitials } from '@/utils/initials';
 
 export type MenuItem = { key: string; label: string; icon: string; destructive?: boolean };
 
@@ -69,7 +70,7 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
               ) : message.avatar ? (
                 <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
               ) : (
-                <Text style={{ color: '#fff', fontWeight: '700' }}>{(message.initials ?? message.name.split(' ').map((n: string) => n[0]).slice(0, 2).join(''))}</Text>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{message.initials ?? getInitials(message.name)}</Text>
               )}
             </View>
 

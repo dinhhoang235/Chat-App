@@ -3,8 +3,8 @@ import { Modal, View, Text, TouchableOpacity, Pressable, ScrollView, Image } fro
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import type { User } from '@/services/friendship';
-import { getInitials } from '@/utils/contacts';
 import { API_URL } from '@/services/api';
+import { getInitials } from '@/utils/initials';
 
 type Props = {
   visible: boolean;

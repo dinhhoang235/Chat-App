@@ -5,6 +5,7 @@ import { useTheme } from '@/context/themeContext';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/authContext';
 import { Header, ProfileBioModal } from '@/components';
+import { getInitials } from '@/utils/initials';
 import { MaterialIcons } from '@expo/vector-icons';
 import { userAPI } from '@/services/user';
 import { checkFriendshipStatus, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest, User } from '@/services/friendship';
@@ -46,23 +47,7 @@ export default function UserProfile() {
     return coverPath ? `${API_BASE_URL}${coverPath}` : null;
   }, []);
 
-  const calculateInitials = useCallback((fullName?: string, fallbackId?: string) => {
-    if (fullName) {
-      return fullName
-        .split(' ')
-        .map((n: string) => n[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase();
-    }
-    return fallbackId ? fallbackId.slice(-2).toUpperCase() : 'U';
-  }, []);
-
-  // Memoized values
-  const initials = useMemo(
-    () => profile?.fullName ? calculateInitials(profile.fullName) : calculateInitials(undefined, id),
-    [profile?.fullName, id, calculateInitials]
-  );
+  const initials = useMemo(() => getInitials(profile?.fullName, id), [profile?.fullName, id]);
 
   const avatarUrl = useMemo(() => getAvatarUrl(profile?.avatar), [profile?.avatar, getAvatarUrl]);
   const coverUrl = useMemo(() => getCoverUrl(profile?.coverImage), [profile?.coverImage, getCoverUrl]);

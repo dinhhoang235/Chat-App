@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from "@/context/themeContext";
 import { MenuModal, MuteOptionsSheet, MuteSettingsModal } from '@/components/modals';
 import { GroupAvatar } from '@/components/avatars';
+import { getInitials } from '@/utils/initials';
 
 type Props = {
   message: {
@@ -35,7 +36,7 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
   const [excludeReminders, setExcludeReminders] = useState<boolean>(false);
   const rowRef = useRef<any>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const initials = message.initials ?? message.name.split(' ').map(n => n[0]).slice(0, 2).join('');
+  const initials = message.initials ?? getInitials(message.name);
   const isGroupConversation = !!message.isGroup;
 
   const menuItems = [

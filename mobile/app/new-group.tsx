@@ -9,6 +9,7 @@ import { ContactItem } from '@/components/lists/ContactRow';
 import { chatApi } from '../services/chat';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { getInitials } from '@/utils/initials';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -110,7 +111,7 @@ export default function NewGroup() {
   };
 
   const renderItem = ({ item }: { item: ContactItem }) => {
-    const initials = item.fullName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+    const initials = getInitials(item.fullName, item.id?.toString());
     
     return (
       <TouchableOpacity onPress={() => toggle(item.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
@@ -213,8 +214,8 @@ export default function NewGroup() {
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.header, borderRadius: 0, paddingHorizontal: 12, paddingVertical: 10, paddingBottom: insets.bottom + 12, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 8 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
             {selectedContacts.map((c) => {
-                const sInitials = c.fullName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
-                return (
+              const sInitials = getInitials(c.fullName, c.id?.toString());
+              return (
               <View key={c.id} style={{ marginRight: 8, position: 'relative' }}>
                 {c.avatar ? (
                   <Image

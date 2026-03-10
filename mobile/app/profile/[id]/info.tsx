@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/authContext';
 import { userAPI } from '@/services/user';
 import type { User } from '@/services/friendship';
+import { getInitials } from '@/utils/initials';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -51,7 +52,7 @@ export default function ProfileInfo() {
   const displayProfile = {
     name: profile?.fullName || 'Người dùng',
     phone: profile?.phone || '',
-    initials: profile?.fullName?.split(' ').map((n: string) => n[0]).slice(0,2).join('').toUpperCase() || 'U',
+    initials: getInitials(profile?.fullName, profile?.id?.toString()),
     gender: profile?.gender ?? undefined,
     dob: formatDate(profile?.dateOfBirth),
     avatar: profile?.avatar,

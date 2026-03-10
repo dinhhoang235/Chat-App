@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, Alert } from 'react-native';
+import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, Alert, Keyboard } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Header } from '../../components/Header';
-import * as ImagePicker from 'expo-image-picker';
+import GallerySheet from '../../components/GallerySheet';
 import * as DocumentPicker from 'expo-document-picker';
 import InThreadSearch from '../../components/InThreadSearch';
 import MessageBubble from '../../components/MessageBubble';
@@ -46,8 +46,12 @@ export default function ChatThread() {
     insets,
     animatedContentStyle,
     fetchMessages,
-    handleSend,
+    handleSend: originalHandleSend,
     handleSendAttachment,
+    // attachment state and helpers
+    attachments,
+    addAttachments,
+    removeAttachment,
     targetUserStatus,
     targetUser,
     isGroup,
@@ -55,30 +59,37 @@ export default function ChatThread() {
     membersCount
   } = useChatThread();
 
-  const pickImageFromLibrary = async () => {
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (permission.granted === false) {
-        Alert.alert('Permission required', 'Please allow access to your photos.');
-        return;
-      }
-      const result: any = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.7,
-        allowsMultipleSelection: false,
-      });
-      // new API returns { canceled: boolean; assets: Asset[] }
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        const uri = asset.uri;
-        const name = uri.split('/').pop() || 'photo.jpg';
-        const match = /\.(\w+)$/.exec(name);
-        const type = match ? `image/${match[1]}` : asset.type || 'image/jpeg';
-        handleSendAttachment({ uri, name, type });
-      }
-    } catch (err) {
-      console.error('Image picker error', err);
+  const handleSend = async () => {
+    if (attachments.length > 0) {
+      setGalleryVisible(false);
     }
+    await originalHandleSend();
+  };
+
+  // open the gallery bottom sheet rather than OS picker
+  const [galleryVisible, setGalleryVisible] = React.useState(false);
+
+  // if one sheet opens make sure the other closes
+  React.useEffect(() => {
+    if (composerVisible && galleryVisible) {
+      setGalleryVisible(false);
+    }
+  }, [composerVisible, galleryVisible, setGalleryVisible]);
+
+  React.useEffect(() => {
+    if (galleryVisible && composerVisible) {
+      setComposerVisible(false);
+    }
+  }, [galleryVisible, composerVisible, setComposerVisible]);
+
+  const pickImageFromLibrary = () => {
+    // hide keyboard like ComposerActionsSheet does
+    inputRef.current?.blur?.();
+    Keyboard.dismiss();
+
+    setGalleryVisible(true);
+    // if composer actions already visible, hide them
+    if (composerVisible) setComposerVisible(false);
   };
 
   const pickDocument = async () => {
@@ -234,6 +245,13 @@ export default function ChatThread() {
 
           {/* Wrapper for messages and composer that pushes up with keyboard */}
           <Animated.View style={[{ flex: 1 }, animatedContentStyle]}>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={{ flex: 1 }}
+              onPress={() => {
+                if (galleryVisible) setGalleryVisible(false);
+              }}
+            >
             {loading ? (
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={colors.tint} />
@@ -348,9 +366,26 @@ export default function ChatThread() {
                 colors={colors}
                 insets={insets}
                 onImagePress={pickImageFromLibrary}
+                attachments={attachments}
+                onRemoveAttachment={removeAttachment}
+                onFocus={() => {
+                  if (galleryVisible) setGalleryVisible(false);
+                }}
               />
             )}
+          </TouchableOpacity>
           </Animated.View>
+
+          {galleryVisible && (
+            <GallerySheet
+              inline
+              visible={galleryVisible}
+              onClose={() => setGalleryVisible(false)}
+              attachments={attachments}
+              addAttachment={(file: any) => addAttachments([file])}
+              removeAttachment={removeAttachment}
+            />
+          )}
 
           {composerVisible && (
             <ComposerActionsSheet

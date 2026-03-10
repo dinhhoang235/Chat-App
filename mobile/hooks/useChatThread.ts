@@ -144,6 +144,29 @@ export function useChatThread() {
   const [composerVisible, setComposerVisible] = useState(false);
   const [messageText, setMessageText] = useState('');
 
+  // attachments picked from image picker (max 10)
+  const [attachments, setAttachments] = useState<{uri: string; name: string; type: string; size?: number}[]>([]);
+
+  const addAttachments = (files: {uri: string; name: string; type: string; size?: number}[]) => {
+    setAttachments(prev => {
+      const combined = [...prev, ...files].slice(0, 10);
+      if (combined.length >= 10 && prev.length + files.length > 10) {
+        alert('Chỉ có thể gửi tối đa 10 ảnh.');
+      }
+      return combined;
+    });
+  };
+
+  const removeAttachment = (arg: number | string) => {
+    setAttachments(prev => {
+      if (typeof arg === 'number') {
+        return prev.filter((_, i) => i !== arg);
+      } else {
+        return prev.filter(a => a.uri !== arg);
+      }
+    });
+  };
+
   const onTextChange = (text: string) => {
     setMessageText(text);
     handleType();
@@ -411,6 +434,16 @@ export function useChatThread() {
   }, [conversationId, user?.id, isFocused, fetchMessages, fetchGroupDetails, isGroup]);
 
   const handleSend = async () => {
+    // if attachments exist, send them first (and clear afterwards)
+    if (attachments.length > 0) {
+      // iterate sequentially to preserve order
+      for (const file of attachments) {
+        await handleSendAttachment(file);
+      }
+      setAttachments([]);
+      return;
+    }
+
     if (!messageText.trim()) return;
     await handleSendText(messageText.trim());
   };
@@ -619,6 +652,10 @@ export function useChatThread() {
     fetchMessages,
     handleSend,
     handleSendAttachment,
+    // new attachment helpers
+    attachments,
+    addAttachments,
+    removeAttachment,
     targetUser,
     targetUserStatus,
     isGroup,

@@ -12,7 +12,6 @@ import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
 import { userAPI } from '@/services/user';
 import { useAuth } from '@/context/authContext';
-import { API_URL } from '@/services/api';
 import { getAvatarUrl } from '@/utils/avatar';
 import { useTyping } from './useTyping';
 

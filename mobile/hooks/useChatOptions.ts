@@ -5,7 +5,6 @@ import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
 import { useAuth } from '@/context/authContext';
 import { contacts } from '@/constants/mockData';
-import { API_URL } from '@/services/api';
 import { getAvatarUrl } from '@/utils/avatar';
 
 export function useChatOptions() {
@@ -42,7 +41,7 @@ export function useChatOptions() {
   const contact = contacts.find(c => c.id === id);
   const name = (params as any).name || contact?.name || 'Người dùng';
   const rawAvatar = (params as any).avatar as string | undefined;
-  const avatar = rawAvatar ? getAvatarUrl(rawAvatar) : undefined;
+  const avatar = rawAvatar ? (getAvatarUrl(rawAvatar) || undefined) : undefined;
   const targetUserId = (params as any).targetUserId as string | undefined;
   
   const isGroup = useMemo(() => {

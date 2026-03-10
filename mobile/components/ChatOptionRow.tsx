@@ -12,12 +12,22 @@ interface Props {
   showChevron?: boolean;
   titleColor?: string;
   iconColor?: string;
+  bottomBorder?: boolean; // control underline
 }
 
-export default function ChatOptionRow({ icon, title, subtitle, rightNode, onPress, showChevron = false, titleColor, iconColor }: Props) {
+export default function ChatOptionRow({ icon, title, subtitle, rightNode, onPress, showChevron = false, titleColor, iconColor, bottomBorder = true }: Props) {
   const { colors } = useTheme();
   return (
-    <TouchableOpacity onPress={onPress} className="py-4 flex-row items-center justify-between" style={{ paddingLeft: 8, paddingRight: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+    <TouchableOpacity
+      onPress={onPress}
+      className="py-4 flex-row items-center justify-between"
+      style={{
+        paddingLeft: 8,
+        paddingRight: 16,
+        borderBottomWidth: bottomBorder ? 1 : 0,
+        borderBottomColor: colors.border,
+      }}
+    >
       <View className="flex-row items-center">
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: colors.surfaceVariant }}>
           <MaterialIcons name={icon as any} size={20} color={iconColor ?? colors.textSecondary} />

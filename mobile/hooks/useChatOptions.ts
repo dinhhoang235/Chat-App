@@ -75,6 +75,64 @@ export function useChatOptions() {
     }
   }, [id, isGroup]);
 
+  // preview images for media row
+  const [recentImages, setRecentImages] = useState<string[]>([]);
+  const loadRecentImages = useCallback(async () => {
+    try {
+      const imgs: string[] = [];
+      let cursor: any = undefined;
+      // page through until we gather 4 images or run out of messages
+      while (imgs.length < 4) {
+        const res = await chatApi.getMessages(Number(id), cursor, 20);
+        if (!res.data || res.data.length === 0) break;
+        for (const m of res.data) {
+          if (m.type === 'image') {
+            let url: string | undefined;
+            try {
+              const info = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
+              url = info?.url;
+            } catch {
+              url = m.content;
+            }
+            if (url) {
+              if (!url.startsWith('http')) {
+                if (!url.startsWith('/media')) url = `/media${url}`;
+                url = `${API_URL}${url}`;
+              }
+              imgs.push(url);
+            }
+          }
+          if (imgs.length >= 4) break;
+        }
+        if (imgs.length >= 4) break;
+        // prepare for next page
+        const last = res.data[res.data.length - 1];
+        cursor = last ? last.id : undefined;
+        if (!cursor) break;
+      }
+      setRecentImages(imgs.slice(0, 4));
+    } catch (err) {
+      console.error('Load recent images error', err);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    loadRecentImages();
+  }, [loadRecentImages]);
+
+  // refresh on new image message
+  useEffect(() => {
+    const handler = (data: any) => {
+      if (data.conversationId?.toString() === id.toString() && data.type === 'image') {
+        loadRecentImages();
+      }
+    };
+    socketService.on('new_message', handler);
+    return () => {
+      socketService.off('new_message', handler);
+    };
+  }, [id, loadRecentImages]);
+
   useEffect(() => {
     fetchGroupDetails();
   }, [fetchGroupDetails]);
@@ -174,5 +232,6 @@ export function useChatOptions() {
     performLeaveGroup,
     isOwner,
     fetchGroupDetails,
+    recentImages,
   };
 }

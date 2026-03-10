@@ -273,8 +273,21 @@ export function useChatThread() {
       });
 
       if (isLoadMore) {
-        setMessages(prev => [...prev, ...mapped]);
+        setMessages(prev => {
+          const combined = [...prev, ...mapped];
+          const seen = new Set<string>();
+          const uniq: any[] = [];
+          for (const m of combined) {
+            const key = m.id?.toString();
+            if (key && !seen.has(key)) {
+              seen.add(key);
+              uniq.push(m);
+            }
+          }
+          return uniq;
+        });
       } else {
+        // initial load replaced entirely
         setMessages(mapped);
         setInitialFetchDone(true);
       }

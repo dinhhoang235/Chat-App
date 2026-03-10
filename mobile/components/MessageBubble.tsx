@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image, Linking, useWindowDimensions } fro
 import { useTheme } from '../context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { API_URL } from '../services/api';
+import FullscreenImageViewer from './FullscreenImageViewer';
 
 type ChatMessage = {
   id: string;
@@ -25,6 +26,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const [imgSize, setImgSize] = React.useState<{width:number;height:number} | null>(null);
+  const [viewerVisible, setViewerVisible] = React.useState(false);
 
   if (message.type === 'separator' || message.type === 'system') {
     const textToShow = message.text || message.content;
@@ -107,16 +109,21 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       setImgSize({ width: w, height: h });
     };
     contentElement = (
-      <Image
-        source={{ uri }}
-        style={{
-          width: imgSize ? imgSize.width : maxWidth,
-          height: imgSize ? imgSize.height : maxWidth,
-          borderRadius: 12,
-          resizeMode: 'contain'
-        }}
-        onLoad={onLoad}
-      />
+      <>
+        <TouchableOpacity onPress={() => setViewerVisible(true)} activeOpacity={0.9}>
+          <Image
+            source={{ uri }}
+            style={{
+              width: imgSize ? imgSize.width : maxWidth,
+              height: imgSize ? imgSize.height : maxWidth,
+              borderRadius: 12,
+              resizeMode: 'contain'
+            }}
+            onLoad={onLoad}
+          />
+        </TouchableOpacity>
+        <FullscreenImageViewer visible={viewerVisible} images={[uri]} initialIndex={0} onClose={() => setViewerVisible(false)} />
+      </>
     );
   } else if (message.type === 'file' && message.fileInfo) {
     let { url, name, size, mime } = message.fileInfo;

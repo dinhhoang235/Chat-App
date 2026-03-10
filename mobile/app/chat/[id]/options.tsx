@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Switch, Alert, View, Image  } from 'react-native';
+import { ScrollView, Switch, Alert, View, Image, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../../context/themeContext';
 import { useSearch } from '../../../context/searchContext';
 import { Header } from '../../../components/Header';
@@ -17,6 +17,7 @@ import { useChatOptions } from '../../../hooks/useChatOptions';
 import { ChatOptionsHeaderInfo } from '../../../components/ChatOptionsHeaderInfo';
 import { QuickActions } from '../../../components/QuickActions';
 import { MaterialIcons } from '@expo/vector-icons';
+
 
 const Row = ChatOptionRow;
 
@@ -54,6 +55,7 @@ export default function ChatOptions() {
     performLeaveGroup,
     isOwner,
     fetchGroupDetails,
+    recentImages,
   } = useChatOptions();
 
   return (
@@ -84,25 +86,38 @@ export default function ChatOptions() {
 
         {isGroup ? (
           <>
-            <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
+            <View className="mt-4">
               <Row
                 icon="image"
                 title="Ảnh, file, link"
-                onPress={() => { }}
-                rightNode={(
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', marginRight: 8 }}>
-                      <Image source={{ uri: 'https://via.placeholder.com/80' }} style={{ width: 48, height: 48 }} />
-                    </View>
-                    <View style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', marginRight: 8 }}>
-                      <Image source={{ uri: 'https://via.placeholder.com/80/eee' }} style={{ width: 48, height: 48 }} />
-                    </View>
-                    <View style={{ width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant }}>
-                      <MaterialIcons name="arrow-forward" size={18} color={colors.textSecondary} />
-                    </View>
-                  </View>
-                )}
+                onPress={() => router.push(`/chat/${id}/media`)}
+                showChevron
+                bottomBorder={recentImages.length === 0}
               />
+              {recentImages.length > 0 && (
+                <View style={{ flexDirection: 'row', paddingLeft: 60, paddingVertical: 4 }}>
+                  {recentImages.slice(0, 4).map((uri: string, idx: number) => (
+                    <TouchableOpacity key={idx} onPress={() => router.push(`/chat/${id}/media`)} style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', marginRight: 4 }}>
+                      <Image source={{ uri }} style={{ width: 62, height: 62 }} />
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    onPress={() => router.push(`/chat/${id}/media`)}
+                    style={{
+                      width: 62,
+                      height: 62,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: colors.surfaceVariant,
+                    }}
+                  >
+                    <MaterialIcons name="arrow-forward" size={22} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+            <View className="border-t" style={{ borderTopColor: colors.border, marginTop: 4 }}>
               <Row icon="push-pin" title="Tin nhắn đã ghim" onPress={() => router.push(`/chat/${id}/pinned`)} showChevron />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
@@ -140,26 +155,38 @@ export default function ChatOptions() {
               <Row icon="edit" title="Đổi tên gợi nhớ" subtitle={displayName ? displayName : 'Chưa đặt'} onPress={() => setDisplayNameModalVisible(true)} />
             </View>
 
-            <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
+            <View className="mt-4">
               <Row
                 icon="image"
                 title="Ảnh, file, link"
-                onPress={() => { }}
-                rightNode={(
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', marginRight: 8 }}>
-                      <Image source={{ uri: 'https://via.placeholder.com/80' }} style={{ width: 48, height: 48 }} />
-                    </View>
-                    <View style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', marginRight: 8 }}>
-                      <Image source={{ uri: 'https://via.placeholder.com/80/eee' }} style={{ width: 48, height: 48 }} />
-                    </View>
-                    <View style={{ width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant }}>
-                      <MaterialIcons name="arrow-forward" size={18} color={colors.textSecondary} />
-                    </View>
-                  </View>
-                )}
-
+                onPress={() => router.push(`/chat/${id}/media`)}
+                showChevron
+                bottomBorder={recentImages.length === 0}
               />
+              {recentImages.length > 0 && (
+                <View style={{ flexDirection: 'row', paddingLeft: 60, paddingVertical: 4 }}>
+                  {recentImages.slice(0, 4).map((uri: string, idx: number) => (
+                    <TouchableOpacity key={idx} onPress={() => router.push(`/chat/${id}/media`)} style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', marginRight: 4 }}>
+                      <Image source={{ uri }} style={{ width: 62, height: 62 }} />
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    onPress={() => router.push(`/chat/${id}/media`)}
+                    style={{
+                      width: 62,
+                      height: 62,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: colors.surfaceVariant,
+                    }}
+                  >
+                    <MaterialIcons name="arrow-forward" size={22} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+            <View className="border-t" style={{ borderTopColor: colors.border, marginTop: 4 }}>
               <Row icon="people" title="Xem nhóm chung" subtitle="(1)" onPress={() => { }} />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>

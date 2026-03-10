@@ -262,7 +262,10 @@ export default function ChatThread() {
                   ref={flatListRef}
                   data={messages}
                   inverted
-                  keyExtractor={(i) => i.id.toString()}
+                  keyExtractor={(i, idx) => {
+                    if (i.id != null && i.id.toString() !== '') return i.id.toString();
+                    return `msg-${idx}`;
+                  }}
                   initialNumToRender={20}
                   maxToRenderPerBatch={20}
                   windowSize={10}

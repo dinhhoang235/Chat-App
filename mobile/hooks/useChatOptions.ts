@@ -6,6 +6,7 @@ import { socketService } from '@/services/socket';
 import { useAuth } from '@/context/authContext';
 import { contacts } from '@/constants/mockData';
 import { API_URL } from '@/services/api';
+import { getAvatarUrl } from '@/utils/avatar';
 
 export function useChatOptions() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export function useChatOptions() {
   const contact = contacts.find(c => c.id === id);
   const name = (params as any).name || contact?.name || 'Người dùng';
   const rawAvatar = (params as any).avatar as string | undefined;
-  const avatar = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${API_URL}${rawAvatar}`) : undefined;
+  const avatar = rawAvatar ? getAvatarUrl(rawAvatar) : undefined;
   const targetUserId = (params as any).targetUserId as string | undefined;
   
   const isGroup = useMemo(() => {
@@ -58,9 +59,8 @@ export function useChatOptions() {
   const groupAvatars = useMemo(() => {
     if (groupDetails?.participants) {
       return groupDetails.participants
-        .map((p: any) => p.user.avatar)
-        .filter(Boolean)
-        .map((a: string) => `${API_URL}${a}`);
+        .map((p: any) => getAvatarUrl(p.user.avatar))
+        .filter(Boolean) as string[];
     }
     return (params as any).avatars ? ((params as any).avatars as string).split(',') : [];
   }, [groupDetails, params]);
@@ -97,7 +97,7 @@ export function useChatOptions() {
             if (url) {
               if (!url.startsWith('http')) {
                 if (!url.startsWith('/media')) url = `/media${url}`;
-                url = `${API_URL}${url}`;
+                url = getAvatarUrl(url) || url;
               }
               imgs.push(url);
             }

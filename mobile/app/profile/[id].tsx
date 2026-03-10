@@ -6,11 +6,11 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/authContext';
 import { Header, ProfileBioModal } from '@/components';
 import { getInitials } from '@/utils/initials';
+import { getAvatarUrl } from '@/utils/avatar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { userAPI } from '@/services/user';
 import { checkFriendshipStatus, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest, User } from '@/services/friendship';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 // Constants
 const AVATAR_SIZE = 92;
@@ -38,19 +38,10 @@ export default function UserProfile() {
   // Support special 'me' route which shows the logged-in user's profile
   const isMeRoute = id === 'me';
 
-  // Helper functions
-  const getAvatarUrl = useCallback((avatarPath?: string) => {
-    return avatarPath ? `${API_BASE_URL}${avatarPath}` : null;
-  }, []);
-
-  const getCoverUrl = useCallback((coverPath?: string) => {
-    return coverPath ? `${API_BASE_URL}${coverPath}` : null;
-  }, []);
-
   const initials = useMemo(() => getInitials(profile?.fullName, id), [profile?.fullName, id]);
 
-  const avatarUrl = useMemo(() => getAvatarUrl(profile?.avatar), [profile?.avatar, getAvatarUrl]);
-  const coverUrl = useMemo(() => getCoverUrl(profile?.coverImage), [profile?.coverImage, getCoverUrl]);
+  const avatarUrl = useMemo(() => getAvatarUrl(profile?.avatar), [profile?.avatar]);
+  const coverUrl = useMemo(() => getAvatarUrl(profile?.coverImage), [profile?.coverImage]);
 
   // If not found and id looks like a phone number, treat as stranger with phone as id
   const isPhoneLike = /^\d+$/.test(id || '');

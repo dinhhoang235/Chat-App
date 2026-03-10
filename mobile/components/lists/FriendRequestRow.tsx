@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/themeContext';
 import type { FriendRequestItem } from '@/services/friendship';
+import { getAvatarUrl } from '@/utils/avatar';
 
 type Props = {
   request: FriendRequestItem;
@@ -16,7 +17,6 @@ type Props = {
 const FriendRequestRow = ({ request, onAccept, onDecline, isSent = false, avatar, userId }: Props) => {
   const { colors } = useTheme();
   const router = useRouter();
-  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
   const handleProfilePress = () => {
     if (userId) {
@@ -29,7 +29,7 @@ const FriendRequestRow = ({ request, onAccept, onDecline, isSent = false, avatar
       <TouchableOpacity onPress={handleProfilePress} style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: request.color || '#6B7280', overflow: 'hidden' }}>
         {avatar ? (
           <Image
-            source={{ uri: `${API_BASE_URL}${avatar}` }}
+            source={{ uri: getAvatarUrl(avatar) || undefined }}
             style={{ width: 48, height: 48, borderRadius: 24 }}
           />
         ) : (

@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { API_URL } from '@/services/api';
 import { getInitials } from '@/utils/initials';
+import { getAvatarUrl } from '@/utils/avatar';
 
 type Contact = {
   id: string;
@@ -60,7 +60,7 @@ export default function ResultsList({ contactResults, messageResults, query, sen
                   <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', marginRight: 12, overflow: 'hidden' }}>
                     {resultData?.avatar ? (
                       <Image
-                        source={{ uri: `${API_URL}${resultData.avatar}` }}
+                        source={{ uri: getAvatarUrl(resultData.avatar) || undefined }}
                         style={{ width: 40, height: 40, borderRadius: 20 }}
                       />
                     ) : (

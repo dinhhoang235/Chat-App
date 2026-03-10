@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Image, Text } from 'react-native';
-import { API_URL } from '@/services/api';
+import { getAvatarUrl } from '@/utils/avatar';
 
 interface ChatAvatarProps {
   avatar?: string | string[];
@@ -21,11 +21,7 @@ const ChatAvatar = ({
 }: ChatAvatarProps) => {
   const avatarStr = Array.isArray(avatar) ? avatar[0] : avatar;
 
-  const avatarUrl = avatarStr
-    ? (avatarStr.startsWith('http')
-      ? avatarStr
-      : `${API_URL}${avatarStr.startsWith('/') ? '' : '/'}${avatarStr}`)
-    : undefined;
+  const avatarUrl = avatarStr ? getAvatarUrl(avatarStr) : undefined;
 
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: tintColor }}>

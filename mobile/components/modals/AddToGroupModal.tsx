@@ -4,7 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFriendsList } from '@/services/friendship';
-import { API_URL } from '@/services/api';
+import { getAvatarUrl } from '@/utils/avatar';
 import { getInitials } from '@/utils/initials';
 
 type Props = {
@@ -54,7 +54,7 @@ export default function AddToGroupModal({ visible, onClose, onSave, initialSelec
             id: userInfo.id?.toString() || Math.random().toString(),
             name: userInfo.fullName || 'Người dùng',
             phone: userInfo.phone || '',
-            avatar: userInfo.avatar ? `${API_URL}${userInfo.avatar}` : null,
+            avatar: getAvatarUrl(userInfo.avatar),
             initials: getInitials(userInfo.fullName, userInfo.id?.toString()),
             color: '#6B7280'
           };

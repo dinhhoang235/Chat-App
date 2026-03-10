@@ -6,8 +6,8 @@ import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from "@expo/vector-icons";
 import { useAuth } from '@/context/authContext';
 import { useRouter } from 'expo-router';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+import { getAvatarUrl } from '@/utils/avatar';
+import { getInitials } from '@/utils/initials';
 
 export default function AccountSettings() {
   const theme = useTheme();
@@ -29,11 +29,11 @@ export default function AccountSettings() {
             <View className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-800 items-center justify-center mr-4 overflow-hidden">
               {user?.avatar ? (
                 <Image
-                  source={{ uri: `${API_BASE_URL}${user.avatar}` }}
+                  source={{ uri: getAvatarUrl(user.avatar) || undefined }}
                   style={{ width: 56, height: 56, borderRadius: 28 }}
                 />
               ) : (
-                <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-bold text-lg`}>{user ? user.fullName.charAt(0).toUpperCase() : 'U'}</Text>
+                <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-bold text-lg`}>{getInitials(user?.fullName, user?.id?.toString())}</Text>
               )}
             </View>
             <View>

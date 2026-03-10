@@ -3,8 +3,8 @@ import { Modal, View, Text, TouchableOpacity, Pressable, ScrollView, Image } fro
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import type { User } from '@/services/friendship';
-import { API_URL } from '@/services/api';
 import { getInitials } from '@/utils/initials';
+import { getAvatarUrl } from '@/utils/avatar';
 
 type Props = {
   visible: boolean;
@@ -23,7 +23,7 @@ export default function MemberActionsSheet({ visible, onClose, member, isOwner, 
   if (!member) return null;
 
   const initials = getInitials(member.fullName);
-  const avatarUrl = member.avatar ? (member.avatar.startsWith('http') ? member.avatar : `${API_URL}${member.avatar}`) : null;
+  const avatarUrl = getAvatarUrl(member.avatar);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>

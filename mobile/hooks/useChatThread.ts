@@ -13,6 +13,7 @@ import { socketService } from '@/services/socket';
 import { userAPI } from '@/services/user';
 import { useAuth } from '@/context/authContext';
 import { API_URL } from '@/services/api';
+import { getAvatarUrl } from '@/utils/avatar';
 import { useTyping } from './useTyping';
 
 export function useChatThread() {
@@ -79,9 +80,8 @@ export function useChatThread() {
   const groupAvatars = useMemo(() => {
     if (groupDetails?.participants) {
       return groupDetails.participants
-        .map((p: any) => p.user.avatar)
-        .filter(Boolean)
-        .map((a: string) => `${API_URL}${a}`);
+        .map((p: any) => getAvatarUrl(p.user.avatar))
+        .filter(Boolean) as string[];
     }
     return params.avatars 
       ? (Array.isArray(params.avatars) ? params.avatars : (typeof params.avatars === 'string' && params.avatars.includes(',') ? params.avatars.split(',') : [params.avatars as string])) 
@@ -91,10 +91,8 @@ export function useChatThread() {
   const membersCount = groupDetails?.participants?.length || (params.membersCount ? Number(params.membersCount) : undefined);
 
   const displayTypingAvatar = typingUser?.avatar
-    ? (typingUser.avatar.startsWith('http') ? typingUser.avatar : `${API_URL}${typingUser.avatar}`)
-    : (avatarParam
-        ? (avatarParam.startsWith('http') ? avatarParam : `${API_URL}${avatarParam}`)
-        : undefined);
+    ? getAvatarUrl(typingUser.avatar)
+    : (avatarParam ? getAvatarUrl(avatarParam) : undefined);
 
   const messagesRef = useRef<any[]>([]);
   const flatListRef = useRef<FlatList>(null);
@@ -255,7 +253,7 @@ export function useChatThread() {
           fromMe: m.senderId ? m.senderId === user?.id : false,
           time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           contactName: m.sender?.id ? m.sender.fullName : (m.type === 'system' ? 'Hệ thống' : undefined),
-          contactAvatar: m.sender?.avatar ? `${API_URL}${m.sender.avatar}` : undefined,
+          contactAvatar: m.sender?.avatar ? getAvatarUrl(m.sender.avatar) || undefined : undefined,
           seenBy: m.seenBy || [],
         };
         if (m.type === 'file' || m.type === 'image') {
@@ -395,7 +393,7 @@ export function useChatThread() {
           fromMe: message.senderId ? message.senderId === user?.id : false,
           time: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           contactName: message.sender?.id ? message.sender.fullName : (message.type === 'system' ? 'Hệ thống' : undefined),
-          contactAvatar: message.sender?.avatar ? `${API_URL}${message.sender.avatar}` : undefined,
+          contactAvatar: message.sender?.avatar ? getAvatarUrl(message.sender.avatar) || undefined : undefined,
           seenBy: message.seenBy || [],
           status: 'sent',
         };

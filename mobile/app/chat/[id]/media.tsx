@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useChatThread } from '@/hooks/useChatThread';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { API_URL } from '@/services/api';
+import { getAvatarUrl } from '@/utils/avatar';
 
 const TABS = ['Ảnh', 'File', 'Link'];
 
@@ -41,7 +41,7 @@ export default function ChatMedia() {
     let uri = item.fileInfo?.url;
     if (uri && !uri.startsWith('http')) {
       if (!uri.startsWith('/media')) uri = `/media${uri}`;
-      uri = `${API_URL}${uri}`;
+      uri = getAvatarUrl(uri) || uri;
     }
     return (
       <TouchableOpacity
@@ -65,7 +65,7 @@ export default function ChatMedia() {
     let uri = fileInfo?.url;
     if (uri && !uri.startsWith('http')) {
       if (!uri.startsWith('/media')) uri = `/media${uri}`;
-      uri = `${API_URL}${uri}`;
+      uri = getAvatarUrl(uri) || uri;
     }
     const name = fileInfo?.name || 'File';
     return (
@@ -166,7 +166,7 @@ export default function ChatMedia() {
           let uri = m.fileInfo?.url || '';
           if (uri && !uri.startsWith('http')) {
             if (!uri.startsWith('/media')) uri = `/media${uri}`;
-            uri = `${API_URL}${uri}`;
+            uri = getAvatarUrl(uri) || uri;
           }
           return uri;
         })}

@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { API_URL } from '@/services/api';
 import { getInitials } from '@/utils/initials';
+import { getAvatarUrl } from '@/utils/avatar';
 
 type SearchUser = {
   id: number;
@@ -39,7 +39,7 @@ export default function SearchHistory({ history, onSelect, onRemove, onClear, co
           >
             {user.avatar ? (
               <Image 
-                source={{ uri: user.avatar.startsWith('http') ? user.avatar : `${API_URL}${user.avatar}` }} 
+                source={{ uri: getAvatarUrl(user.avatar) || undefined }} 
                 style={{ width: 44, height: 44, borderRadius: 22, marginRight: 12 }} 
               />
             ) : (

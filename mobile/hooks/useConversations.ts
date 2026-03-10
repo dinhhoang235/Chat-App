@@ -7,6 +7,7 @@ import { useSelection } from '@/context/selectionContext';
 import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
 import { API_URL } from '@/services/api';
+import { getAvatarUrl } from '@/utils/avatar';
 
 export function useConversations() {
   const { colors } = useTheme();
@@ -47,8 +48,8 @@ export function useConversations() {
         }
 
         const avatars = conv.participants
-          .map((p: any) => p.user.avatar ? `${API_URL}${p.user.avatar}` : null)
-          .filter(Boolean);
+          .map((p: any) => getAvatarUrl(p.user.avatar))
+          .filter(Boolean) as string[];
         
         const updatedAt = lastMsg 
           ? new Date(lastMsg.createdAt).getTime() 
@@ -62,7 +63,7 @@ export function useConversations() {
           unread: conv._count?.messages || 0,
           initials: (conv.name || otherParticipant?.user.fullName || 'Z')[0],
           color: conv.isGroup ? colors.tint : (otherParticipant?.user.avatar ? undefined : colors.tint),
-          avatar: conv.avatar ? `${API_URL}${conv.avatar}` : (otherParticipant?.user.avatar ? `${API_URL}${otherParticipant.user.avatar}` : undefined),
+          avatar: conv.avatar ? getAvatarUrl(conv.avatar) : (otherParticipant?.user.avatar ? getAvatarUrl(otherParticipant.user.avatar) : undefined),
           avatars: avatars,
           membersCount: conv.membersCount || conv.participants.length,
           isGroup: conv.isGroup,

@@ -4,8 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/themeContext';
 import { getInitials } from '@/utils/initials';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+import { getAvatarUrl } from '@/utils/avatar';
 
 export interface ContactItem {
   id: number | string;
@@ -35,7 +34,7 @@ export default function ContactRow({ contact, onPress, onCall, onVideo }: Props)
         <View>
           {contact.avatar ? (
             <Image
-              source={{ uri: `${API_BASE_URL}${contact.avatar}` }}
+              source={{ uri: getAvatarUrl(contact.avatar) || undefined }}
               style={{ width: 48, height: 48, borderRadius: 24 }}
             />
           ) : (

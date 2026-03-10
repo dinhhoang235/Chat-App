@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import { getInitials } from '@/utils/initials';
+import { getAvatarUrl } from '@/utils/avatar';
 
 type Props = {
   visible: boolean;
@@ -39,8 +40,8 @@ export default function MyQrModal({ visible, onClose, name, phone, avatarUri, da
 
             <View style={{ alignItems: 'center', padding: 18 }}>
               <View style={{ alignItems: 'center', marginBottom: 8 }}>
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={{ width: 60, height: 60, borderRadius: 30, marginBottom: 6 }} />
+                {avatarUri && getAvatarUrl(avatarUri) ? (
+                  <Image source={{ uri: getAvatarUrl(avatarUri) || undefined }} style={{ width: 60, height: 60, borderRadius: 30, marginBottom: 6 }} />
                 ) : (
                   <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
                     <Text style={{ color: colors.textSecondary }}>{getInitials(name)}</Text>

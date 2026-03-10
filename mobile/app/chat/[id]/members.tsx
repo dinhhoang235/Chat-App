@@ -7,8 +7,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '@/context/authContext';
 import { Header, MemberActionsSheet, AddToGroupModal } from '@/components';
 import { chatApi } from '@/services/chat';
-import { API_URL } from '@/services/api';
 import { getInitials } from '@/utils/initials';
+import { getAvatarUrl } from '@/utils/avatar';
 
 export default function MembersScreen() {
   const { colors } = useTheme();
@@ -163,7 +163,7 @@ export default function MembersScreen() {
             data={displayed}
             keyExtractor={(i: any) => i.id.toString()}
             renderItem={({ item }: any) => {
-              const avatarUrl = item.avatar ? (item.avatar.startsWith('http') ? item.avatar : `${API_URL}${item.avatar}`) : null;
+              const avatarUrl = getAvatarUrl(item.avatar);
               const initials = getInitials(item.fullName);
 
               return (

@@ -6,8 +6,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from '@/context/themeContext';
 import { useAuth } from '@/context/authContext';
 import { useRouter } from "expo-router";
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+import { getAvatarUrl } from '@/utils/avatar';
+import { getInitials } from '@/utils/initials';
 
 export default function SwitchAccount() {
   const { scheme, colors } = useTheme();
@@ -34,11 +34,11 @@ export default function SwitchAccount() {
                   <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.surface }}>
                     {user?.avatar ? (
                       <Image
-                        source={{ uri: `${API_BASE_URL}${user.avatar}` }}
+                        source={{ uri: getAvatarUrl(user.avatar) || undefined }}
                         style={{ width: 48, height: 48, borderRadius: 24 }}
                       />
                     ) : (
-                      <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{user.fullName.charAt(0).toUpperCase()}</Text>
+                      <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{getInitials(user.fullName, user.id?.toString())}</Text>
                     )}
                   </View>
                   <View style={{ position: 'absolute', right: -6, top: -6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success, borderWidth: 2, borderColor: '#fff' }}>

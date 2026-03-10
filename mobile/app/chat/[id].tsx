@@ -278,7 +278,7 @@ export default function ChatThread() {
                     ListHeaderComponent={() => isTyping ? (
                       <View className="px-4 py-2 flex-row items-center">
                         <Image
-                          source={{ uri: displayTypingAvatar }}
+                          source={displayTypingAvatar ? { uri: displayTypingAvatar } : undefined}
                           className="w-10 h-10 rounded-full mr-3"
                           style={{ backgroundColor: colors.surfaceVariant }}
                         />

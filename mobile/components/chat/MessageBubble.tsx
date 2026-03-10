@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Image, Linking, useWindowDimensions } from 'react-native';
 import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
-import { API_URL } from '@/services/api';
+import { getAvatarUrl } from '@/utils/avatar';
 import { FullscreenImageViewer } from '@/components/modals';
 
 type ChatMessage = {
@@ -94,7 +94,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     if (!uri.startsWith('http')) {
       // ensure /media prefix
       if (!uri.startsWith('/media')) uri = `/media${uri}`;
-      uri = `${API_URL}${uri}`;
+      uri = getAvatarUrl(uri) || uri;
     }
     const maxWidth = screenWidth * 0.7; // 70% of screen
     const onLoad = (e: any) => {
@@ -130,7 +130,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     let uri = url;
     if (!uri.startsWith('http')) {
       if (!uri.startsWith('/media')) uri = `/media${uri}`;
-      uri = `${API_URL}${uri}`;
+      uri = getAvatarUrl(uri) || uri;
     }
 
     const filename = name || 'File';
@@ -257,7 +257,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
                 >
                   {u.avatar ? (
                     <Image 
-                      source={{ uri: u.avatar.startsWith('http') ? u.avatar : `${API_URL}${u.avatar}` }} 
+                      source={{ uri: getAvatarUrl(u.avatar) || undefined }} 
                       style={{ width: 24, height: 24 }} 
                       onError={(e) => console.log('Avatar load error:', e.nativeEvent.error)}
                     />

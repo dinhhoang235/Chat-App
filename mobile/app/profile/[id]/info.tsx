@@ -8,8 +8,7 @@ import { useAuth } from '@/context/authContext';
 import { userAPI } from '@/services/user';
 import type { User } from '@/services/friendship';
 import { getInitials } from '@/utils/initials';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+import { getAvatarUrl } from '@/utils/avatar';
 
 export default function ProfileInfo() {
   const { colors } = useTheme();
@@ -58,6 +57,8 @@ export default function ProfileInfo() {
     avatar: profile?.avatar,
   };
 
+  const avatarUri = getAvatarUrl(displayProfile.avatar);
+
   const isOwn = isMeRoute || (profile?.phone && user?.phone && profile.phone === user.phone);
   const [editVisible, setEditVisible] = React.useState(false);
 
@@ -76,9 +77,9 @@ export default function ProfileInfo() {
       <View style={{ padding: 16 }}>
         <View style={{ alignItems: 'center', marginBottom: 12 }}>
           <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-            {displayProfile.avatar ? (
+            {avatarUri ? (
               <Image
-                source={{ uri: `${API_BASE_URL}${displayProfile.avatar}` }}
+                source={{ uri: avatarUri }}
                 style={{ width: 88, height: 88, borderRadius: 44 }}
               />
             ) : (

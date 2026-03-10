@@ -5,8 +5,8 @@ import { useAuth } from '@/context/authContext';
 import { Header } from '@/components';
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from '@/context/themeContext';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+import { getInitials } from '@/utils/initials';
+import { getAvatarUrl } from '@/utils/avatar';
 
 const items = [
   { title: 'Tài khoản và bảo mật', subtitle: 'Cài đặt mật khẩu, 2 bước xác thực', icon: 'security', href: '/settings/account' },
@@ -44,11 +44,11 @@ export default function Profile() {
               <View style={{ width: 56, height: 56, backgroundColor: colors.tint, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
                 {user.avatar ? (
                   <Image
-                    source={{ uri: `${API_BASE_URL}${user.avatar}` }}
+                    source={{ uri: getAvatarUrl(user.avatar) || undefined }}
                     style={{ width: 56, height: 56, borderRadius: 28 }}
                   />
                 ) : (
-                  <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>{user.fullName.charAt(0).toUpperCase()}</Text>
+                  <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>{getInitials(user.fullName)}</Text>
                 )}
               </View>
               <View style={{ flex: 1 }}>

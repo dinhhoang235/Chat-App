@@ -8,7 +8,8 @@ export const getSentFriendRequests = async (req: Request, res: Response): Promis
 
     const requests = await prisma.friendRequest.findMany({
       where: {
-        senderId: userId
+        senderId: userId,
+        status: 'pending'
       },
       include: {
         receiver: {

@@ -1,15 +1,10 @@
 import { FlatList, View, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Header } from "../../components/Header";
-import SelectionHeader from "../../components/SelectionHeader";
-import BottomActionBar from "../../components/BottomActionBar";
-import { MessageRow } from '../../components/MessageRow';
 import { useState } from 'react';
-import { useAddMenu } from '../../context/addMenuContext';
-import { useTabBar } from '../../context/tabBarContext';
-import StartChatModal from "../../components/StartChatModal";
-import { useConversations } from "../../hooks/useConversations";
-import { EmptyConversations } from "../../components/EmptyConversations";
+import { Header, SelectionHeader, BottomActionBar, MessageRow, StartChatModal, EmptyConversations } from '@/components';
+import { useAddMenu } from '@/context/addMenuContext';
+import { useTabBar } from '@/context/tabBarContext';
+import { useConversations } from '@/hooks/useConversations';
 
 export default function Messages() {
   const { toggle, setAddLayout, setHeaderLayout } = useAddMenu();

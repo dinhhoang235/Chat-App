@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { tokenStorage } from '../utils/tokenStorage';
+import { tokenStorage } from '@/utils/tokenStorage';
 
 // Use environment variable for socket URL
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL;

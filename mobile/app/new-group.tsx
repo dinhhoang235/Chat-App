@@ -1,14 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, FlatList, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Header } from '../components/Header';
-import { useTheme } from '../context/themeContext';
+import { Header, GroupAvatarPicker } from '@/components';
+import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
-import { getFriendsList } from '../services/friendship';
-import { ContactItem } from '../components/ContactRow';
+import { getFriendsList } from '@/services/friendship';
+import { ContactItem } from '@/components/lists/ContactRow';
 import { chatApi } from '../services/chat';
 import { useRouter } from 'expo-router';
-import GroupAvatarPicker from '../components/GroupAvatarPicker';
 import * as ImagePicker from 'expo-image-picker';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;

@@ -1,7 +1,7 @@
 import { View, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Header } from "../../components/Header";
-import { useTheme } from "../../context/themeContext";
+import { Header } from '@/components';
+import { useTheme } from '@/context/themeContext';
 
 export default function HelpSettings() {
   const { colors } = useTheme();

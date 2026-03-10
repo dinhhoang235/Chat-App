@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Switch, Alert, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '../../../context/themeContext';
+import { useTheme } from '@/context/themeContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import ChatOptionRow from '../../../components/ChatOptionRow';
-import { Header } from '../../../components/Header';
-import PermissionSheet from '../../../components/PermissionSheet';
-import { chatApi } from '../../../services/chat';
-import { socketService } from '../../../services/socket';
+import { ChatOptionRow, Header, PermissionSheet } from '@/components';
+import { chatApi } from '@/services/chat';
+import { socketService } from '@/services/socket';
 
 const Row = ChatOptionRow;
 

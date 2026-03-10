@@ -1,10 +1,10 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Header } from "../../components/Header";
+import { Header } from '@/components';
 import { MaterialIcons } from "@expo/vector-icons";
-import { useTheme } from "../../context/themeContext";
-import { useAuth } from "../../context/authContext";
+import { useTheme } from '@/context/themeContext';
+import { useAuth } from '@/context/authContext';
 import { useRouter } from "expo-router";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;

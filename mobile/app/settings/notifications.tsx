@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { View, Text, Switch, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Header } from "../../components/Header";
-import { useTheme } from "../../context/themeContext";
+import { Header } from '@/components';
+import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from "@expo/vector-icons";
 
 export default function NotificationsSettings() {

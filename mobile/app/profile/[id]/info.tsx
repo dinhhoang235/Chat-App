@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '../../../context/themeContext';
-import { Header } from '../../../components/Header';
-
+import { useTheme } from '@/context/themeContext';
+import { Header, ProfileEditModal } from '@/components';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '../../../context/authContext';
-import ProfileEditModal from '../../../components/ProfileEditModal';
-import { userAPI } from '../../../services/user';
-import type { User } from '../../../services/friendship';
+import { useAuth } from '@/context/authContext';
+import { userAPI } from '@/services/user';
+import type { User } from '@/services/friendship';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 

@@ -1,11 +1,9 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Switch, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Header } from "../../components/Header";
-import { useTheme } from "../../context/themeContext";
+import { Header, PresenceStatusModal, MessagePermissionSheet } from '@/components';
+import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from "@expo/vector-icons";
-import PresenceStatusModal from '../../components/PresenceStatusModal';
-import MessagePermissionSheet from '../../components/MessagePermissionSheet';
 
 export default function PrivacySettings() {
   const { colors } = useTheme();

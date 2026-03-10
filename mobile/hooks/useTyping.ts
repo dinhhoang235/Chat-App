@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { socketService } from '../services/socket';
+import { socketService } from '@/services/socket';
 
 export const useTyping = (conversationId: string | null, userId: number | undefined) => {
   const [isTyping, setIsTyping] = useState(false);

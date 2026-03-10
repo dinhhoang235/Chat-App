@@ -1,21 +1,10 @@
 import React from 'react';
 import { ScrollView, Switch, Alert, View, Image, TouchableOpacity } from 'react-native';
-import { useTheme } from '../../../context/themeContext';
-import { useSearch } from '../../../context/searchContext';
-import { Header } from '../../../components/Header';
-import MuteOptionsSheet from '../../../components/MuteOptionsSheet';
-import MuteSettingsModal from '../../../components/MuteSettingsModal';
-import BlockSettingsModal from '../../../components/BlockSettingsModal';
-import EditDisplayNameModal from '../../../components/EditDisplayNameModal';
-import AddToGroupModal from '../../../components/AddToGroupModal';
-import ChatOptionRow from '../../../components/ChatOptionRow';
-import ReportModal from '../../../components/ReportModal';
-import ConfirmModal from '../../../components/ConfirmModal';
-import LeaveGroupSheet from '../../../components/LeaveGroupSheet';
+import { useTheme } from '@/context/themeContext';
+import { useSearch } from '@/context/searchContext';
+import { Header, MuteOptionsSheet, MuteSettingsModal, BlockSettingsModal, EditDisplayNameModal, AddToGroupModal, ChatOptionRow, ReportModal, ConfirmModal, LeaveGroupSheet, ChatOptionsHeaderInfo, QuickActions } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useChatOptions } from '../../../hooks/useChatOptions';
-import { ChatOptionsHeaderInfo } from '../../../components/ChatOptionsHeaderInfo';
-import { QuickActions } from '../../../components/QuickActions';
+import { useChatOptions } from '@/hooks/useChatOptions';
 import { MaterialIcons } from '@expo/vector-icons';
 
 

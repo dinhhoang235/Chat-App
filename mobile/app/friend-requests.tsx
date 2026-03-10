@@ -1,13 +1,12 @@
 import React, { useCallback } from 'react';
 import { View, Text, SectionList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Header } from '../components/Header';
-import { useTheme } from '../context/themeContext';
-import { useTabBar } from '../context/tabBarContext';
-import { FriendRequestRow } from '../components/FriendRequestRow';
+import { Header, FriendRequestRow } from '@/components';
+import { useTheme } from '@/context/themeContext';
+import { useTabBar } from '@/context/tabBarContext';
 import { useFocusEffect } from 'expo-router';
-import { getPendingFriendRequests, getSentFriendRequests, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '../services/friendship';
-import type { FriendRequest } from '../services/friendship';
+import { getPendingFriendRequests, getSentFriendRequests, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '@/services/friendship';
+import type { FriendRequest } from '@/services/friendship';
 
 export default function FriendRequests() {
   const { colors } = useTheme();

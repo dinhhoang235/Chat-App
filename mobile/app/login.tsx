@@ -5,8 +5,8 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityInd
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useAuth } from "../context/authContext";
-import { useTheme } from "../context/themeContext";
+import { useAuth } from '@/context/authContext';
+import { useTheme } from '@/context/themeContext';
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState("");

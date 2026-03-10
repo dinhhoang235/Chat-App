@@ -6,7 +6,7 @@ type TabBarContextType = {
 
 const TabBarContext = createContext<TabBarContextType>({ tabBarHeight: 0 });
 
-export const TabBarProvider: React.FC<{ height: number; children: React.ReactNode }> = ({ height, children }) => {
+export function TabBarProvider({ height, children }: { height: number; children: React.ReactNode }) {
   return (
     <TabBarContext.Provider value={{ tabBarHeight: height }}>
       {children}

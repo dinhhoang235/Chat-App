@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { chatApi } from '../services/chat';
-import { socketService } from '../services/socket';
-import { useAuth } from '../context/authContext';
-import { contacts } from '../constants/mockData';
-import { API_URL } from '../services/api';
+import { chatApi } from '@/services/chat';
+import { socketService } from '@/services/socket';
+import { useAuth } from '@/context/authContext';
+import { contacts } from '@/constants/mockData';
+import { API_URL } from '@/services/api';
 
 export function useChatOptions() {
   const router = useRouter();

@@ -3,16 +3,16 @@ import * as FileSystem from 'expo-file-system';
 import { FlatList } from 'react-native';
 import { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
-import { useTheme } from '../context/themeContext';
+import { useTheme } from '@/context/themeContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSearch } from '../context/searchContext';
+import { useSearch } from '@/context/searchContext';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { chatApi } from '../services/chat';
-import { socketService } from '../services/socket';
-import { userAPI } from '../services/user';
-import { useAuth } from '../context/authContext';
-import { API_URL } from '../services/api';
+import { chatApi } from '@/services/chat';
+import { socketService } from '@/services/socket';
+import { userAPI } from '@/services/user';
+import { useAuth } from '@/context/authContext';
+import { API_URL } from '@/services/api';
 import { useTyping } from './useTyping';
 
 export function useChatThread() {

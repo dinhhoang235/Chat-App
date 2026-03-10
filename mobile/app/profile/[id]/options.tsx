@@ -1,18 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { useAuth } from '../../../context/authContext';
-import ImagePickerModal from '../../../components/ImagePickerModal';
-import ProfileBioModal from '../../../components/ProfileBioModal';
-import MyQrModal from '../../../components/MyQrModal';
+import { useAuth } from '@/context/authContext';
+import { ImagePickerModal, ProfileBioModal, MyQrModal, Header } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '../../../context/themeContext';
-import { Header } from '../../../components/Header';
+import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as ImagePickerLib from 'expo-image-picker';
-import { uploadImage } from '../../../services/imageUpload';
-import { userAPI } from '../../../services/user';
-import { checkFriendshipStatus, sendFriendRequest, acceptFriendRequest, cancelFriendRequest, removeFriend, type User } from '../../../services/friendship';
+import { uploadImage } from '@/services/imageUpload';
+import { userAPI } from '@/services/user';
+import { checkFriendshipStatus, sendFriendRequest, acceptFriendRequest, cancelFriendRequest, removeFriend, type User } from '@/services/friendship';
 
 function Row({ icon, title, subtitle, onPress, rightNode, showChevron = true }: any) {
   const { colors } = useTheme();

@@ -1,10 +1,10 @@
 import { View, Text, TouchableOpacity, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Header } from "../components/Header";
-import { useAuth } from "../context/authContext";
+import { Header } from '@/components';
+import { useAuth } from '@/context/authContext';
 import { MaterialIcons } from "@expo/vector-icons";
-import { useTheme } from "../context/themeContext";
+import { useTheme } from '@/context/themeContext';
 
 type SettingsRoute =
   | "/settings/account"

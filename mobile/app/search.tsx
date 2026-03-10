@@ -2,12 +2,10 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useTheme } from '../context/themeContext';
-import SearchBar from '../components/SearchBar';
-import SearchHistory from '../components/SearchHistory';
-import ResultsList from '../components/ResultsList';
-import { userAPI } from '../services/user';
-import { sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '../services/friendship';
+import { useTheme } from '@/context/themeContext';
+import { SearchBar, SearchHistory, ResultsList } from '@/components';
+import { userAPI } from '@/services/user';
+import { sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '@/services/friendship';
 
 type SearchResult = {
   id: number;

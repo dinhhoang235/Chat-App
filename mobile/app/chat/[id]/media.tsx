@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Image, Linking, StyleSheet } from 'react-native';
-import { useTheme } from '../../../context/themeContext';
-import { Header } from '../../../components/Header';
+import { useTheme } from '@/context/themeContext';
+import { Header, FullscreenImageViewer } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useChatThread } from '../../../hooks/useChatThread';
+import { useChatThread } from '@/hooks/useChatThread';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { API_URL } from '../../../services/api';
-import FullscreenImageViewer from '../../../components/FullscreenImageViewer';
+import { API_URL } from '@/services/api';
 
 const TABS = ['Ảnh', 'File', 'Link'];
 

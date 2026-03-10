@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, Alert, Share } from 'react-native';
-import { useTheme } from '../../../context/themeContext';
-import { Header } from '../../../components/Header';
+import { useTheme } from '@/context/themeContext';
+import { Header } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { contacts } from '../../../constants/mockData';
+import { contacts } from '@/constants/mockData';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, Switch, Modal, TextInput, Pressable, Alert } from 'react-native';
-import { useTheme } from '../../../../context/themeContext';
+import { useTheme } from '@/context/themeContext';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Header } from '../../../../components/Header';
-import { contacts } from '../../../../constants/mockData';
-import { useAuth } from '../../../../context/authContext';
+import { Header } from '@/components';
+import { contacts } from '@/constants/mockData';
+import { useAuth } from '@/context/authContext';
 
 export default function MemberPendingSettings() {
   const { colors, scheme } = useTheme();

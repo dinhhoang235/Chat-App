@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Header } from "../components/Header";
-import { useTheme } from "../context/themeContext";
+import { Header } from '@/components';
+import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
-import { userAPI } from '../services/user';
+import { userAPI } from '@/services/user';
 
 export default function NewContact() {
   const { colors } = useTheme();

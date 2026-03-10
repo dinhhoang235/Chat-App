@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Switch, ScrollView, Alert, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Header } from "../../components/Header";
-import { useTheme } from "../../context/themeContext";
+import { Header, MyQrModal } from '@/components';
+import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from "@expo/vector-icons";
-import { useAuth } from "../../context/authContext";
+import { useAuth } from '@/context/authContext';
 import { useRouter } from 'expo-router';
-import MyQrModal from '../../components/MyQrModal';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 

@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '../../../context/themeContext';
+import { useTheme } from '@/context/themeContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useAuth } from '../../../context/authContext';
-import { Header } from '../../../components/Header';
-import MemberActionsSheet from '../../../components/MemberActionsSheet';
-import AddToGroupModal from '../../../components/AddToGroupModal';
-import { chatApi } from '../../../services/chat';
-import { API_URL } from '../../../services/api';
-import { getInitials } from '../../../utils/contacts';
+import { useAuth } from '@/context/authContext';
+import { Header, MemberActionsSheet, AddToGroupModal } from '@/components';
+import { chatApi } from '@/services/chat';
+import { API_URL } from '@/services/api';
+import { getInitials } from '@/utils/contacts';
 
 export default function MembersScreen() {
   const { colors } = useTheme();

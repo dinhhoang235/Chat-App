@@ -1,13 +1,13 @@
 import { Tabs, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useTheme } from "../../context/themeContext";
-import { useSelection } from "../../context/selectionContext";
+import { useTheme } from '@/context/themeContext';
+import { useSelection } from '@/context/selectionContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AddMenuProvider, useAddMenu } from '../../context/addMenuContext';
-import { AddMenu } from '../../components/AddMenu';
+import { AddMenuProvider, useAddMenu } from '@/context/addMenuContext';
+import { AddMenu } from '@/components';
 
-import { TabBarProvider } from '../../context/tabBarContext';
+import { TabBarProvider } from '@/context/tabBarContext';
 
 export default function TabsLayout() {
   const { colors } = useTheme();

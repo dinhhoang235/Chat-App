@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Alert } from 'react-native';
-import { useTheme } from '../../../context/themeContext';
-import { Header } from '../../../components/Header';
-import MessageBubble from '../../../components/MessageBubble';
+import { useTheme } from '@/context/themeContext';
+import { Header, MessageBubble } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';

@@ -8,7 +8,7 @@ type SearchContextType = {
 
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
-export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [openFor, setOpenFor] = useState<string | null>(null);
 
   const open = useCallback((chatId: string) => setOpenFor(chatId), []);

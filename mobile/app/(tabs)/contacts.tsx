@@ -1,15 +1,15 @@
 import React, { useCallback } from 'react';
 import { SectionList, View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Header } from "../../components/Header";
-import { useTheme } from "../../context/themeContext";
-import { useTabBar } from '../../context/tabBarContext';
+import { Header, ContactRow } from '@/components';
+import { useTheme } from '@/context/themeContext';
+import { useTabBar } from '@/context/tabBarContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { ContactRow, ContactItem } from '../../components/ContactRow';
+import { ContactItem } from '@/components/lists/ContactRow';
 import { MaterialIcons } from '@expo/vector-icons';
-import { getFriendsList, getPendingFriendRequests } from '../../services/friendship';
-import { socketService } from '../../services/socket';
+import { getFriendsList, getPendingFriendRequests } from '@/services/friendship';
+import { socketService } from '@/services/socket';
 
 type Section = {
   title: string;

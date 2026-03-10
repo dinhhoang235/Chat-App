@@ -1,14 +1,13 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ImageBackground, Alert, Image, Modal, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../../context/themeContext';
+import { useTheme } from '@/context/themeContext';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useAuth } from '../../context/authContext';
-import { Header } from '../../components/Header';
-import ProfileBioModal from '../../components/ProfileBioModal';
+import { useAuth } from '@/context/authContext';
+import { Header, ProfileBioModal } from '@/components';
 import { MaterialIcons } from '@expo/vector-icons';
-import { userAPI } from '../../services/user';
-import { checkFriendshipStatus, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest, User } from '../../services/friendship';
+import { userAPI } from '@/services/user';
+import { checkFriendshipStatus, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest, User } from '@/services/friendship';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 

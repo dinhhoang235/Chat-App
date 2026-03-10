@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { useTheme } from '../context/themeContext';
-import { useAuth } from '../context/authContext';
-import { useSelection } from '../context/selectionContext';
-import { chatApi } from '../services/chat';
-import { socketService } from '../services/socket';
-import { API_URL } from '../services/api';
+import { useTheme } from '@/context/themeContext';
+import { useAuth } from '@/context/authContext';
+import { useSelection } from '@/context/selectionContext';
+import { chatApi } from '@/services/chat';
+import { socketService } from '@/services/socket';
+import { API_URL } from '@/services/api';
 
 export function useConversations() {
   const { colors } = useTheme();

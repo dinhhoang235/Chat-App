@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Header } from "../../components/Header";
-import { useTheme } from "../../context/themeContext";
+import { Header } from '@/components';
+import { useTheme } from '@/context/themeContext';
 import { useRouter } from "expo-router";
-import { useAuth } from "../../context/authContext";
+import { useAuth } from '@/context/authContext';
 
 export default function AddAccount() {
   const { colors } = useTheme();
@@ -13,18 +13,27 @@ export default function AddAccount() {
 
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!phone || !password) {
       Alert.alert("Lỗi", "Vui lòng nhập số điện thoại và mật khẩu");
       return;
     }
 
-    // Attempt login (mock). If success go back to switch-account
-    if (login(phone, password)) {
-      router.back();
-    } else {
-      Alert.alert("Lỗi", "Số điện thoại hoặc mật khẩu không đúng");
+    setLoading(true);
+    try {
+      const success = await login(phone, password);
+      if (success) {
+        router.back();
+      } else {
+        Alert.alert("Lỗi", "Số điện thoại hoặc mật khẩu không đúng");
+      }
+    } catch (err) {
+      console.error('Login error', err);
+      Alert.alert("Lỗi", "Đã xảy ra lỗi khi đăng nhập");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,11 +73,15 @@ export default function AddAccount() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={{ backgroundColor: phone && password ? colors.tint : colors.surfaceVariant, opacity: phone && password ? 1 : 0.8, borderRadius: 999, paddingVertical: 12, marginBottom: 16 }}
-            disabled={!phone || !password}
+            style={{ backgroundColor: phone && password ? colors.tint : colors.surfaceVariant, opacity: phone && password && !loading ? 1 : 0.6, borderRadius: 999, paddingVertical: 12, marginBottom: 16 }}
+            disabled={!phone || !password || loading}
             onPress={handleAdd}
           >
-            <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 16 }}>Thêm tài khoản</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600', fontSize: 16 }}>Thêm tài khoản</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>

@@ -13,7 +13,7 @@ type AddMenuContextType = {
 
 const AddMenuContext = createContext<AddMenuContextType | undefined>(undefined);
 
-export const AddMenuProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AddMenuProvider({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(false);
   const [addLayout, setAddLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [headerLayout, setHeaderLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);

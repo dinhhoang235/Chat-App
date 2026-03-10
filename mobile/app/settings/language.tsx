@@ -1,9 +1,9 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Header } from "../../components/Header";
+import { Header } from '@/components';
 import { MaterialIcons } from "@expo/vector-icons";
-import { useTheme } from "../../context/themeContext";
+import { useTheme } from '@/context/themeContext';
 
 export default function LanguageSettings() {
   const { preference, setPreference, scheme, colors } = useTheme();

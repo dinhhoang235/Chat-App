@@ -5,6 +5,7 @@ import { socketService } from "@/services/socket";
 
 interface AuthContextType {
   isLoggedIn: boolean;
+  initialized: boolean; // true once hydration from storage finished
   user: { id: number; phone: string; fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null } | null;
   login: (phone: string, password: string) => Promise<boolean>;
   signup: (phone: string, fullName: string, password: string) => Promise<boolean>;
@@ -16,9 +17,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [user, setUser] = useState<{ id: number; phone: string; fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null } | null>(
     null
   );
+
+  // restore login state when the provider mounts
+  useEffect(() => {
+    (async () => {
+      const access = await tokenStorage.getAccessToken();
+      const storedUser = await tokenStorage.getUser();
+      if (access && storedUser) {
+        setIsLoggedIn(true);
+        setUser(storedUser);
+      } else {
+        // make sure no leftover data remain
+        await tokenStorage.removeTokens();
+        await tokenStorage.removeUser();
+      }
+      setInitialized(true);
+    })();
+  }, []);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -35,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoggedIn(true);
         setUser(data.user);
         await tokenStorage.saveTokens(data.accessToken, data.refreshToken);
+        await tokenStorage.saveUser(data.user);
         return true;
       }
       return false;
@@ -55,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoggedIn(true);
         setUser(data.user);
         await tokenStorage.saveTokens(data.accessToken, data.refreshToken);
+        await tokenStorage.saveUser(data.user);
         return true;
       }
       return false;
@@ -74,11 +95,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setIsLoggedIn(false);
     setUser(null);
-    await tokenStorage.removeTokens();
+    await Promise.all([tokenStorage.removeTokens(), tokenStorage.removeUser()]);
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider value={{ isLoggedIn, initialized, user, login, signup, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

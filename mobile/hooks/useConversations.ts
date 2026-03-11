@@ -20,6 +20,12 @@ export function useConversations() {
   const [startChatVisible, setStartChatVisible] = useState(false);
 
   const fetchConversations = useCallback(async () => {
+    // don't attempt to hit the API if we don't have a logged-in user yet
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await chatApi.getConversations();
       const mapped = response.data.map((conv: any) => {
@@ -72,15 +78,18 @@ export function useConversations() {
         };
       }).sort((a: any, b: any) => b.updatedAt - a.updatedAt);
       setData(mapped);
-    } catch (err) {
-      console.error("Fetch conversations error:", err);
+    } catch (err: any) {
+      // 401 may occur if auth isn't ready; we already guard but log others
+      if (err?.response?.status !== 401) {
+        console.error("Fetch conversations error:", err);
+      }
     } finally {
       setLoading(false);
     }
   }, [user, colors.tint]);
 
   useEffect(() => {
-    if (isFocused) {
+    if (isFocused && user) {
       fetchConversations();
     }
 
@@ -111,7 +120,7 @@ export function useConversations() {
       socketService.off('new_message', handleNewMessage);
       socketService.off('user_status_changed', handleStatusChanged);
     };
-  }, [fetchConversations, isFocused]);
+  }, [fetchConversations, isFocused, user]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));

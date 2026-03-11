@@ -1,9 +1,10 @@
-import { Stack } from "expo-router";
+import React, { useEffect } from "react";
+import { Stack, useRouter } from "expo-router";
 import "../global.css";
 import { View } from "react-native";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from "expo-status-bar";
-import { AuthProvider } from '@/context/authContext';
+import { AuthProvider, useAuth } from '@/context/authContext';
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from '@/context/themeContext';
 import { SelectionProvider } from '@/context/selectionContext';
@@ -12,6 +13,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 function ThemeRoot() {
   const { scheme, colors } = useTheme();
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View className={`flex-1 ${scheme === 'dark' ? 'dark' : ''}`}>
@@ -20,19 +22,52 @@ function ThemeRoot() {
           <KeyboardProvider>
             <SelectionProvider>
               <AuthProvider>
-                <SearchProvider>
-                  <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="login" />
-                    <Stack.Screen name="signup" />
-                    <Stack.Screen name="(tabs)" />
-                  </Stack>
-                </SearchProvider>
-              </AuthProvider>
+          <SearchProvider>
+            <AppStack />
+          </SearchProvider>
+        </AuthProvider>
             </SelectionProvider>
           </KeyboardProvider>
         </SafeAreaProvider>
       </View>
     </GestureHandlerRootView>
+  );
+}
+
+// simple navigation stack that switches depending on authentication state
+function AppStack() {
+  const { isLoggedIn, initialized } = useAuth();
+  const router = useRouter();
+
+  // if auth state changes we immediately update navigation
+  useEffect(() => {
+    if (!initialized) return; // wait for storage hydration
+
+    if (isLoggedIn) {
+      // send to main tabs when logged in
+      router.replace('/(tabs)');
+    } else {
+      // make sure unauthenticated users land on login
+      router.replace('/login');
+    }
+  }, [isLoggedIn, initialized, router]);
+
+  if (!initialized) {
+    // could render splash/loading indicator here
+    return null;
+  }
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      {isLoggedIn ? (
+        <Stack.Screen name="(tabs)" />
+      ) : (
+        <>
+          <Stack.Screen name="login" />
+          <Stack.Screen name="signup" />
+        </>
+      )}
+    </Stack>
   );
 }
 

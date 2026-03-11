@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, TextInput, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -13,8 +13,14 @@ interface ChatComposerProps {
   colors: any;
   insets: { bottom: number };
   onImagePress?: () => void;
+  /** if true, show image icon as active (blue) */
+  imageActive?: boolean;
+  /** unified sheet opener: 'gallery' | 'actions' */
+  onOpenSheet?: (type: 'gallery' | 'actions') => void;
+  onMorePress?: () => void;
   attachments?: {uri: string}[];
   onRemoveAttachment?: (arg: number | string) => void;
+  onClearAttachments?: () => void;
   onFocus?: () => void;
 }
 
@@ -29,10 +35,16 @@ export default function ChatComposer({
   colors,
   insets,
   onImagePress,
+  imageActive,
+  onOpenSheet,
+  onMorePress,
   attachments,
   onRemoveAttachment,
+  onClearAttachments,
   onFocus,
 }: ChatComposerProps) {
+  const [imagePressed, setImagePressed] = useState(false);
+
   return (
     <View
       style={{
@@ -42,37 +54,6 @@ export default function ChatComposer({
         marginTop: -8, // Kéo composer lên sát hơn với tin nhắn
       }}
     >
-      {/* preview selected attachments */}
-      {attachments && attachments.length > 0 && (
-        <View className="px-4 py-2">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {attachments.map((att, idx) => (
-              <View key={idx} className="mr-2 relative">
-                <Image
-                  source={{ uri: att.uri }}
-                  style={{ width: 40, height: 40, borderRadius: 6 }}
-                />
-                {onRemoveAttachment && (
-                  <TouchableOpacity
-                    style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      backgroundColor: colors.surface,
-                      borderRadius: 10,
-                      padding: 2,
-                    }}
-                    onPress={() => onRemoveAttachment(idx)}
-                  >
-                    <MaterialIcons name="close" size={14} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
       <View
         className="px-4 flex-row items-center"
         style={{
@@ -80,41 +61,50 @@ export default function ChatComposer({
           paddingTop: 4,
         }}
       >
-        <TouchableOpacity className="mr-3">
-          <MaterialIcons name="emoji-emotions" size={26} color={colors.icon} />
-        </TouchableOpacity>
+        {attachments && attachments.length > 0 ? (
+          <TouchableOpacity className="mr-3" onPress={onClearAttachments}>
+            <MaterialIcons name="chevron-left" size={26} color={colors.icon} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity className="mr-3">
+            <MaterialIcons name="emoji-emotions" size={26} color={colors.icon} />
+          </TouchableOpacity>
+        )}
 
-        <TouchableWithoutFeedback onPress={() => setComposerVisible(false)}>
-          <View
-            className="flex-1 px-2 py-2 mr-3"
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 10,
-              minHeight: 40,
-              maxHeight: 100,
-              justifyContent: 'center',
-            }}
-          >
-            <TextInput
-              ref={inputRef}
-              value={messageText}
-              onChangeText={onTextChange}
-              onFocus={() => {
-                setComposerVisible(false);
-                if (onFocus) onFocus();
-              }}
-              placeholder="Tin nhắn"
-              placeholderTextColor={colors.textSecondary}
+        {(!attachments || attachments.length === 0) ? (
+          <TouchableWithoutFeedback onPress={() => setComposerVisible(false)}>
+            <View
+              className="flex-1 px-2 py-2 mr-3"
               style={{
-                color: colors.text,
-                fontSize: 16,
-                paddingVertical: 8,
-                textAlignVertical: 'center',
+                backgroundColor: colors.surface,
+                borderRadius: 10,
+                minHeight: 40,
+                maxHeight: 100,
+                justifyContent: 'center',
               }}
-              multiline
-            />
-          </View>
-        </TouchableWithoutFeedback>
+            >
+              <TextInput
+                ref={inputRef}
+                value={messageText}
+                onChangeText={onTextChange}
+                onFocus={() => {
+                  if (onFocus) onFocus();
+                }}
+                placeholder="Tin nhắn"
+                placeholderTextColor={colors.textSecondary}
+                style={{
+                  color: colors.text,
+                  fontSize: 16,
+                  paddingVertical: 8,
+                  textAlignVertical: 'center',
+                }}
+                multiline
+              />
+            </View>
+          </TouchableWithoutFeedback>
+        ) : (
+          <View style={{ flex: 1 }} />
+        )}
 
         {/* Right action icons: show send when typing, otherwise more/mic/image */}
         <View className="flex-row items-center">
@@ -127,7 +117,7 @@ export default function ChatComposer({
               {creatingConversation ? (
                 <ActivityIndicator size={28} color={colors.tint} />
               ) : (
-                <MaterialIcons name="send" size={34} color={colors.tint} />
+                <MaterialIcons name="send" size={26} color={colors.tint} />
               )}
             </TouchableOpacity>
           ) : (
@@ -137,13 +127,19 @@ export default function ChatComposer({
                 onPress={() => {
                   inputRef.current?.blur?.();
                   Keyboard.dismiss();
-                  setComposerVisible(v => !v);
+                  if (onOpenSheet) {
+                    onOpenSheet('actions');
+                  } else if (onMorePress) {
+                    onMorePress();
+                  } else {
+                    setComposerVisible(v => !v);
+                  }
                 }}
                 style={{ padding: 6 }}
               >
                 <MaterialIcons
                   name="more-horiz"
-                  size={24}
+                  size={26}
                   color={composerVisible ? colors.tint : colors.icon}
                 />
               </TouchableOpacity>
@@ -153,28 +149,36 @@ export default function ChatComposer({
                 onPress={() => console.log('Mic pressed')}
                 style={{ padding: 6 }}
               >
-                <MaterialIcons name="mic" size={28} color={colors.icon} />
+                <MaterialIcons name="mic" size={26} color={colors.icon} />
               </TouchableOpacity>
 
               <TouchableOpacity
+                onPressIn={() => setImagePressed(true)}
+                onPressOut={() => setImagePressed(false)}
                 onPress={() => {
-                  if (onImagePress) {
+                  console.log('image icon tapped');
+                  if (onOpenSheet) {
+                    onOpenSheet('gallery');
+                  } else if (onImagePress) {
                     onImagePress();
-                  } else {
-                    console.log('Image pressed');
                   }
                 }}
+                activeOpacity={0.7}
                 style={{ padding: 6 }}
               >
-                <MaterialIcons name="image" size={26} color={colors.icon} />
+                <MaterialIcons
+                  name="image"
+                  size={26}
+                  color={
+                    imageActive || imagePressed ? colors.tint : colors.icon
+                  }
+                />
               </TouchableOpacity>
             </>
           )}
         </View>
       </View>
 
-      {/* Return to using a small spacer or insets for default state */}
-      <View style={{ height: insets.bottom / 2 }} />
     </View>
   );
 }

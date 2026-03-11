@@ -1,5 +1,6 @@
-import React from 'react';
-import { Modal, Pressable, View, Text, TouchableOpacity } from 'react-native';
+import React, { useRef, useEffect, useMemo } from 'react';
+import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 
@@ -11,45 +12,74 @@ const ACTIONS: Action[] = [
   { key: 'gif', icon: 'gif', label: '@GIF', color: '#34D399' },
 ];
 
-export default function ComposerActionsSheet({ visible, onClose, onAction, inline = false }: { visible: boolean; onClose: () => void; onAction: (key: string) => void; inline?: boolean }) {
-  const { scheme, colors } = useTheme();
-  const overlay = scheme === 'dark' ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.35)';
+export default function ComposerActionsSheet({
+  visible,
+  onClose,
+  onAction,
+  height,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onAction: (key: string) => void;
+  height?: number;
+}) {
+  const { colors } = useTheme();
+  const sheetRef = useRef<BottomSheet>(null);
 
-  const content = (
-    <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 12, borderTopRightRadius: 12, paddingTop: 12, paddingBottom: 18 }}>
+  const snapPoints = useMemo(() => {
+    const h = height ?? Math.round(Dimensions.get('window').height * 0.35);
+    return [h];
+  }, [height]);
 
-          <View style={{ paddingHorizontal: 18 }}>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-          {ACTIONS.map((a) => (
-            <TouchableOpacity key={a.key} onPress={() => onAction(a.key)} style={{ width: '25%', alignItems: 'center', paddingVertical: 10 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: a.color || '#EEE', marginBottom: 8 }}>
-                <MaterialIcons name={a.icon as any} size={22} color="#fff" />
-              </View>
-              <Text style={{ color: colors.text, fontSize: 12, textAlign: 'center' }}>{a.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
+  useEffect(() => {
+    if (visible) {
+      sheetRef.current?.snapToIndex(0);
+    } else {
+      sheetRef.current?.close();
+    }
+  }, [visible]);
 
-  if (!inline) {
-    return (
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-        <Pressable style={{ flex: 1, backgroundColor: overlay }} onPress={onClose}>
-          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-            {content}
-          </View>
-        </Pressable>
-      </Modal>
-    );
-  }
 
-  // Inline variant: render content directly (not modal) so it pushes composer up
-  if (!visible) return null;
   return (
-    <View style={{ borderTopWidth: 1, borderTopColor: colors.surfaceVariant }}>
-      {content}
-    </View>
+    <BottomSheet
+      ref={sheetRef}
+      index={-1}
+      snapPoints={snapPoints}
+      enablePanDownToClose={false}
+      enableContentPanningGesture={false}
+      enableHandlePanningGesture={false}
+      handleComponent={null}
+      onClose={onClose}
+      backgroundStyle={{ backgroundColor: colors.surface }}
+      enableDynamicSizing={false}
+      containerStyle={{ pointerEvents: 'box-none' }}
+    >
+      <BottomSheetView>
+        <View style={{ paddingHorizontal: 18, paddingTop: 8, paddingBottom: 18 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            {ACTIONS.map((a) => (
+              <TouchableOpacity
+                key={a.key}
+                onPress={() => onAction(a.key)}
+                style={{ width: '25%', alignItems: 'center', paddingVertical: 10 }}
+              >
+                <View style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: a.color || '#EEE',
+                  marginBottom: 8,
+                }}>
+                  <MaterialIcons name={a.icon as any} size={22} color="#fff" />
+                </View>
+                <Text style={{ color: colors.text, fontSize: 12, textAlign: 'center' }}>{a.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </BottomSheetView>
+    </BottomSheet>
   );
 }

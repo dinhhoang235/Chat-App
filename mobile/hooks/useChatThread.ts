@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import * as FileSystem from 'expo-file-system';
 import { FlatList } from 'react-native';
-import { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
-import { useKeyboardHandler } from 'react-native-keyboard-controller';
+import { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useKeyboardSheetHeight } from './useKeyboardSheetHeight';
 import { useTheme } from '@/context/themeContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSearch } from '@/context/searchContext';
 import { useIsFocused } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, initialWindowMetrics } from 'react-native-safe-area-context';
 import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
 import { userAPI } from '@/services/user';
@@ -139,6 +139,7 @@ export function useChatThread() {
   const [currentResultIndex, setCurrentResultIndex] = useState(0);
 
   const [composerVisible, setComposerVisible] = useState(false);
+  const [galleryVisible, setGalleryVisible] = useState(false);
   const [messageText, setMessageText] = useState('');
 
   // attachments picked from image picker (max 10)
@@ -164,38 +165,68 @@ export function useChatThread() {
     });
   };
 
+  const clearAttachments = () => setAttachments([]);
+
   const onTextChange = (text: string) => {
     setMessageText(text);
     handleType();
   };
 
-  const insets = useSafeAreaInsets();
+  const safeInsets = useSafeAreaInsets();
+  // Khởi tạo inset từ initialWindowMetrics để tránh bị 0 ở frame đầu tiên
+  const insets = useMemo(() => ({
+    top: safeInsets.top || initialWindowMetrics?.insets.top || 0,
+    bottom: safeInsets.bottom || initialWindowMetrics?.insets.bottom || 0,
+    left: safeInsets.left || initialWindowMetrics?.insets.left || 0,
+    right: safeInsets.right || initialWindowMetrics?.insets.right || 0,
+  }), [safeInsets]);
 
   // Listen to SearchContext open events to avoid navigation flicker
   const { openFor, close } = useSearch();
   const isFocused = useIsFocused();
   const [pendingOpen, setPendingOpen] = useState(false);
 
-  const keyboardHeight = useSharedValue(0);
+  const { keyboardHeight, lastKeyboardHeight } = useKeyboardSheetHeight();
+  const sheetHeightSV = useSharedValue(0);
+  const sheetTimeoutRef = useRef<any>(null);
 
-  const animatedContentStyle = useAnimatedStyle(() => ({
-    paddingBottom: Math.max(0, keyboardHeight.value - insets.bottom / 2),
-  }));
+  useEffect(() => {
+    if (sheetTimeoutRef.current) {
+      clearTimeout(sheetTimeoutRef.current);
+      sheetTimeoutRef.current = null;
+    }
 
-  useKeyboardHandler({
-    onStart: (event) => {
-      'worklet';
-      keyboardHeight.value = event.height;
-    },
-    onMove: (event) => {
-      'worklet';
-      keyboardHeight.value = event.height;
-    },
-    onEnd: (event) => {
-      'worklet';
-      keyboardHeight.value = event.height;
-    },
-  });
+    const isAnySheetVisible = composerVisible || galleryVisible;
+    if (isAnySheetVisible) {
+      if (keyboardHeight.value > 0) {
+        // Nếu bàn phím đang mở (VD: từ bàn phím bấm sang More)
+        // Ta set thẳng giá trị để Chat bar bị "ghim" lại tại chỗ, không có độ trễ
+        sheetHeightSV.value = lastKeyboardHeight;
+      } else {
+        sheetHeightSV.value = withTiming(lastKeyboardHeight, { duration: 333 });
+      }
+    } else {
+      if (inputRef.current?.isFocused()) {
+        // Khi từ sheet chuyển sang bàn phím, giữ sheetHeight một lúc để không bị dip (hụt)
+        // vì keyboard đang animate lên. Sau đó snap về 0 (vì lúc này keyboardHeight đã chèn vào rồi).
+        sheetTimeoutRef.current = setTimeout(() => {
+          sheetHeightSV.value = 0;
+        }, 350);
+      } else {
+        sheetHeightSV.value = withTiming(0, { duration: 333 });
+      }
+    }
+  }, [composerVisible, galleryVisible, lastKeyboardHeight, sheetHeightSV, keyboardHeight]);
+
+  const animatedContentStyle = useAnimatedStyle(() => {
+    return {
+      paddingBottom: Math.max(
+        insets.bottom,
+        keyboardHeight.value,
+        sheetHeightSV.value
+      ),
+    };
+  }, [insets.bottom]);
 
   const getTargetUserStatus = useCallback(async () => {
     if (!targetUserIdState) return;
@@ -289,7 +320,10 @@ export function useChatThread() {
         setInitialFetchDone(true);
       }
 
-      setHasMore(newMessages.length === 20);
+      // If we got exactly 'take' (20) messages, there's likely more.
+      // If we got fewer, but it was a Load More, then we've definitely reached the end.
+      // If it's the initial fetch, we still set hasMore based on count.
+      setHasMore(newMessages.length >= 20);
 
       // If we still don't have targetUserId, extract it from the messages
       if (!targetUserIdState && mapped.length > 0) {
@@ -304,10 +338,11 @@ export function useChatThread() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [conversationId, user?.id, hasMore, loadingMore, targetUserIdState]);
+  }, [conversationId, user?.id, hasMore, loadingMore, targetUserIdState, messagesRef]);
 
   useEffect(() => {
     if (!isFocused || !conversationId) return;
+    if (initialFetchDone) return;
 
     const conversationIdNum = parseInt(conversationId, 10);
     
@@ -633,6 +668,7 @@ export function useChatThread() {
     router,
     id,
     paramName,
+    lastKeyboardHeight,
     targetUserId,
     targetUserIdState,
     isNewConversation,
@@ -655,6 +691,8 @@ export function useChatThread() {
     setCurrentResultIndex,
     composerVisible,
     setComposerVisible,
+    galleryVisible,
+    setGalleryVisible,
     messageText,
     onTextChange,
     insets,
@@ -666,6 +704,7 @@ export function useChatThread() {
     attachments,
     addAttachments,
     removeAttachment,
+    clearAttachments,
     targetUser,
     targetUserStatus,
     isGroup,

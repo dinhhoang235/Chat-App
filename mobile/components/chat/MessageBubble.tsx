@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image, Linking, useWindowDimensions } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getAvatarUrl } from '@/utils/avatar';
@@ -22,11 +23,29 @@ type ChatMessage = {
   fileInfo?: { url: string; name?: string; size?: number; mime?: string };
 };
 
+const IMAGE_SIZE_CACHE = new Map<string, {width: number, height: number}>();
+
 export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
-  const [imgSize, setImgSize] = React.useState<{width:number;height:number} | null>(null);
-  const [viewerVisible, setViewerVisible] = React.useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+
+  // Unify URI building for cache and source
+  const fullImageUri = useMemo(() => {
+    if (message.type !== 'image' || !message.fileInfo) return null;
+    let url = message.fileInfo.url;
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    if (!url.startsWith('/media')) url = `/media${url}`;
+    return getAvatarUrl(url) || url;
+  }, [message.type, message.fileInfo]);
+
+  const [imgSize, setImgSize] = useState<{width:number;height:number} | null>(() => {
+    if (fullImageUri && IMAGE_SIZE_CACHE.has(fullImageUri)) {
+      return IMAGE_SIZE_CACHE.get(fullImageUri)!;
+    }
+    return null;
+  });
 
   if (message.type === 'separator' || message.type === 'system') {
     const textToShow = message.text || message.content;
@@ -89,40 +108,38 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     contentElement = (
       <Image source={{ uri: 'https://via.placeholder.com/120x120.png?text=STK' }} style={{ width: 120, height: 120, borderRadius: 12 }} />
     );
-  } else if (message.type === 'image' && message.fileInfo) {
-    let uri = message.fileInfo.url;
-    if (!uri.startsWith('http')) {
-      // ensure /media prefix
-      if (!uri.startsWith('/media')) uri = `/media${uri}`;
-      uri = getAvatarUrl(uri) || uri;
-    }
+  } else if (message.type === 'image' && message.fileInfo && fullImageUri) {
     const maxWidth = screenWidth * 0.7; // 70% of screen
-    const onLoad = (e: any) => {
-      const { width, height } = e.nativeEvent.source;
-      let w = width;
-      let h = height;
-      if (w > maxWidth) {
-        const ratio = maxWidth / w;
-        w = maxWidth;
-        h = h * ratio;
-      }
-      setImgSize({ width: w, height: h });
-    };
     contentElement = (
       <>
         <TouchableOpacity onPress={() => setViewerVisible(true)} activeOpacity={0.9}>
           <Image
-            source={{ uri }}
+            source={{ uri: fullImageUri }}
             style={{
               width: imgSize ? imgSize.width : maxWidth,
-              height: imgSize ? imgSize.height : maxWidth,
+              height: imgSize ? imgSize.height : maxWidth * 0.75,
               borderRadius: 12,
-              resizeMode: 'contain'
+              backgroundColor: colors.surfaceVariant
             }}
-            onLoad={onLoad}
+            contentFit="contain"
+            transition={200}
+            onLoad={(e) => {
+              const { width, height } = e.source;
+              let w = width;
+              let h = height;
+              if (w > maxWidth) {
+                const ratio = maxWidth / w;
+                w = maxWidth;
+                h = h * ratio;
+              }
+              const newSize = { width: w, height: h };
+              IMAGE_SIZE_CACHE.set(fullImageUri, newSize);
+              setImgSize(newSize);
+            }}
+            onError={(err) => console.log('Image load error:', fullImageUri, err)}
           />
         </TouchableOpacity>
-        <FullscreenImageViewer visible={viewerVisible} images={[uri]} initialIndex={0} onClose={() => setViewerVisible(false)} />
+        <FullscreenImageViewer visible={viewerVisible} images={[fullImageUri]} initialIndex={0} onClose={() => setViewerVisible(false)} />
       </>
     );
   } else if (message.type === 'file' && message.fileInfo) {
@@ -259,7 +276,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
                     <Image 
                       source={{ uri: getAvatarUrl(u.avatar) || undefined }} 
                       style={{ width: 24, height: 24 }} 
-                      onError={(e) => console.log('Avatar load error:', e.nativeEvent.error)}
+                      onError={(e) => console.log('Avatar load error:', e)}
                     />
                   ) : (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

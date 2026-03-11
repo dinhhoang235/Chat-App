@@ -1,22 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
-  Pressable,
   FlatList,
   Image,
   Dimensions,
   ActivityIndicator,
   Alert,
+  StyleSheet,
 } from 'react-native';
+import BottomSheet from '@gorhom/bottom-sheet';
 import * as MediaLibrary from 'expo-media-library';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 
-const COLUMN_COUNT = 4;
+const COLUMN_COUNT = 3;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_SIZE = SCREEN_WIDTH / COLUMN_COUNT - 2;
 
@@ -28,7 +28,8 @@ type GallerySheetProps = {
   attachments: FileObject[];
   addAttachment: (file: FileObject) => void;
   removeAttachment: (arg: number | string) => void;
-  inline?: boolean;
+  /** Chiều cao sheet — bằng chiều cao bàn phím */
+  height?: number;
 };
 
 export default function GallerySheet({
@@ -37,20 +38,33 @@ export default function GallerySheet({
   attachments,
   addAttachment,
   removeAttachment,
-  inline = false,
+  height,
 }: GallerySheetProps) {
   const { colors } = useTheme();
+  const sheetRef = useRef<BottomSheet>(null);
+
   const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [after, setAfter] = useState<string | undefined>(undefined);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
-  const loadAssets = React.useCallback(async () => {
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') {
-      console.warn('Media library permission not granted');
-      return;
+  // Snap to open or close when visible changes
+  useEffect(() => {
+    if (visible) {
+      sheetRef.current?.snapToIndex(0);
+    } else {
+      sheetRef.current?.close();
     }
+  }, [visible]);
+
+  const snapPoints = useMemo(() => {
+    const h = height ?? Math.round(Dimensions.get('window').height * 0.35);
+    return [h];
+  }, [height]);
+
+  const loadAssets = useCallback(async () => {
+    if (!hasPermission) return;
     if (loading || !hasMore) return;
     setLoading(true);
     try {
@@ -68,15 +82,34 @@ export default function GallerySheet({
     } finally {
       setLoading(false);
     }
-  }, [loading, hasMore, after]);
+  }, [loading, hasMore, after, hasPermission]);
 
   useEffect(() => {
-    if (visible) {
-      loadAssets();
-    }
-  }, [visible, loadAssets]);
+    let mounted = true;
+    const ensurePermAndLoad = async () => {
+      if (hasPermission === null) {
+        try {
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          if (!mounted) return;
+          setHasPermission(status === 'granted');
+          if (status === 'granted') {
+            setAssets([]);
+            setAfter(undefined);
+            setHasMore(true);
+            await loadAssets();
+          }
+        } catch (e) {
+          console.warn('Permission request failed', e);
+        }
+      } else if (visible && hasPermission) {
+        await loadAssets();
+      }
+    };
+    if (visible) ensurePermAndLoad();
+    return () => { mounted = false; };
+  }, [visible, loadAssets, hasPermission]);
 
-  const toggleAsset = (asset: MediaLibrary.Asset) => {
+  const toggleAsset = useCallback((asset: MediaLibrary.Asset) => {
     const uri = asset.uri;
     const existing = attachments.find(a => a.uri === uri);
     const file: FileObject = {
@@ -92,49 +125,29 @@ export default function GallerySheet({
     } else {
       alert('Tối đa 10 ảnh');
     }
-  };
+  }, [attachments, addAttachment, removeAttachment]);
 
-  const renderItem = ({ item }: { item: MediaLibrary.Asset | 'camera' }) => {
-    if (item === 'camera') {
-      return (
-        <TouchableOpacity
-          style={{ width: ITEM_SIZE, height: ITEM_SIZE, justifyContent: 'center', alignItems: 'center' }}
-          onPress={openCamera}
-        >
-          <MaterialIcons name="camera-alt" size={32} color={colors.textSecondary} />
-        </TouchableOpacity>
-      );
-    }
-    const asset = item as MediaLibrary.Asset;
-    const selectedIndex = attachments.findIndex(a => a.uri === asset.uri);
-    return (
-      <TouchableOpacity onPress={() => toggleAsset(asset)}>
-        <Image
-          source={{ uri: asset.uri }}
-          style={{ width: ITEM_SIZE, height: ITEM_SIZE, margin: 1 }}
-        />
-        {selectedIndex !== -1 && (
-          <View
-            style={{
-              position: 'absolute',
-              top: 4,
-              right: 4,
-              backgroundColor: colors.tint,
-              borderRadius: 10,
-              width: 20,
-              height: 20,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ color: '#fff', fontSize: 12 }}>{selectedIndex + 1}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
+  const data = useMemo<(MediaLibrary.Asset | 'camera')[]>(
+    () => (['camera', ...assets] as (MediaLibrary.Asset | 'camera')[]),
+    [assets]
+  );
 
-  const openCamera = async () => {
+  const getItemLayout = useCallback(
+    (_: any, index: number) => {
+      const row = Math.floor(index / COLUMN_COUNT);
+      return { length: ITEM_SIZE, offset: row * ITEM_SIZE, index };
+    },
+    []
+  );
+
+  const styles = useMemo(() => StyleSheet.create({
+    cameraCell: { width: ITEM_SIZE, height: ITEM_SIZE, justifyContent: 'center', alignItems: 'center' },
+    image: { width: ITEM_SIZE, height: ITEM_SIZE, margin: 1, backgroundColor: '#eee' },
+    itemContainer: { width: ITEM_SIZE, height: ITEM_SIZE, borderWidth: 1, borderColor: '#ccc', justifyContent: 'center', alignItems: 'center' },
+    badge: { position: 'absolute', top: 4, right: 4, backgroundColor: colors.tint, borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  }), [colors]);
+
+  const openCamera = useCallback(async () => {
     try {
       const camPerm = await ImagePicker.requestCameraPermissionsAsync();
       if (camPerm.status !== 'granted') {
@@ -147,76 +160,70 @@ export default function GallerySheet({
     const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
-      const file: FileObject = {
+      addAttachment({
         uri: asset.uri,
         name: asset.uri.split('/').pop(),
         type: asset.type ? `${asset.type}/jpeg` : 'image/jpeg',
         size: (asset as any).fileSize,
-      };
-      addAttachment(file);
+      });
     }
-  };
+  }, [addAttachment]);
 
-  // sheet contents reused for both inline and modal modes
-  const sheetContent = (
-    <View
-      style={{
-        backgroundColor: colors.surface,
-        borderTopLeftRadius: 12,
-        borderTopRightRadius: 12,
-        height: '30%',
-      }}
-    >
-      <View style={{ width: 40, height: 4, backgroundColor: colors.surfaceVariant, alignSelf: 'center', marginVertical: 8, borderRadius: 2 }} />
-      <FlatList
-        data={[ 'camera', ...assets ]}
-        keyExtractor={(item, idx) => (item === 'camera' ? 'camera' : (item as MediaLibrary.Asset).id)}
-        numColumns={COLUMN_COUNT}
-        renderItem={renderItem}
-        onEndReached={loadAssets}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={loading ? <ActivityIndicator style={{ margin: 12 }} color={colors.tint} /> : null}
-      />
-    </View>
-  );
-
-  if (inline) {
-    if (!visible) return null;
+  const renderItem = useCallback(({ item }: { item: MediaLibrary.Asset | 'camera' }) => {
+    if (item === 'camera') {
+      return (
+        <TouchableOpacity style={styles.cameraCell} onPress={openCamera}>
+          <MaterialIcons name="camera-alt" size={32} color={colors.textSecondary} />
+        </TouchableOpacity>
+      );
+    }
+    const asset = item as MediaLibrary.Asset;
+    const selectedIndex = attachments.findIndex(a => a.uri === asset.uri);
     return (
-      <View style={{ position: 'relative' }}>
-        {/* invisible overlay occupying space above sheet */}
-        <Pressable
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: '30%',
-          }}
-          onPress={onClose}
+      <TouchableOpacity onPress={() => toggleAsset(asset)} style={styles.itemContainer}>
+        <Image
+          source={{ uri: asset.uri }}
+          onError={e => console.warn('GallerySheet image error', e.nativeEvent)}
+          style={styles.image}
         />
-        <View style={{ borderTopWidth: 1, borderTopColor: colors.surfaceVariant }}>
-          {sheetContent}
-        </View>
-      </View>
+        {selectedIndex !== -1 && (
+          <View style={styles.badge}>
+            <Text style={{ color: '#fff', fontSize: 12 }}>{selectedIndex + 1}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
     );
-  }
+  }, [attachments, toggleAsset, colors, openCamera, styles]);
+
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={onClose} />
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }}
-        >
-          {sheetContent}
-        </View>
-      </>
-    </Modal>
+    <BottomSheet
+      ref={sheetRef}
+      index={-1}
+      snapPoints={snapPoints}
+      enablePanDownToClose={false}
+      enableContentPanningGesture={false}
+      enableHandlePanningGesture={false}
+      handleComponent={null}
+      onClose={onClose}
+      backgroundStyle={{ backgroundColor: colors.surface }}
+      enableDynamicSizing={false}
+      containerStyle={{ pointerEvents: 'box-none' }}
+    >
+        <FlatList
+          data={data}
+          keyExtractor={(item, idx) => (item === 'camera' ? 'camera' : (item as MediaLibrary.Asset).id)}
+          numColumns={COLUMN_COUNT}
+          renderItem={renderItem}
+          onEndReached={loadAssets}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={loading ? <ActivityIndicator style={{ margin: 12 }} color={colors.tint} /> : null}
+          initialNumToRender={12}
+          maxToRenderPerBatch={24}
+          windowSize={5}
+          removeClippedSubviews
+          getItemLayout={getItemLayout}
+        />
+    </BottomSheet>
   );
 }

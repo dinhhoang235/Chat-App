@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, Alert, Keyboard } from 'react-native';
+import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, Alert } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Header, GallerySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ChatComposer } from '@/components';
+import useSheetControl from '@/hooks/useSheetControl';
 import * as DocumentPicker from 'expo-document-picker';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { useChatThread } from '@/hooks/useChatThread';
 
 export default function ChatThread() {
@@ -40,16 +41,20 @@ export default function ChatThread() {
     fetchMessages,
     handleSend: originalHandleSend,
     handleSendAttachment,
-    // attachment state and helpers
     attachments,
     addAttachments,
     removeAttachment,
+    clearAttachments,
     targetUserStatus,
     targetUser,
     isGroup,
     groupAvatars,
-    membersCount
+    membersCount,
+    lastKeyboardHeight,
+    galleryVisible,
+    setGalleryVisible,
   } = useChatThread();
+
 
   const handleSend = async () => {
     if (attachments.length > 0) {
@@ -58,31 +63,15 @@ export default function ChatThread() {
     await originalHandleSend();
   };
 
-  // open the gallery bottom sheet rather than OS picker
-  const [galleryVisible, setGalleryVisible] = React.useState(false);
-
-  // if one sheet opens make sure the other closes
-  React.useEffect(() => {
-    if (composerVisible && galleryVisible) {
-      setGalleryVisible(false);
-    }
-  }, [composerVisible, galleryVisible, setGalleryVisible]);
-
-  React.useEffect(() => {
-    if (galleryVisible && composerVisible) {
-      setComposerVisible(false);
-    }
-  }, [galleryVisible, composerVisible, setComposerVisible]);
-
-  const pickImageFromLibrary = () => {
-    // hide keyboard like ComposerActionsSheet does
-    inputRef.current?.blur?.();
-    Keyboard.dismiss();
-
-    setGalleryVisible(true);
-    // if composer actions already visible, hide them
-    if (composerVisible) setComposerVisible(false);
-  };
+  // unified sheet control (gallery/composer) moved to hook
+  const { openSheet, closeAll, sheetHeight } = useSheetControl(
+    inputRef,
+    composerVisible,
+    setComposerVisible,
+    galleryVisible,
+    setGalleryVisible,
+    lastKeyboardHeight
+  );
 
   const pickDocument = async () => {
     try {
@@ -136,7 +125,7 @@ export default function ChatThread() {
   };
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: colors.surface }}>
+    <View className="flex-1" style={{ backgroundColor: colors.surface, paddingTop: insets.top }}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={{ flex: 1 }} >
           {searchMode ? (
@@ -152,8 +141,9 @@ export default function ChatThread() {
               renderMode="header"
             />
           ) : (
-            <Header
-              showBack
+            <View onTouchStart={closeAll}>
+              <Header
+                showBack
               leftElement={
                 <TouchableOpacity
                   onPress={() => {
@@ -233,34 +223,33 @@ export default function ChatThread() {
                 },
               ]}
             />
+            </View>
           )}
 
           {/* Wrapper for messages and composer that pushes up with keyboard */}
-          <Animated.View style={[{ flex: 1 }, animatedContentStyle]}>
-            <TouchableOpacity
-              activeOpacity={1}
-              style={{ flex: 1 }}
-              onPress={() => {
-                if (galleryVisible) setGalleryVisible(false);
-              }}
-            >
+            <Animated.View style={[{ flex: 1 }, animatedContentStyle]}>
               {loading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                   <ActivityIndicator size="large" color={colors.tint} />
                 </View>
               ) : (
-                <View style={{ flex: 1, marginBottom: 2 }}>
+                <View
+                  style={{ flex: 1, marginBottom: 2 }}
+                  onTouchStart={closeAll}
+                >
                   <FlatList
                     ref={flatListRef}
                     data={messages}
                     inverted
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
                     keyExtractor={(i, idx) => {
                       if (i.id != null && i.id.toString() !== '') return i.id.toString();
                       return `msg-${idx}`;
                     }}
                     initialNumToRender={20}
-                    maxToRenderPerBatch={20}
-                    windowSize={10}
+                    maxToRenderPerBatch={40}
+                    windowSize={21}
                     maintainVisibleContentPosition={{
                       minIndexForVisible: 0,
                       autoscrollToTopThreshold: 10,
@@ -270,7 +259,7 @@ export default function ChatThread() {
                       paddingBottom: 0
                     }}
                     onEndReached={() => {
-                      if (hasMore && !loadingMore && messages.length >= 10) {
+                      if (hasMore && !loadingMore) {
                         fetchMessages(true);
                       }
                     }}
@@ -313,7 +302,7 @@ export default function ChatThread() {
                           highlightQuery={searchQuery}
                           isLastInGroup={isLastInConsecutiveGroup}
                           isThreadLast={isThreadLast}
-                          onPress={() => { if (composerVisible) setComposerVisible(false); }}
+                          onPress={() => { if (composerVisible) closeAll(); }}
                           onAvatarPress={() => {
                             if (item.fromMe) return router.push('/profile/me');
                             router.push(`/profile/${item.senderId}`);
@@ -360,51 +349,53 @@ export default function ChatThread() {
                   setComposerVisible={setComposerVisible}
                   colors={colors}
                   insets={insets}
-                  onImagePress={pickImageFromLibrary}
+                  onOpenSheet={openSheet}
+                  imageActive={galleryVisible}
                   attachments={attachments}
                   onRemoveAttachment={removeAttachment}
+                  onClearAttachments={clearAttachments}
                   onFocus={() => {
                     if (galleryVisible) setGalleryVisible(false);
+                    if (composerVisible) setComposerVisible(false);
                   }}
                 />
               )}
-            </TouchableOpacity>
           </Animated.View>
 
-          {galleryVisible && (
-            <GallerySheet
-              inline
-              visible={galleryVisible}
-              onClose={() => setGalleryVisible(false)}
-              attachments={attachments}
-              addAttachment={(file: any) => addAttachments([file])}
-              removeAttachment={removeAttachment}
-            />
-          )}
+          <GallerySheet
+            visible={galleryVisible}
+            onClose={() => {
+              setGalleryVisible(false);
+            }}
+            attachments={attachments}
+            addAttachment={(file: any) => addAttachments([file])}
+            removeAttachment={removeAttachment}
+            height={sheetHeight}
+          />
 
-          {composerVisible && (
-            <ComposerActionsSheet
-              inline
-              visible={composerVisible}
-              onClose={() => setComposerVisible(false)}
-              onAction={(key) => {
-                console.log('composer action selected', key);
-                setComposerVisible(false);
-                if (key === 'document') {
-                  pickDocument();
-                } else if (key === 'location') {
-                  // TODO: implement location share
-                } else if (key === 'gif') {
-                  // TODO: open GIF picker
-                } else {
-                  console.log('Composer action:', key);
-                }
-              }}
-            />
-          )}
+          <ComposerActionsSheet
+            visible={composerVisible}
+            onClose={() => {
+              setComposerVisible(false);
+            }}
+            height={sheetHeight}
+            onAction={(key) => {
+              console.log('composer action selected', key);
+              closeAll();
+              if (key === 'document') {
+                pickDocument();
+              } else if (key === 'location') {
+                // TODO: implement location share
+              } else if (key === 'gif') {
+                // TODO: open GIF picker
+              } else {
+                console.log('Composer action:', key);
+              }
+            }}
+          />
 
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }

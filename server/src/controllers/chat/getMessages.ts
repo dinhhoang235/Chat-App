@@ -47,21 +47,23 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
     // 1. Try to get from Cache if it's the first page (no cursor)
     if (!cursor) {
       const cached = await getCachedMessages(convId, take);
-      // Filter cached messages by deletedAt
-      if (cached && cached.length > 0) {
+      // Only serve from cache if it satisfies the full request or we can be sure it's the end (but we can't easily)
+      // So we only use cache if it has at least 'take' items OR if we want to be more relaxed.
+      // Let's go with: if we have at least 'take' items, use cache.
+      if (cached && cached.length >= take) {
         const filteredCached = participant.deletedAt 
           ? cached.filter((m: any) => new Date(m.createdAt) > (participant.deletedAt as Date))
           : cached;
           
         if (filteredCached.length > 0) {
-          console.log('Serving filtered messages from Redis cache');
+          console.log(`Serving ${filteredCached.length} messages from Redis cache for conv ${convId}`);
           messages = filteredCached;
           fromCache = true;
         }
       }
     }
-
     if (!messages) {
+      console.log(`Fetching from DB for conv ${convId}, cursor: ${cursorId}, limit: ${take}`);
       messages = await prisma.message.findMany({
         where: { 
           conversationId: convId,
@@ -83,6 +85,7 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
           }
         }
       });
+      console.log(`DB returned ${messages.length} messages`);
     }
 
     // Get participants to determine who has seen which messages

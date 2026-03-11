@@ -56,14 +56,12 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
           : cached;
           
         if (filteredCached.length > 0) {
-          console.log(`Serving ${filteredCached.length} messages from Redis cache for conv ${convId}`);
           messages = filteredCached;
           fromCache = true;
         }
       }
     }
     if (!messages) {
-      console.log(`Fetching from DB for conv ${convId}, cursor: ${cursorId}, limit: ${take}`);
       messages = await prisma.message.findMany({
         where: { 
           conversationId: convId,
@@ -85,7 +83,6 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
           }
         }
       });
-      console.log(`DB returned ${messages.length} messages`);
     }
 
     // Get participants to determine who has seen which messages

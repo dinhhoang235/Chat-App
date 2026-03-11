@@ -122,8 +122,6 @@ export default function GallerySheet({
       removeAttachment(uri);
     } else if (attachments.length < 10) {
       addAttachment(file);
-    } else {
-      alert('Tối đa 10 ảnh');
     }
   }, [attachments, addAttachment, removeAttachment]);
 

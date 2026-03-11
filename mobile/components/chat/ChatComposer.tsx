@@ -51,14 +51,14 @@ export default function ChatComposer({
         borderTopWidth: 1,
         borderTopColor: colors.surfaceVariant,
         backgroundColor: colors.surface,
-        marginTop: -8, // Kéo composer lên sát hơn với tin nhắn
+        marginTop: -14,
       }}
     >
       <View
         className="px-4 flex-row items-center"
         style={{
-          paddingBottom: 4,
-          paddingTop: 4,
+          paddingBottom: 1,
+          paddingTop: 1,
         }}
       >
         {attachments && attachments.length > 0 ? (
@@ -156,7 +156,6 @@ export default function ChatComposer({
                 onPressIn={() => setImagePressed(true)}
                 onPressOut={() => setImagePressed(false)}
                 onPress={() => {
-                  console.log('image icon tapped');
                   if (onOpenSheet) {
                     onOpenSheet('gallery');
                   } else if (onImagePress) {

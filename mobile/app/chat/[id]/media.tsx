@@ -171,6 +171,18 @@ export default function ChatMedia() {
           return uri;
         })}
         initialIndex={selectedIndex}
+        userInfo={
+          imageMessages[selectedIndex]
+            ? {
+                name: imageMessages[selectedIndex].fromMe
+                  ? 'Bạn'
+                  : imageMessages[selectedIndex].contactName || 'Người dùng',
+                avatarUrl: imageMessages[selectedIndex].fromMe
+                  ? undefined
+                  : imageMessages[selectedIndex].contactAvatar,
+              }
+            : undefined
+        }
         onClose={() => setViewerVisible(false)}
       />
     </SafeAreaView>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useChatThread } from '@/hooks/useChatThread';
 import { View, Text, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useTheme } from '@/context/themeContext';
@@ -28,9 +29,25 @@ const IMAGE_SIZE_CACHE = new Map<string, {width: number, height: number}>();
 export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
+  const { messages } = useChatThread();
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Unify URI building for cache and source
+  // derive list of image URIs from entire thread
+  const threadImageUris = useMemo(() => {
+    return messages
+      .filter(m => m.type === 'image' && m.fileInfo?.url)
+      .map(m => {
+        let uri = m.fileInfo?.url || '';
+        if (uri && !uri.startsWith('http')) {
+          if (!uri.startsWith('/media')) uri = `/media${uri}`;
+          uri = getAvatarUrl(uri) || uri;
+        }
+        return uri;
+      });
+  }, [messages]);
+
+  // Unify URI building for cache and source for this message
   const fullImageUri = useMemo(() => {
     if (message.type !== 'image' || !message.fileInfo) return null;
     let url = message.fileInfo.url;
@@ -112,7 +129,15 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     const maxWidth = screenWidth * 0.7; // 70% of screen
     contentElement = (
       <>
-        <TouchableOpacity onPress={() => setViewerVisible(true)} activeOpacity={0.9}>
+        <TouchableOpacity
+          onPress={() => {
+            // find index of this image inside the thread list
+            const idx = threadImageUris.indexOf(fullImageUri);
+            setSelectedIndex(idx >= 0 ? idx : 0);
+            setViewerVisible(true);
+          }}
+          activeOpacity={0.9}
+        >
           <Image
             source={{ uri: fullImageUri }}
             style={{
@@ -139,7 +164,16 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
             onError={(err) => console.log('Image load error:', fullImageUri, err)}
           />
         </TouchableOpacity>
-        <FullscreenImageViewer visible={viewerVisible} images={[fullImageUri]} initialIndex={0} onClose={() => setViewerVisible(false)} />
+        <FullscreenImageViewer
+          visible={viewerVisible}
+          images={threadImageUris}
+          initialIndex={selectedIndex}
+          userInfo={{
+            name: message.fromMe ? 'Bạn' : message.contactName || 'Người dùng',
+            avatarUrl: message.fromMe ? undefined : message.contactAvatar,
+          }}
+          onClose={() => setViewerVisible(false)}
+        />
       </>
     );
   } else if (message.type === 'file' && message.fileInfo) {

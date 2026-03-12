@@ -244,7 +244,14 @@ export default function ChatThread() {
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
                     keyExtractor={(i, idx) => {
-                      if (i.id != null && i.id.toString() !== '') return i.id.toString();
+                      // prefer stable id when available, convert to string
+                      if (i.id != null && i.id.toString() !== '') {
+                        return i.id.toString();
+                      }
+                      // fallback for messages without an id – include index to
+                      // guarantee uniqueness in this render cycle. ideally this
+                      // never occurs but it prevents duplicate-key errors when
+                      // the backend returns a message with a missing id.
                       return `msg-${idx}`;
                     }}
                     initialNumToRender={20}

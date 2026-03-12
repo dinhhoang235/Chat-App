@@ -262,6 +262,22 @@ export function useChatThread() {
     };
   }, [isFocused, targetUserIdState]);
 
+  // helper to remove duplicate messages by id (stringified)
+  const dedupe = (list: any[]) => {
+    const seen = new Set<string>();
+    const uniq: any[] = [];
+    for (const m of list) {
+      // if there's no id we'll fall back to a generated key to avoid
+      // ongoing duplicates; usually all server messages have ids though
+      const key = m.id != null ? m.id.toString() : JSON.stringify(m);
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniq.push(m);
+      }
+    }
+    return uniq;
+  };
+
   const fetchMessages = useCallback(async (isLoadMore = false) => {
     if (!conversationId) return;
     if (isLoadMore && (!hasMore || loadingMore)) return;
@@ -301,22 +317,10 @@ export function useChatThread() {
       });
 
       if (isLoadMore) {
-        setMessages(prev => {
-          const combined = [...prev, ...mapped];
-          const seen = new Set<string>();
-          const uniq: any[] = [];
-          for (const m of combined) {
-            const key = m.id?.toString();
-            if (key && !seen.has(key)) {
-              seen.add(key);
-              uniq.push(m);
-            }
-          }
-          return uniq;
-        });
+        setMessages(prev => dedupe([...prev, ...mapped]));
       } else {
-        // initial load replaced entirely
-        setMessages(mapped);
+        // initial load replaced entirely; remove any dupes just in case
+        setMessages(dedupe(mapped));
         setInitialFetchDone(true);
       }
 
@@ -395,7 +399,7 @@ export function useChatThread() {
       }
 
       setMessages(prev => {
-        const isDuplicate = prev.find(m => m.id === message.id);
+const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         if (isDuplicate) return prev;
 
         // prepare parsed version of incoming message so we can compare

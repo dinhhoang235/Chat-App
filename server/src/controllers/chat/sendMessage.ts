@@ -130,7 +130,8 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
           }
           pushMessages.push({
             to: token,
-            sound: 'default',
+            sound: 'notification.mp3',
+            channelId: 'chat', 
             title: message.sender?.fullName || 'Tin nhắn mới',
             body: bodyText,
             data: { conversationId: convId }

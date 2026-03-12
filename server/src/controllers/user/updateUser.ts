@@ -10,7 +10,7 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
 
     // Handle multipart/form-data where req.body might be undefined
     const body = req.body || {};
-    const { fullName, bio, gender, dateOfBirth } = body;
+    const { fullName, bio, gender, dateOfBirth, pushToken } = body;
 
     // Get current user to check old images
     const currentUser = await prisma.user.findUnique({
@@ -24,6 +24,10 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
     if (bio !== undefined && bio !== null) data.bio = bio;
     if (gender !== undefined && gender !== null && gender !== '') data.gender = gender;
     if (dateOfBirth !== undefined && dateOfBirth !== null) data.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+    if (pushToken !== undefined) {
+      console.log(`updating pushToken for user ${userId}:`, pushToken);
+      data.pushToken = pushToken; // allow clearing by passing null
+    }
 
     // Handle file uploads
     for (const file of files) {

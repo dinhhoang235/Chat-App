@@ -5,6 +5,7 @@ import path from 'path';
 import prisma from '../../db.js';
 import { AuthRequest } from '../../middleware/auth.js';
 import { cacheMessage } from '../../utils/redis.js';
+import Expo from 'expo-server-sdk';
 
 export const sendMessage = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { conversationId } = req.params;
@@ -84,7 +85,8 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
     // Also notify users who might not be in the conversation room currently 
     // but should see an updated list of conversations
     const participants = await prisma.conversationParticipant.findMany({
-      where: { conversationId: convId }
+      where: { conversationId: convId },
+      include: { user: true }
     });
 
     participants.forEach(p => {
@@ -93,6 +95,63 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
         lastMessage: message
       });
     });
+
+    // send push notifications to participants with push tokens (excluding sender)
+    try {
+      // expo-server-sdk is now a normal dependency
+      const expo = new Expo();
+      const pushMessages: any[] = [];
+
+      // log participant tokens for debugging
+      console.log('Participants for push:', participants.map(p => ({
+        userId: p.userId,
+        pushToken: (p.user as any)?.pushToken || null
+      })));
+
+      participants.forEach(p => {
+        // @ts-ignore pushToken may not exist on user type yet
+        const token = (p.user as any).pushToken;
+        if (!token || token === '') {
+          console.log(`no push token for user ${p.userId}`);
+        }
+        if (token && token !== '' && p.userId !== userId) {
+          let bodyText = '';
+          if (message.type === 'text') {
+            bodyText = message.content;
+          } else if (message.type === 'image') {
+            bodyText = '📷 Ảnh';
+          } else if (message.type === 'file') {
+            try {
+              const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
+              bodyText = `📎 ${info?.name || 'Tệp'}`;
+            } catch {
+              bodyText = '📎 Tệp';
+            }
+          }
+          pushMessages.push({
+            to: token,
+            sound: 'default',
+            title: message.sender?.fullName || 'Tin nhắn mới',
+            body: bodyText,
+            data: { conversationId: convId }
+          });
+        }
+      });
+
+      console.log('pushMessages built:', pushMessages);
+
+      const chunks = expo.chunkPushNotifications(pushMessages);
+      for (const chunk of chunks) {
+        try {
+          const receipt = await expo.sendPushNotificationsAsync(chunk);
+          console.log('expo push chunk results:', receipt);
+        } catch (err) {
+          console.error('Error sending expo push chunk:', err);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to send push notifications:', err);
+    }
 
     return res.status(201).json(message);
   } catch (err) {

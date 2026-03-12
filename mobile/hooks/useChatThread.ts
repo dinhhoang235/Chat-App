@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { setActiveConversationId, activeConversationId } from '@/services/notificationState';
 import * as FileSystem from 'expo-file-system';
 import { FlatList } from 'react-native';
 import { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -129,6 +130,18 @@ export function useChatThread() {
     setHasMore(true);
     setMessages([]);
     if (conversationId) setLoading(true);
+  }, [conversationId]);
+
+  // keep global notification state in sync so we don't show a local notification
+  // for the conversation the user is actively viewing
+  useEffect(() => {
+    setActiveConversationId(conversationId);
+    return () => {
+      // clear only if it's still our conversation (prevent races)
+      if (activeConversationId === conversationId) {
+        setActiveConversationId(null);
+      }
+    };
   }, [conversationId]);
 
   // Search mode toggled by Options or header

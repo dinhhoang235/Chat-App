@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "742058270217",
+    "project_id": "chat-app-34602",
+    "storage_bucket": "chat-app-34602.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:742058270217:android:f7cf5bd89667233c31e2d8",
+        "android_client_info": {
+          "package_name": "com.diskordmes.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCx8DMCfJ19-Q7ugOw2f9tAwku62HbDonY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

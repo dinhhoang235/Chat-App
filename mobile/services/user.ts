@@ -11,8 +11,13 @@ export const userAPI = {
     return response.data;
   },
 
-  updateUser: async (id: number, data: { fullName?: string; avatar?: string; coverImage?: string; bio?: string; gender?: string; dateOfBirth?: string }) => {
+  updateUser: async (id: number, data: { fullName?: string; avatar?: string; coverImage?: string; bio?: string; gender?: string; dateOfBirth?: string; pushToken?: string | null }) => {
     const response = await apiClient.patch(`/users/${id}`, data);
+    return response.data;
+  },
+
+  updatePushToken: async (id: number, token: string | null) => {
+    const response = await apiClient.patch(`/users/${id}`, { pushToken: token });
     return response.data;
   },
 

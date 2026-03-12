@@ -4,6 +4,7 @@ import "../global.css";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
+import { NotificationHandler } from '@/components/';
 import { AuthProvider, useAuth } from "@/context/authContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "@/context/themeContext";
@@ -28,6 +29,8 @@ function ThemeRoot() {
             <SelectionProvider>
               <AuthProvider>
                 <SearchProvider>
+                  {/* invisible component handles permissions and socket notifications */}
+                  <NotificationHandler />
                   <AppStack />
                 </SearchProvider>
               </AuthProvider>

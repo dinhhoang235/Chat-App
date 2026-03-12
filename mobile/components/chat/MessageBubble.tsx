@@ -147,7 +147,6 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
               backgroundColor: colors.surfaceVariant
             }}
             contentFit="contain"
-            transition={200}
             onLoad={(e) => {
               const { width, height } = e.source;
               let w = width;

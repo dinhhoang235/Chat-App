@@ -75,7 +75,7 @@ export default function ChatOptions() {
 
         {isGroup ? (
           <>
-            <View className="mt-4">
+            <View className="mt-4 border-t border-b" style={{ borderTopColor: colors.border, borderBottomColor: colors.border }}>
               <Row
                 icon="image"
                 title="Ảnh, file, link"
@@ -106,7 +106,7 @@ export default function ChatOptions() {
                 </View>
               )}
             </View>
-            <View className="border-t" style={{ borderTopColor: colors.border, marginTop: 4 }}>
+            <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="push-pin" title="Tin nhắn đã ghim" onPress={() => router.push(`/chat/${id}/pinned`)} showChevron />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
@@ -144,7 +144,7 @@ export default function ChatOptions() {
               <Row icon="edit" title="Đổi tên gợi nhớ" subtitle={displayName ? displayName : 'Chưa đặt'} onPress={() => setDisplayNameModalVisible(true)} />
             </View>
 
-            <View className="mt-4">
+            <View className="mt-4 border-t border-b" style={{ borderTopColor: colors.border, borderBottomColor: colors.border }}>
               <Row
                 icon="image"
                 title="Ảnh, file, link"
@@ -175,9 +175,7 @@ export default function ChatOptions() {
                 </View>
               )}
             </View>
-            <View className="border-t" style={{ borderTopColor: colors.border, marginTop: 4 }}>
-              <Row icon="people" title="Xem nhóm chung" subtitle="(1)" onPress={() => { }} />
-            </View>
+
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="push-pin" title="Ghim trò chuyện" rightNode={<Switch value={pinned} onValueChange={setPinned} />} onPress={() => setPinned(v => !v)} />
               <Row icon="notifications" title="Báo cuộc gọi đến" rightNode={<Switch value={true} />} onPress={() => { }} />

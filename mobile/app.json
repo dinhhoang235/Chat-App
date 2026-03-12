@@ -8,9 +8,7 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.mobile",
@@ -58,9 +56,9 @@
       [
         "expo-notifications",
         {
-          "sounds": [
-            "./assets/sounds/notification.mp3"
-          ],
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#ffffff",
+          "sounds": ["./assets/sounds/notification.mp3"],
           "defaultChannel": "chat"
         }
       ]

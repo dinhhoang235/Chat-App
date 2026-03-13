@@ -43,6 +43,59 @@ export function useChatThread() {
   const [targetUser, setTargetUser] = useState<any>(null);
 
   const [groupDetails, setGroupDetails] = useState<any>(null);
+  const [allMedia, setAllMedia] = useState<any[]>([]);
+  const [loadingMoreMedia, setLoadingMoreMedia] = useState(false);
+  const [hasMoreMedia, setHasMoreMedia] = useState(true);
+
+  const fetchAllMedia = useCallback(async (isLoadMore = false) => {
+    if (!id || id === 'new') return;
+    if (isLoadMore && (!hasMoreMedia || loadingMoreMedia)) return;
+
+    try {
+      if (isLoadMore) setLoadingMoreMedia(true);
+
+      const cursor =
+        isLoadMore && allMedia.length > 0
+          ? allMedia[allMedia.length - 1].id
+          : undefined;
+
+      const response = await chatApi.getConversationMedia(id, cursor, 30);
+      const newMedia = response.data;
+
+      const mapped = newMedia.map((m: any) => {
+        let fileInfo = m.fileInfo;
+        // In case fileInfo isn't pre-mapped correctly from the server
+        if (!fileInfo && (m.type === 'file' || m.type === 'image')) {
+          try {
+            fileInfo = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
+          } catch {
+            if (m.type === 'image') {
+               fileInfo = { url: m.content };
+            }
+          }
+        }
+        return {
+          ...m,
+          fromMe: m.senderId ? m.senderId === user?.id : false,
+          contactName: m.sender?.id ? m.sender.fullName : undefined,
+          contactAvatar: m.sender?.avatar ? getAvatarUrl(m.sender.avatar) || undefined : undefined,
+          fileInfo
+        };
+      });
+
+      if (isLoadMore) {
+        setAllMedia(prev => dedupe([...prev, ...mapped]));
+      } else {
+        setAllMedia(dedupe(mapped));
+      }
+
+      setHasMoreMedia(newMedia.length >= 30);
+    } catch (error) {
+      console.error('Fetch all media error:', error);
+    } finally {
+      if (isLoadMore) setLoadingMoreMedia(false);
+    }
+  }, [id, user?.id, hasMoreMedia, loadingMoreMedia, allMedia]);
 
   const fetchGroupDetails = useCallback(async () => {
     if (!id || params.isGroup !== 'true') return;
@@ -365,13 +418,14 @@ export function useChatThread() {
     
     // Join room and always fetch messages to ensure sync
     fetchMessages(false);
+    fetchAllMedia(); // added to dependency list below
     socketService.emit('join_conversation', conversationIdNum);
 
     // Always mark as read when focusing a conversation
     chatApi.markAsRead(conversationIdNum).catch(err => {
       console.error('Mark as read focus error:', err);
     });
-  }, [conversationId, isFocused, fetchMessages, initialFetchDone]);
+  }, [conversationId, isFocused, fetchMessages, fetchAllMedia, initialFetchDone]);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -726,6 +780,10 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     targetUserStatus,
     isGroup,
     groupAvatars,
-    membersCount
+    membersCount,
+    allMedia,
+    fetchAllMedia,
+    loadingMoreMedia,
+    hasMoreMedia
   };
 }

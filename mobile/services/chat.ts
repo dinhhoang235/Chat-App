@@ -4,6 +4,8 @@ import { Platform } from 'react-native';
 export const chatApi = {
   getConversations: () => apiClient.get('/chats/conversations'),
   getConversationDetails: (id: string | number) => apiClient.get(`/chats/${id}`),
+  getConversationMedia: (id: string | number, cursor?: number, limit: number = 20) => 
+    apiClient.get(`/chats/${id}/media`, { params: { cursor, limit } }),
   getMessages: (id: string | number, cursor?: number, limit: number = 20) => 
     apiClient.get(`/chats/${id}/messages`, { params: { cursor, limit } }),
   sendMessage: (id: string | number, content: string, type: string = 'text', file?: any) => {

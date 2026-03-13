@@ -12,7 +12,8 @@ import {
   getConversationDetails,
   addMembers,
   removeMember,
-  leaveGroup
+  leaveGroup,
+  getConversationMedia
 } from '../controllers/chat/index.js';
 import { upload } from '../middleware/upload.js';
 import { Server } from 'socket.io';
@@ -25,6 +26,7 @@ export const chatRoutes = (io: Server) => {
   router.get('/conversations', getConversations);
   router.post('/group', upload.any(), createGroup(io));
   router.get('/:conversationId', getConversationDetails);
+  router.get('/:conversationId/media', getConversationMedia);
   router.get('/:conversationId/messages', getMessages(io));
   // messages can include a file attachment under fieldname 'file'
   router.post('/:conversationId/messages', upload.single('file'), sendMessage(io));

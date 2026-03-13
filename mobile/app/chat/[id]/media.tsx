@@ -17,20 +17,20 @@ export default function ChatMedia() {
   const router = useRouter();
 
   // reuse chat thread to access messages for this conversation
-  const { messages, fetchMessages } = useChatThread();
+  const { allMedia, fetchAllMedia } = useChatThread();
   const [selectedTab, setSelectedTab] = useState<string>(TABS[0]);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
-    // fetch initial messages for previews
-    fetchMessages(false);
-  }, [fetchMessages]);
+    // fetch initial media instead of partial messages
+    fetchAllMedia();
+  }, [fetchAllMedia]);
 
   // derive filtered lists
-  const imageMessages = messages.filter(m => m.type === 'image' && m.fileInfo?.url);
-  const fileMessages = messages.filter(m => m.type === 'file' && m.fileInfo?.url);
-  const linkMessages = messages.filter(
+  const imageMessages = allMedia.filter(m => m.type === 'image' && m.fileInfo?.url);
+  const fileMessages = allMedia.filter(m => m.type === 'file' && m.fileInfo?.url);
+  const linkMessages = allMedia.filter(
     m =>
       m.type === 'text' &&
       typeof m.content === 'string' &&
@@ -105,7 +105,7 @@ export default function ChatMedia() {
             numColumns={3}
             renderItem={renderImage}
             contentContainerStyle={{ padding: 6 }}
-            onEndReached={() => fetchMessages(true)}
+            onEndReached={() => fetchAllMedia(true)}
             onEndReachedThreshold={0.5}
           />
         );
@@ -118,7 +118,7 @@ export default function ChatMedia() {
             keyExtractor={m => m.id}
             renderItem={renderFile}
             contentContainerStyle={{ padding: 4 }}
-            onEndReached={() => fetchMessages(true)}
+            onEndReached={() => fetchAllMedia(true)}
             onEndReachedThreshold={0.5}
           />
         );
@@ -131,7 +131,7 @@ export default function ChatMedia() {
             keyExtractor={m => m.id}
             renderItem={renderLink}
             contentContainerStyle={{ padding: 4 }}
-            onEndReached={() => fetchMessages(true)}
+            onEndReached={() => fetchAllMedia(true)}
             onEndReachedThreshold={0.5}
           />
         );

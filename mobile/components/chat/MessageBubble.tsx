@@ -29,23 +29,39 @@ const IMAGE_SIZE_CACHE = new Map<string, {width: number, height: number}>();
 export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
-  const { messages } = useChatThread();
+  const { allMedia } = useChatThread();
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // derive list of image URIs from entire thread
-  const threadImageUris = useMemo(() => {
-    return messages
-      .filter(m => m.type === 'image' && m.fileInfo?.url)
-      .map(m => {
+  // derive list of image URIs (and their message ids) from entire thread
+  // we also keep the corresponding message ids so we can find the correct
+  // index when an image URI appears multiple times in the thread.
+  const { threadImageUris, threadImageIds } = useMemo(() => {
+    const uris: string[] = [];
+    const ids: string[] = [];
+    // Only use allMedia to build the full array of images for the viewer
+    const sourceImages = allMedia && allMedia.length > 0 ? allMedia : [];
+    sourceImages.forEach(m => {
+      if (m.type === 'image' && m.fileInfo?.url) {
         let uri = m.fileInfo?.url || '';
         if (uri && !uri.startsWith('http')) {
           if (!uri.startsWith('/media')) uri = `/media${uri}`;
           uri = getAvatarUrl(uri) || uri;
         }
-        return uri;
-      });
-  }, [messages]);
+        uris.push(uri);
+        ids.push(m.id != null ? m.id.toString() : '');
+      }
+    });
+
+    // We must reverse them because allMedia comes back orderBy id: 'desc' 
+    // Wait... if allMedia comes desc, they are newest first. 
+    // Messages in bubble are also displayed inverted?
+    // Let's check how they were originally ordered. 
+    return { 
+      threadImageUris: uris, 
+      threadImageIds: ids 
+    };
+  }, [allMedia]);
 
   // Unify URI building for cache and source for this message
   const fullImageUri = useMemo(() => {
@@ -131,9 +147,31 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       <>
         <TouchableOpacity
           onPress={() => {
-            // find index of this image inside the thread list
-            const idx = threadImageUris.indexOf(fullImageUri);
-            setSelectedIndex(idx >= 0 ? idx : 0);
+            // determine the index of the tapped image. previously we relied
+            // solely on the URI, but if the same picture was sent more than
+            // once the first occurrence would be returned leading the viewer
+            // to open at the wrong position (usually the most recent match).
+            // instead we look up the index by message id and fall back to the
+            // URI comparison if necessary.  if the message isn't yet part of
+            // the messages array (e.g. user tapped while older messages were
+            // still loading) we fall back to opening a single-image viewer by
+            // adding the URI locally.
+            let idx = -1;
+            if (message.id != null) {
+              idx = threadImageIds.indexOf(message.id.toString());
+            }
+            if (idx === -1) {
+              idx = threadImageUris.indexOf(fullImageUri);
+            }
+            let imagesForViewer = threadImageUris;
+            if (idx === -1) {
+              console.warn('MessageBubble: image URI not found in threadImageUris', fullImageUri, threadImageUris);
+              // include the current image so the viewer has something to show
+              imagesForViewer = [...threadImageUris, fullImageUri];
+              idx = imagesForViewer.length - 1;
+            }
+
+            setSelectedIndex(idx);
             setViewerVisible(true);
           }}
           activeOpacity={0.9}
@@ -165,7 +203,14 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         </TouchableOpacity>
         <FullscreenImageViewer
           visible={viewerVisible}
-          images={threadImageUris}
+          images={
+            // if we previously had to append the tapped image, make sure
+            // the viewer gets the same list we used to compute idx; the
+            // handler above already built `imagesForViewer` when needed.
+            fullImageUri && selectedIndex >= threadImageUris.length
+              ? [...threadImageUris, fullImageUri]
+              : threadImageUris
+          }
           initialIndex={selectedIndex}
           userInfo={{
             name: message.fromMe ? 'Bạn' : message.contactName || 'Người dùng',

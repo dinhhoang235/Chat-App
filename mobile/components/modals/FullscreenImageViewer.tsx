@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -216,22 +216,37 @@ export default function FullscreenImageViewer({
   const nativeGesture = Gesture.Native();
   const footerRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
-    setCurrentIndex(displayInitial);
-    listRef.current?.scrollToIndex({ index: displayInitial, animated: false });
-    setIsZoomed(false);
-    setControlsVisible(true);
-  }, [displayInitial, visible, isLandscape]);
-
-  useEffect(() => {
-    if (footerRef.current && images.length > 0) {
+  const scrollFooterToCenter = useCallback((index: number, animated = true) => {
+    if (footerRef.current && displayImages.length > 0) {
       const thumbSize = 48;
       const margin = 8;
       const centerOffset = width / 2 - thumbSize / 2;
-      const x = currentIndex * (thumbSize + margin) - centerOffset + 12;
-      footerRef.current.scrollTo({ x: Math.max(0, x), animated: true });
+      const x = index * (thumbSize + margin) - centerOffset + 12;
+      footerRef.current.scrollTo({ x: Math.max(0, x), animated });
     }
-  }, [currentIndex, width, images.length]);
+  }, [displayImages.length, width]);
+
+  useEffect(() => {
+    if (visible) {
+      setCurrentIndex(displayInitial);
+      setIsZoomed(false);
+      setControlsVisible(true);
+      
+      // Small timeout to ensure FlatList and ScrollView are ready
+      const timer = setTimeout(() => {
+        listRef.current?.scrollToIndex({ index: displayInitial, animated: false });
+        scrollFooterToCenter(displayInitial, false);
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [displayInitial, visible, isLandscape, scrollFooterToCenter]);
+
+  useEffect(() => {
+    if (visible && !isLandscape) {
+      scrollFooterToCenter(currentIndex, true);
+    }
+  }, [currentIndex, visible, isLandscape, scrollFooterToCenter]);
 
   if (!visible) return null;
 

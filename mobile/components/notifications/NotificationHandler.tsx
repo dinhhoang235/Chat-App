@@ -8,6 +8,20 @@ import { socketService } from '@/services/socket';
 import { activeConversationId } from '@/services/notificationState';
 import { useAuth } from '@/context/authContext';
 import { userAPI } from '@/services/user';
+import { useRouter } from 'expo-router';
+
+// minimal response type used locally to avoid export issues
+interface NotificationResponse {
+  notification: {
+    request: {
+      content: {
+        data?: any;
+      };
+    };
+  };
+  actionIdentifier: string;
+  userText?: string;
+}
 
 // foreground notification behavior
 Notifications.setNotificationHandler({
@@ -63,6 +77,35 @@ const SOUND_NAME = Platform.OS === 'android' ? 'notification' : 'notification.mp
 export default function NotificationHandler() {
   const { user } = useAuth();
   const appState = useRef(AppState.currentState);
+  const router = useRouter();
+
+  // when a notification is tapped we want to navigate to the related chat
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response: NotificationResponse) => {
+        const data: any = response.notification.request.content.data;
+        const convId = data?.conversationId;
+        if (convId) {
+          // push route for conversation
+          router.push(`/chat/${convId}`);
+        }
+      }
+    );
+
+    // handle case where app was cold started from a notification
+    (async () => {
+      const lastResponse = await Notifications.getLastNotificationResponseAsync();
+      if (lastResponse) {
+        const data: any = lastResponse.notification.request.content.data;
+        const convId = data?.conversationId;
+        if (convId) {
+          router.push(`/chat/${convId}`);
+        }
+      }
+    })();
+
+    return () => subscription.remove();
+  }, [router]);
 
   // Setup: preload sound asset + create Android channel
   useEffect(() => {
@@ -143,6 +186,7 @@ export default function NotificationHandler() {
             title,
             body,
             sound: SOUND_NAME,
+            data: { conversationId: message.conversationId?.toString() },
             // Android: bind to our channel so the channel's sound/vibration is used
             ...(Platform.OS === 'android' && {
               android: { channelId: 'chat' },

@@ -115,7 +115,7 @@ export default function ChatComposer({
               style={{ padding: 6, opacity: creatingConversation ? 0.5 : 1 }}
             >
               {creatingConversation ? (
-                <ActivityIndicator size={28} color={colors.tint} />
+                <ActivityIndicator size={26} color={colors.tint} />
               ) : (
                 <MaterialIcons name="send" size={26} color={colors.tint} />
               )}

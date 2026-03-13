@@ -58,6 +58,13 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
             fullName: true,
             avatar: true
           }
+        },
+        conversation: {
+          select: {
+            id: true,
+            isGroup: true,
+            name: true
+          }
         }
       }
     });
@@ -128,13 +135,27 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
               bodyText = '📎 Tệp';
             }
           }
+
+          // For group conversations, use group name as title and prefix sender in body
+          let titleText = message.sender?.fullName || 'Tin nhắn mới';
+          if (message.conversation?.isGroup) {
+            // prefix with 'Nhóm '
+            titleText = `Nhóm ${message.conversation.name || ''}`.trim();
+            const senderName = message.sender?.fullName || 'Ai đó';
+            bodyText = `${senderName}: ${bodyText}`;
+          }
+
           pushMessages.push({
             to: token,
             sound: 'notification.mp3',
             channelId: 'chat', 
-            title: message.sender?.fullName || 'Tin nhắn mới',
+            title: titleText,
             body: bodyText,
-            data: { conversationId: convId }
+            data: {
+              conversationId: convId,
+              isGroup: message.conversation?.isGroup || false,
+              name: message.conversation?.name || ''
+            }
           });
         }
       });

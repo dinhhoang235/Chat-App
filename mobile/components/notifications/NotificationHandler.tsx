@@ -23,6 +23,17 @@ interface NotificationResponse {
   userText?: string;
 }
 
+// server messages include conversation info in data payload
+interface IncomingMessage {
+  id: number;
+  conversationId?: number | string;
+  senderId?: number;           // sometimes message may still have this
+  sender?: { id: number; fullName: string };
+  type?: string;
+  content?: any;
+  conversation?: { isGroup?: boolean; name?: string };
+}
+
 // foreground notification behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -80,31 +91,44 @@ export default function NotificationHandler() {
   const router = useRouter();
 
   // when a notification is tapped we want to navigate to the related chat
+  const coldHandled = useRef(false);
+
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener(
       (response: NotificationResponse) => {
         const data: any = response.notification.request.content.data;
+        console.log('notification tapped data', data);
         const convId = data?.conversationId;
         if (convId) {
-          // push route for conversation
-          router.push(`/chat/${convId}`);
+          const params: any = { id: convId };
+          if (data.isGroup) params.isGroup = 'true';
+          if (data.name) params.name = data.name;
+          router.push({ pathname: '/chat/[id]', params });
         }
       }
     );
 
-    // handle case where app was cold started from a notification
+    return () => subscription.remove();
+  }, [router]);
+
+  // cold start should only be handled once ever
+  useEffect(() => {
+    if (coldHandled.current) return;
     (async () => {
       const lastResponse = await Notifications.getLastNotificationResponseAsync();
       if (lastResponse) {
         const data: any = lastResponse.notification.request.content.data;
+        console.log('cold start notification data', data);
         const convId = data?.conversationId;
         if (convId) {
-          router.push(`/chat/${convId}`);
+          const params: any = { id: convId };
+          if (data.isGroup) params.isGroup = 'true';
+          if (data.name) params.name = data.name;
+          router.push({ pathname: '/chat/[id]', params });
         }
       }
+      coldHandled.current = true;
     })();
-
-    return () => subscription.remove();
   }, [router]);
 
   // Setup: preload sound asset + create Android channel
@@ -151,7 +175,7 @@ export default function NotificationHandler() {
 
   // Listen for incoming socket messages and fire local notifications
   useEffect(() => {
-    const handleNewMessage = async (message: any) => {
+    const handleNewMessage = async (message: IncomingMessage) => {
       // Ignore own messages
       if (message.senderId === user?.id) return;
 
@@ -161,13 +185,17 @@ export default function NotificationHandler() {
         return;
       }
 
-      const title = message.sender?.fullName || 'Tin nhắn mới';
+      // prepare notification text
+      const isGroup = message.conversation?.isGroup;
+      const convName = message.conversation?.name;
+
+      let title = message.sender?.fullName || 'Tin nhắn mới';
       let body = '';
 
       if (message.type === 'text') {
         body = message.content;
       } else if (message.type === 'image') {
-        body = '📷 Ảnh';
+        body = '[Hình Ảnh]';
       } else if (message.type === 'file') {
         try {
           const info =
@@ -180,13 +208,23 @@ export default function NotificationHandler() {
         }
       }
 
+      if (isGroup) {
+        title = `Nhóm ${convName || ''}`.trim();
+        const senderName = message.sender?.fullName || 'Ai đó';
+        body = `${senderName}: ${body}`;
+      }
+
       try {
         await Notifications.scheduleNotificationAsync({
           content: {
             title,
             body,
             sound: SOUND_NAME,
-            data: { conversationId: message.conversationId?.toString() },
+            data: {
+              conversationId: message.conversationId?.toString(),
+              isGroup: isGroup || false,
+              name: convName || ''
+            },
             // Android: bind to our channel so the channel's sound/vibration is used
             ...(Platform.OS === 'android' && {
               android: { channelId: 'chat' },

@@ -13,7 +13,7 @@ type ChatMessage = {
   content?: string;
   time?: string;
   fromMe?: boolean;
-  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'file';
+  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'file' | 'image_group';
   contactName?: string;
   contactAvatar?: string;
   contactAvatarColor?: string;
@@ -22,6 +22,7 @@ type ChatMessage = {
   isLastInGroup?: boolean;
   status?: 'sending' | 'sent' | 'error';
   fileInfo?: { url: string; name?: string; size?: number; mime?: string };
+  images?: any[]; // for image_group
 };
 
 const IMAGE_SIZE_CACHE = new Map<string, {width: number, height: number}>();
@@ -142,20 +143,11 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       <Image source={{ uri: 'https://via.placeholder.com/120x120.png?text=STK' }} style={{ width: 120, height: 120, borderRadius: 12 }} />
     );
   } else if (message.type === 'image' && message.fileInfo && fullImageUri) {
-    const maxWidth = screenWidth * 0.7; // 70% of screen
+    const maxWidth = screenWidth * 0.75;
     contentElement = (
       <>
         <TouchableOpacity
           onPress={() => {
-            // determine the index of the tapped image. previously we relied
-            // solely on the URI, but if the same picture was sent more than
-            // once the first occurrence would be returned leading the viewer
-            // to open at the wrong position (usually the most recent match).
-            // instead we look up the index by message id and fall back to the
-            // URI comparison if necessary.  if the message isn't yet part of
-            // the messages array (e.g. user tapped while older messages were
-            // still loading) we fall back to opening a single-image viewer by
-            // adding the URI locally.
             let idx = -1;
             if (message.id != null) {
               idx = threadImageIds.indexOf(message.id.toString());
@@ -165,8 +157,6 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
             }
             let imagesForViewer = threadImageUris;
             if (idx === -1) {
-              console.warn('MessageBubble: image URI not found in threadImageUris', fullImageUri, threadImageUris);
-              // include the current image so the viewer has something to show
               imagesForViewer = [...threadImageUris, fullImageUri];
               idx = imagesForViewer.length - 1;
             }
@@ -179,24 +169,16 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           <Image
             source={{ uri: fullImageUri }}
             style={{
-              width: imgSize ? imgSize.width : maxWidth,
-              height: imgSize ? imgSize.height : maxWidth * 0.75,
+              width: maxWidth,
+              height: imgSize ? (imgSize.height * (maxWidth / imgSize.width)) : maxWidth * 0.75,
               borderRadius: 12,
               backgroundColor: colors.surfaceVariant
             }}
-            contentFit="contain"
+            contentFit="cover"
             onLoad={(e) => {
               const { width, height } = e.source;
-              let w = width;
-              let h = height;
-              if (w > maxWidth) {
-                const ratio = maxWidth / w;
-                w = maxWidth;
-                h = h * ratio;
-              }
-              const newSize = { width: w, height: h };
-              IMAGE_SIZE_CACHE.set(fullImageUri, newSize);
-              setImgSize(newSize);
+              IMAGE_SIZE_CACHE.set(fullImageUri, { width, height });
+              setImgSize({ width, height });
             }}
             onError={(err) => console.log('Image load error:', fullImageUri, err)}
           />
@@ -204,9 +186,6 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         <FullscreenImageViewer
           visible={viewerVisible}
           images={
-            // if we previously had to append the tapped image, make sure
-            // the viewer gets the same list we used to compute idx; the
-            // handler above already built `imagesForViewer` when needed.
             fullImageUri && selectedIndex >= threadImageUris.length
               ? [...threadImageUris, fullImageUri]
               : threadImageUris
@@ -219,6 +198,86 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           onClose={() => setViewerVisible(false)}
         />
       </>
+    );
+  } else if (message.type === 'image_group' && message.images) {
+    const maxWidth = screenWidth * 0.75;
+    const spacing = 4;
+    const total = message.images.length;
+    
+    const numCols = 2; // Use a fixed column count for consistency and cleaner grid
+
+    const remainder = total % numCols;
+    const firstRowCols = remainder === 0 ? numCols : remainder;
+
+    contentElement = (
+      <View style={{ width: maxWidth, flexDirection: 'row', flexWrap: 'wrap' }}>
+        {message.images.map((img, idx) => {
+          let uri = img.fileInfo?.url || '';
+          if (uri && !uri.startsWith('http')) {
+            if (!uri.startsWith('/media')) uri = `/media${uri}`;
+            uri = getAvatarUrl(uri) || uri;
+          }
+          
+          let currentColCount = numCols;
+          if (idx < firstRowCols) {
+            currentColCount = firstRowCols;
+          }
+
+          const imgWidth = (maxWidth - ((currentColCount - 1) * spacing)) / currentColCount;
+          const imgHeight = currentColCount === 1 
+            ? maxWidth * 0.6 
+            : (() => {
+                const cachedSize = IMAGE_SIZE_CACHE.get(uri);
+                const isLand = cachedSize ? cachedSize.width > cachedSize.height : true; // Default to landscape-like for grid
+                return isLand ? imgWidth * 0.75 : imgWidth * 1.3;
+              })();
+
+          
+          const isRowEnd = (idx < firstRowCols) ? (idx === firstRowCols - 1) : ((idx - firstRowCols + 1) % numCols === 0);
+
+          return (
+            <TouchableOpacity
+              key={img.id}
+              style={{ 
+                width: imgWidth, 
+                height: imgHeight, 
+                marginBottom: spacing,
+                marginRight: isRowEnd ? 0 : spacing,
+                borderRadius: 10,
+                overflow: 'hidden'
+              }}
+              onPress={() => {
+                let viewerIdx = threadImageIds.indexOf(img.id.toString());
+                if (viewerIdx === -1) viewerIdx = threadImageUris.indexOf(uri);
+                setSelectedIndex(viewerIdx);
+                setViewerVisible(true);
+              }}
+              activeOpacity={0.9}
+            >
+              <Image
+                source={{ uri }}
+                style={{ width: '100%', height: '100%' }}
+                contentFit="cover"
+                onLoad={(e) => {
+                  const { width, height } = e.source;
+                  IMAGE_SIZE_CACHE.set(uri, { width, height });
+                  setImgSize({ width, height });
+                }}
+              />
+            </TouchableOpacity>
+          );
+        })}
+        <FullscreenImageViewer
+          visible={viewerVisible}
+          images={threadImageUris}
+          initialIndex={selectedIndex}
+          userInfo={{
+            name: message.fromMe ? 'Bạn' : message.contactName || 'Người dùng',
+            avatarUrl: message.fromMe ? undefined : message.contactAvatar,
+          }}
+          onClose={() => setViewerVisible(false)}
+        />
+      </View>
     );
   } else if (message.type === 'file' && message.fileInfo) {
     let { url, name, size, mime } = message.fileInfo;
@@ -307,10 +366,10 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         <View style={{ maxWidth: '72%', marginLeft: isOutgoing ? 'auto' : 12 }} className={`${isOutgoing ? 'items-end' : 'items-start'}`}> 
             {/* for image attachments we don’t show the standard bubble styling */}
         <View style={{
-            backgroundColor: message.type === 'image' ? 'transparent' : bubbleBg,
-            borderWidth: message.type === 'image' ? 0 : 1,
+            backgroundColor: (message.type === 'image' || message.type === 'image_group') ? 'transparent' : bubbleBg,
+            borderWidth: (message.type === 'image' || message.type === 'image_group') ? 0 : 1,
             borderColor,
-            padding: message.type === 'image' ? 0 : 12,
+            padding: (message.type === 'image' || message.type === 'image_group') ? 0 : 12,
             borderRadius: 18,
             marginBottom: isLastInGroup ? 0 : -8
           }}>

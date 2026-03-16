@@ -123,6 +123,46 @@ export default function ChatThread() {
     }
     return null;
   };
+  
+  const processedMessages = React.useMemo(() => {
+    if (!messages || messages.length === 0) return [];
+    
+    const grouped: any[] = [];
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      
+      // Only group confirmed image messages from the same sender sent very close together
+      // Note: messages is inverted (0 is newest).
+      if (msg.type === 'image' && msg.status !== 'sending') {
+        const groupImages = [msg];
+        let j = i + 1;
+        while (
+          j < messages.length &&
+          messages[j].type === 'image' &&
+          messages[j].senderId === msg.senderId &&
+          messages[j].status !== 'sending' &&
+          messages[j].createdAt && msg.createdAt &&
+          Math.abs(new Date(messages[j].createdAt).getTime() - new Date(msg.createdAt).getTime()) < 60000 
+        ) {
+          groupImages.push(messages[j]);
+          j++;
+        }
+        
+        if (groupImages.length > 1) {
+          grouped.push({
+            ...msg,
+            type: 'image_group' as any,
+            images: [...groupImages].reverse(), // reverse to show oldest first in grid
+          });
+          i = j - 1;
+          continue;
+        }
+      }
+      
+      grouped.push(msg);
+    }
+    return grouped;
+  }, [messages]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -239,7 +279,7 @@ export default function ChatThread() {
                 >
                   <FlatList
                     ref={flatListRef}
-                    data={messages}
+                    data={processedMessages}
                     inverted
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
@@ -296,11 +336,8 @@ export default function ChatThread() {
                       <ActivityIndicator style={{ marginVertical: 10 }} color={colors.tint} />
                     ) : null}
                     renderItem={({ item, index }: any) => {
-                      const nextMessage = messages[index - 1]; // Inverted list: index 0 is at bottom (newest)
-                      // If message above (index-1) is from same user, this is NOT the last in that user's consecutive group
+                      const nextMessage = processedMessages[index - 1]; 
                       const isLastInConsecutiveGroup = !nextMessage || nextMessage.senderId !== item.senderId;
-
-                      // For 'seen' status: index 0 is the newest message
                       const isThreadLast = index === 0;
 
                       return (

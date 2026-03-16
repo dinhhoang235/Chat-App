@@ -42,7 +42,11 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
   const isGroupConversation = !!message.isGroup;
 
   const menuItems = [
-    { key: 'mark_unread', label: 'Đánh dấu chưa đọc', icon: 'drafts' },
+    { 
+      key: message.unread && message.unread > 0 ? 'mark_read' : 'mark_unread', 
+      label: message.unread && message.unread > 0 ? 'Đánh dấu đã đọc' : 'Đánh dấu chưa đọc', 
+      icon: message.unread && message.unread > 0 ? 'mark-chat-read' : 'mark-chat-unread' 
+    },
     { key: 'pin', label: message.isPinned ? 'Bỏ ghim' : 'Ghim', icon: 'push-pin' },
     { 
       key: 'mute', 

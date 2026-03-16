@@ -25,11 +25,13 @@ export default function Messages() {
     handleSelectAll,
     handleCancelSelection,
     handleMarkRead,
+    handleMarkReadSingle,
     handleDeleteSelected,
     handleDeleteConversation,
     handleMute,
     handleUnmute,
     handlePin,
+    handleMarkUnread,
     router,
     colors
   } = useConversations();
@@ -47,6 +49,14 @@ export default function Messages() {
   };
 
   const handleRowAction = (action: string, id: string, payload?: any) => {
+    if (action === 'mark_unread') {
+      handleMarkUnread(id);
+      return;
+    }
+    if (action === 'mark_read') {
+      handleMarkReadSingle(id);
+      return;
+    }
     if (action === 'select') {
       setSelectionMode(true);
       setSelectedIds([id]);

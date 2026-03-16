@@ -84,7 +84,7 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
         participants: participantsWithStatus,
         membersCount: conv.participants.length,
         _count: {
-          messages: unreadCount
+          messages: participant?.isMarkedUnread ? Math.max(1, unreadCount) : unreadCount
         }
       };
     }));

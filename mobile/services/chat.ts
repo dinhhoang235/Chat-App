@@ -86,4 +86,6 @@ export const chatApi = {
     apiClient.post(`/chats/${id}/mute`, { mutedUntil }),
   pinConversation: (id: string | number, pinned: boolean) =>
     apiClient.post(`/chats/${id}/pin`, { pinned }),
+  markAsUnread: (id: string | number) =>
+    apiClient.post(`/chats/${id}/unread`),
 };

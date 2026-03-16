@@ -46,7 +46,10 @@ export const markAsRead = (io: Server) => async (req: AuthRequest, res: Response
           userId
         }
       },
-      data: { lastReadAt: now }
+      data: { 
+        lastReadAt: now,
+        isMarkedUnread: false 
+      }
     });
 
     // Notify other participants that this user has seen the messages

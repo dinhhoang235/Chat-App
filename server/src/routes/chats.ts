@@ -15,7 +15,8 @@ import {
   leaveGroup,
   getConversationMedia,
   muteConversation,
-  pinConversation
+  pinConversation,
+  markAsUnread
 } from '../controllers/chat/index.js';
 import { upload } from '../middleware/upload.js';
 import { Server } from 'socket.io';
@@ -44,6 +45,7 @@ export const chatRoutes = (io: Server) => {
   router.delete('/:conversationId/members/:userId', removeMember(io));
   router.post('/:conversationId/mute', muteConversation);
   router.post('/:conversationId/pin', pinConversation);
+  router.post('/:conversationId/unread', markAsUnread(io));
 
   return router;
 };

@@ -63,6 +63,7 @@ model ConversationParticipant {
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   role           String       @default("member") // member, admin, owner
   isPinned       Boolean      @default(false)
+  isMarkedUnread Boolean      @default(false)
   mutedUntil     DateTime?
   lastReadAt     DateTime     @default(now())
   joinedAt       DateTime     @default(now())

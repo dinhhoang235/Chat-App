@@ -141,8 +141,26 @@ export function useConversations() {
     setSelectedIds([]);
   };
 
-  const handleMarkRead = () => {
-    setData((prev) => prev.map(m => selectedIds.includes(m.id) ? { ...m, unread: 0 } : m));
+  const handleMarkRead = async () => {
+    try {
+      for (const id of selectedIds) {
+        await chatApi.markAsRead(id);
+      }
+      setData((prev) => prev.map(m => selectedIds.includes(m.id) ? { ...m, unread: 0 } : m));
+      setSelectionMode(false);
+      setSelectedIds([]);
+    } catch (err) {
+      console.error("Mark read error:", err);
+    }
+  };
+
+  const handleMarkReadSingle = async (id: string) => {
+    try {
+      await chatApi.markAsRead(id);
+      setData((prev) => prev.map(m => m.id === id ? { ...m, unread: 0 } : m));
+    } catch (err) {
+      console.error("Mark read single error:", err);
+    }
   };
 
   const handleDeleteConversation = async (id: string) => {
@@ -217,6 +235,15 @@ export function useConversations() {
     }
   };
 
+  const handleMarkUnread = async (id: string) => {
+    try {
+      await chatApi.markAsUnread(id);
+      setData(prev => prev.map(m => m.id === id ? { ...m, unread: Math.max(1, m.unread) } : m));
+    } catch (err) {
+      console.error("Mark unread error:", err);
+    }
+  };
+
   return {
     data,
     setData,
@@ -231,11 +258,13 @@ export function useConversations() {
     handleSelectAll,
     handleCancelSelection,
     handleMarkRead,
+    handleMarkReadSingle,
     handleDeleteSelected,
     handleDeleteConversation,
     handleMute,
     handleUnmute,
     handlePin,
+    handleMarkUnread,
     router,
     colors
   };

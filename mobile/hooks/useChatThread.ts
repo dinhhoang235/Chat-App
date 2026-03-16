@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { setActiveConversationId, activeConversationId } from '@/services/notificationState';
 import * as FileSystem from 'expo-file-system';
-import { FlatList } from 'react-native';
+import { FlatList, Alert } from 'react-native';
 import { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useKeyboardSheetHeight } from './useKeyboardSheetHeight';
 import { useTheme } from '@/context/themeContext';
@@ -15,6 +15,7 @@ import { userAPI } from '@/services/user';
 import { useAuth } from '@/context/authContext';
 import { getAvatarUrl } from '@/utils/avatar';
 import { useTyping } from './useTyping';
+import * as DocumentPicker from 'expo-document-picker';
 
 export function useChatThread() {
   const { colors } = useTheme();
@@ -201,8 +202,96 @@ export function useChatThread() {
   const initialSearch = !!(params as any).search;
   const [searchMode, setSearchMode] = useState<boolean>(initialSearch);
   const [searchQuery, setSearchQuery] = useState('');
-  const [resultIndices] = useState<number[]>([]);
+  const [resultIndices, setResultIndices] = useState<number[]>([]);
   const [currentResultIndex, setCurrentResultIndex] = useState(0);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  // Message processing - group consecutive images
+  const processedMessages = useMemo(() => {
+    if (!messages || messages.length === 0) return [];
+
+    const grouped: any[] = [];
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+
+      // Only group confirmed image messages from the same sender sent very close together
+      // Note: messages is inverted (0 is newest).
+      if (msg.type === 'image' && msg.status !== 'sending') {
+        const groupImages = [msg];
+        let j = i + 1;
+        while (
+          j < messages.length &&
+          messages[j].type === 'image' &&
+          messages[j].senderId === msg.senderId &&
+          messages[j].status !== 'sending' &&
+          messages[j].createdAt && msg.createdAt &&
+          Math.abs(new Date(messages[j].createdAt).getTime() - new Date(msg.createdAt).getTime()) < 60000
+        ) {
+          groupImages.push(messages[j]);
+          j++;
+        }
+
+        if (groupImages.length > 1) {
+          grouped.push({
+            ...msg,
+            type: 'image_group' as any,
+            images: [...groupImages].reverse(), // reverse to show oldest first in grid
+          });
+          i = j - 1;
+          continue;
+        }
+      }
+
+      grouped.push(msg);
+    }
+    return grouped;
+  }, [messages]);
+
+  // Search logic - find indices of messages that match the search query
+  useEffect(() => {
+    if (!searchMode || !searchQuery.trim()) {
+      setResultIndices([]);
+      setCurrentResultIndex(0);
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await chatApi.searchMessages(Number(conversationId), searchQuery);
+        const results = response.data;
+        setSearchResults(results);
+        
+        // Results are handled via currentResultIndices memo below
+        setCurrentResultIndex(0);
+      } catch (err) {
+        console.error('Search error:', err);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchMode, conversationId]);
+
+  // Calculate result indices based on PROCESSED messages
+  const currentResultIndices = useMemo(() => {
+    if (!searchQuery.trim() || !searchResults.length) return [];
+    const indicesSet = new Set<number>();
+
+    searchResults.forEach((res: any) => {
+      const idx = processedMessages.findIndex(m => {
+        // Direct match
+        if (m.id === res.id) return true;
+        // Match inside image group
+        if (m.type === 'image_group' && (m as any).images) {
+          return (m as any).images.some((img: any) => img.id === res.id);
+        }
+        return false;
+      });
+      if (idx !== -1) indicesSet.add(idx);
+    });
+
+    return Array.from(indicesSet).sort((a, b) => a - b);
+  }, [searchQuery, searchResults, processedMessages]);
 
   const [composerVisible, setComposerVisible] = useState(false);
   const [galleryVisible, setGalleryVisible] = useState(false);
@@ -552,6 +641,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
   const handleSend = async () => {
     // if attachments exist, send them first (and clear afterwards)
     if (attachments.length > 0) {
+      setGalleryVisible(false); // Close gallery when sending
       // iterate sequentially to preserve order
       for (const file of attachments) {
         await handleSendAttachment(file);
@@ -733,6 +823,54 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     }
   }, [searchMode, openFor, params, close]);
 
+  const pickDocument = async () => {
+    try {
+      const res: any = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+      let uri: string | undefined;
+      let name: string | undefined;
+      let mime: string | undefined;
+      let size: number | undefined;
+
+      if (res.uri) {
+        uri = res.uri;
+        name = res.name;
+        mime = res.mimeType;
+        size = res.size;
+      } else if (res.assets && res.assets.length > 0) {
+        const asset = res.assets[0];
+        uri = asset.uri;
+        name = asset.name;
+        mime = asset.mimeType;
+        size = asset.size;
+      }
+
+      if (uri) {
+        if (size && size > 5 * 1024 * 1024) {
+          Alert.alert('Tệp quá lớn', 'Vui lòng chọn tệp nhỏ hơn 5MB.');
+          return;
+        }
+        handleSendAttachment({ uri, name: name || 'file', type: mime || 'application/octet-stream', size });
+      }
+    } catch (err) {
+      console.error('Document picker error', err);
+    }
+  };
+
+  const statusText = useMemo(() => {
+    if (isGroup) return null;
+    if (!targetUserStatus) return null;
+    if (targetUserStatus.status === 'online') return 'Đang hoạt động';
+    if (targetUserStatus.lastSeen) {
+      const diff = Math.floor((Date.now() - targetUserStatus.lastSeen) / 60000);
+      if (diff < 1) return 'Hoạt động vừa xong';
+      if (diff < 60) return `Hoạt động ${diff} phút trước`;
+      const hours = Math.floor(diff / 60);
+      if (hours < 24) return `Hoạt động ${hours} giờ trước`;
+      return `Hoạt động ${Math.floor(hours / 24)} ngày trước`;
+    }
+    return null;
+  }, [isGroup, targetUserStatus]);
+
   return {
     colors,
     params,
@@ -760,6 +898,9 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     resultIndices,
     currentResultIndex,
     setCurrentResultIndex,
+    searchResults,
+    processedMessages,
+    currentResultIndices,
     composerVisible,
     setComposerVisible,
     galleryVisible,
@@ -771,6 +912,8 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     fetchMessages,
     handleSend,
     handleSendAttachment,
+    pickDocument,
+    statusText,
     // new attachment helpers
     attachments,
     addAttachments,

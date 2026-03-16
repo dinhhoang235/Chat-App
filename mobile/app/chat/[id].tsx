@@ -1,10 +1,8 @@
 import React from 'react';
-import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, Alert } from 'react-native';
+import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Header, GallerySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ChatComposer } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
-import * as DocumentPicker from 'expo-document-picker';
-
 import { useChatThread } from '@/hooks/useChatThread';
 
 export default function ChatThread() {
@@ -29,7 +27,6 @@ export default function ChatThread() {
     setSearchMode,
     searchQuery,
     setSearchQuery,
-    resultIndices,
     currentResultIndex,
     setCurrentResultIndex,
     composerVisible,
@@ -39,8 +36,6 @@ export default function ChatThread() {
     insets,
     animatedContentStyle,
     fetchMessages,
-    handleSend: originalHandleSend,
-    handleSendAttachment,
     attachments,
     addAttachments,
     removeAttachment,
@@ -53,15 +48,13 @@ export default function ChatThread() {
     lastKeyboardHeight,
     galleryVisible,
     setGalleryVisible,
+    processedMessages,
+    currentResultIndices,
+    statusText,
+    handleSend,
+    pickDocument
   } = useChatThread();
 
-
-  const handleSend = async () => {
-    if (attachments.length > 0) {
-      setGalleryVisible(false);
-    }
-    await originalHandleSend();
-  };
 
   // unified sheet control (gallery/composer) moved to hook
   const { openSheet, closeAll, sheetHeight } = useSheetControl(
@@ -73,97 +66,6 @@ export default function ChatThread() {
     lastKeyboardHeight
   );
 
-  const pickDocument = async () => {
-    try {
-      const res: any = await DocumentPicker.getDocumentAsync({ type: '*/*' });
-      // handle both legacy and new expo-document-picker shapes
-      let uri: string | undefined;
-      let name: string | undefined;
-      let mime: string | undefined;
-      let size: number | undefined;
-
-      if (res.uri) {
-        uri = res.uri;
-        name = res.name;
-        mime = res.mimeType;
-        size = res.size;
-      } else if (res.assets && res.assets.length > 0) {
-        const asset = res.assets[0];
-        uri = asset.uri;
-        name = asset.name;
-        mime = asset.mimeType;
-        size = asset.size;
-      }
-
-      if (uri) {
-        if (size && size > 5 * 1024 * 1024) {
-          Alert.alert('File too large', 'Please select a file smaller than 5MB.');
-          return;
-        }
-        handleSendAttachment({ uri, name: name || 'file', type: mime || 'application/octet-stream', size });
-      } else {
-        console.log('Document picker returned no uri, result:', res);
-      }
-    } catch (err) {
-      console.error('Document picker error', err);
-    }
-  };
-
-  const getStatusText = () => {
-    if (isGroup) return null;
-    if (!targetUserStatus) return null;
-    if (targetUserStatus.status === 'online') return 'Đang hoạt động';
-    if (targetUserStatus.lastSeen) {
-      const diff = Math.floor((Date.now() - targetUserStatus.lastSeen) / 60000);
-      if (diff < 1) return 'Hoạt động vừa xong';
-      if (diff < 60) return `Hoạt động ${diff} phút trước`;
-      const hours = Math.floor(diff / 60);
-      if (hours < 24) return `Hoạt động ${hours} giờ trước`;
-      return `Hoạt động ${Math.floor(hours / 24)} ngày trước`;
-    }
-    return null;
-  };
-  
-  const processedMessages = React.useMemo(() => {
-    if (!messages || messages.length === 0) return [];
-    
-    const grouped: any[] = [];
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
-      
-      // Only group confirmed image messages from the same sender sent very close together
-      // Note: messages is inverted (0 is newest).
-      if (msg.type === 'image' && msg.status !== 'sending') {
-        const groupImages = [msg];
-        let j = i + 1;
-        while (
-          j < messages.length &&
-          messages[j].type === 'image' &&
-          messages[j].senderId === msg.senderId &&
-          messages[j].status !== 'sending' &&
-          messages[j].createdAt && msg.createdAt &&
-          Math.abs(new Date(messages[j].createdAt).getTime() - new Date(msg.createdAt).getTime()) < 60000 
-        ) {
-          groupImages.push(messages[j]);
-          j++;
-        }
-        
-        if (groupImages.length > 1) {
-          grouped.push({
-            ...msg,
-            type: 'image_group' as any,
-            images: [...groupImages].reverse(), // reverse to show oldest first in grid
-          });
-          i = j - 1;
-          continue;
-        }
-      }
-      
-      grouped.push(msg);
-    }
-    return grouped;
-  }, [messages]);
-
   return (
     <View className="flex-1" style={{ backgroundColor: colors.surface, paddingTop: insets.top }}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -173,7 +75,7 @@ export default function ChatThread() {
             <InThreadSearch
               query={searchQuery}
               onQueryChange={setSearchQuery}
-              resultIndices={resultIndices}
+              resultIndices={currentResultIndices}
               currentResultIndex={currentResultIndex}
               onSetCurrentResultIndex={setCurrentResultIndex}
               onClose={() => setSearchMode(false)}
@@ -233,9 +135,9 @@ export default function ChatThread() {
                       <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>
                         {membersCount} thành viên
                       </Text>
-                    ) : getStatusText() && (
+                    ) : statusText && (
                       <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>
-                        {getStatusText()}
+                        {statusText}
                       </Text>
                     )}
                   </View>
@@ -359,27 +261,19 @@ export default function ChatThread() {
               )}
 
               {/* Bottom search bar: replace composer when in searchMode */}
-              {searchMode ? (
-                <View
-                  style={{
-                    borderTopWidth: 1,
-                    borderTopColor: colors.surfaceVariant,
-                    backgroundColor: colors.surface,
-                  }}
-                >
-                  <InThreadSearch
-                    messages={messages as any}
-                    query={searchQuery}
-                    onQueryChange={setSearchQuery}
-                    resultIndices={resultIndices}
-                    currentResultIndex={currentResultIndex}
-                    onSetCurrentResultIndex={setCurrentResultIndex}
-                    onClose={() => setSearchMode(false)}
-                    onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
-                    renderMode="bottom"
-                  />
-                </View>
-              ) : null}
+              {searchMode && (
+                <InThreadSearch
+                  messages={messages as any}
+                  query={searchQuery}
+                  onQueryChange={setSearchQuery}
+                  resultIndices={currentResultIndices}
+                  currentResultIndex={currentResultIndex}
+                  onSetCurrentResultIndex={setCurrentResultIndex}
+                  onClose={() => setSearchMode(false)}
+                  onScrollToMessage={(idx) => flatListRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5 })}
+                  renderMode="bottom"
+                />
+              )}
 
               {/* Composer: hidden when search mode is active */}
               {!searchMode && (

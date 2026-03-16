@@ -16,7 +16,8 @@ import {
   getConversationMedia,
   muteConversation,
   pinConversation,
-  markAsUnread
+  markAsUnread,
+  searchMessages
 } from '../controllers/chat/index.js';
 import { upload } from '../middleware/upload.js';
 import { Server } from 'socket.io';
@@ -46,6 +47,7 @@ export const chatRoutes = (io: Server) => {
   router.post('/:conversationId/mute', muteConversation);
   router.post('/:conversationId/pin', pinConversation);
   router.post('/:conversationId/unread', markAsUnread(io));
+  router.get('/:conversationId/search', searchMessages);
 
   return router;
 };

@@ -47,8 +47,8 @@ export default function InThreadSearch({
     if (typeof msgIndex === 'number' && onScrollToMessage) onScrollToMessage(msgIndex);
   };
 
-  const goPrev = () => scrollToResult(currentResultIndex - 1);
-  const goNext = () => scrollToResult(currentResultIndex + 1);
+  const goOlder = () => scrollToResult(currentResultIndex + 1);
+  const goNewer = () => scrollToResult(currentResultIndex - 1);
 
   return (
     <View>
@@ -65,7 +65,7 @@ export default function InThreadSearch({
                 <MaterialIcons name="search" color={colors.textSecondary} size={20} />
 
                 <TextInput
-                  placeholder="Tìm tin nhắn văn bản..."
+                  placeholder="Tìm tin nhắn..."
                   placeholderTextColor={colors.textSecondary}
                   value={query}
                   onChangeText={onQueryChange}
@@ -75,6 +75,12 @@ export default function InThreadSearch({
                   autoCorrect={false}
                   spellCheck={false}
                 />
+
+                {query.length > 0 && (
+                  <TouchableOpacity onPress={() => onQueryChange('')} style={{ padding: 4 }}>
+                    <MaterialIcons name="close" color={colors.textSecondary} size={20} />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
@@ -83,16 +89,45 @@ export default function InThreadSearch({
 
       {/* Bottom result bar (fixed place where parent should render it) */}
       {renderMode !== 'header' && (
-        <View style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
-          <Text style={{ color: colors.text }}>{hasResults ? `Kết quả thứ ${currentResultIndex + 1}/${resultIndices.length}` : ''}</Text>
+        <View style={{
+          borderTopWidth: 1,
+          borderTopColor: colors.surfaceVariant,
+          backgroundColor: colors.surface,
+          paddingVertical: 8,
+          paddingHorizontal: 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 12,
+          marginTop: -14,
+        }}>
+          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+            {hasResults ? `Kết quả thứ ${currentResultIndex + 1}/${resultIndices.length}` : ''}
+          </Text>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={goPrev} disabled={!hasResults} style={{ padding: 8 }}>
-              <MaterialIcons name="expand-less" color={!hasResults ? colors.textSecondary : colors.text} size={20} />
+            <TouchableOpacity 
+              onPress={goNewer} 
+              disabled={!hasResults || currentResultIndex <= 0} 
+              style={{ padding: 8 }}
+            >
+              <MaterialIcons 
+                name="expand-more" 
+                color={(!hasResults || currentResultIndex <= 0) ? colors.textSecondary : colors.text} 
+                size={26} 
+              />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={goNext} disabled={!hasResults} style={{ padding: 8 }}>
-              <MaterialIcons name="expand-more" color={!hasResults ? colors.textSecondary : colors.text} size={20} />
+            <TouchableOpacity 
+              onPress={goOlder} 
+              disabled={!hasResults || currentResultIndex >= resultIndices.length - 1} 
+              style={{ padding: 8 }}
+            >
+              <MaterialIcons 
+                name="expand-less" 
+                color={(!hasResults || currentResultIndex >= resultIndices.length - 1) ? colors.textSecondary : colors.text} 
+                size={26} 
+              />
             </TouchableOpacity>
           </View>
         </View>

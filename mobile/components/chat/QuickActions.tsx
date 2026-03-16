@@ -8,12 +8,9 @@ interface QuickActionsProps {
   conversationId: string | number;
   isGroup: boolean;
   isMuted: boolean;
-  isPinned: boolean;
   onSearch: () => void;
   onToggleMute: () => void;
-  onTogglePin: () => void;
   onMemberAdded?: () => void;
-  onDelete?: () => void;
   colors: any;
 }
 
@@ -21,12 +18,9 @@ const QuickActions = ({
   conversationId,
   isGroup,
   isMuted,
-  isPinned,
   onSearch,
   onToggleMute,
-  onTogglePin,
   onMemberAdded,
-  onDelete,
   colors,
 }: QuickActionsProps) => {
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -67,20 +61,6 @@ const QuickActions = ({
           <MaterialIcons name={isMuted ? "notifications" : "notifications-off"} size={20} color={isMuted ? '#fff' : colors.text} />
         </View>
         <Text style={{ color: colors.text }}>{isMuted ? 'Bật thông báo' : 'Tắt thông báo'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity className="items-center" onPress={onTogglePin}>
-        <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: isPinned ? colors.tint : colors.surface, borderWidth: 1, borderColor: isPinned ? colors.tint : colors.border }}>
-          <MaterialIcons name="push-pin" size={20} color={isPinned ? '#fff' : colors.text} />
-        </View>
-        <Text style={{ color: colors.text }}>{isPinned ? 'Bỏ ghim' : 'Ghim'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity className="items-center" onPress={onDelete}>
-        <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
-          <MaterialIcons name="delete" size={20} color={colors.danger} />
-        </View>
-        <Text style={{ color: colors.danger }}>Xóa lịch sử</Text>
       </TouchableOpacity>
 
       <AddToGroupModal

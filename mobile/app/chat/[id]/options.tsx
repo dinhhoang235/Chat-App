@@ -67,7 +67,6 @@ export default function ChatOptions() {
           conversationId={id}
           isGroup={isGroup}
           isMuted={isMuted}
-          isPinned={pinned}
           onSearch={() => { open(id); router.back(); }}
           onToggleMute={() => {
             if (isMuted) {
@@ -76,9 +75,7 @@ export default function ChatOptions() {
               setMuteVisible(true);
             }
           }}
-          onTogglePin={handleTogglePin}
           onMemberAdded={fetchConversationDetails}
-          onDelete={() => setConfirmVisible(true)}
           colors={colors}
         />
 

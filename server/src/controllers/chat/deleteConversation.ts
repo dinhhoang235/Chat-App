@@ -49,7 +49,7 @@ export const deleteConversation = (io: Server) => async (req: AuthRequest, res: 
       },
       data: {
         deletedAt: now,
-        hiddenAt: isGroup ? null : now // Nếu là nhóm, không ẩn khỏi danh sách (hiddenAt = null)
+        hiddenAt: now
       }
     });
 

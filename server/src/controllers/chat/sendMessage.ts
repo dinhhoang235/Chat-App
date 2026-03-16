@@ -69,25 +69,28 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
       }
     });
 
-    // 2. Broadcast via socket
-    io.to(`conversation:${convId}`).emit('new_message', message);
-    
-    // 3. Cache the new message
-    cacheMessage(convId, message).catch(e => console.error(e));
-    
-    // Reactivate for all OTHER participants who previously "hid" it
-    // We reset hiddenAt to make conversation visible again,
-    // but KEEP deletedAt to ensure they don't see older messages.
+    // 2. Update Conversation updatedAt and un-hide for everyone who previously hid/deleted it
+    await prisma.conversation.update({
+      where: { id: convId },
+      data: { updatedAt: new Date() }
+    });
+
     await prisma.conversationParticipant.updateMany({
       where: {
         conversationId: convId,
-        userId: { not: userId },
         hiddenAt: { not: null }
       },
       data: {
         hiddenAt: null
       }
     });
+
+    // 3. Broadcast via socket
+    io.to(`conversation:${convId}`).emit('new_message', message);
+    
+    // 3. Cache the new message
+    cacheMessage(convId, message).catch(e => console.error(e));
+    
 
     // Also notify users who might not be in the conversation room currently 
     // but should see an updated list of conversations

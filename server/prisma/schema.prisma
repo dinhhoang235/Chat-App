@@ -62,6 +62,7 @@ model ConversationParticipant {
   userId         Int
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   role           String       @default("member") // member, admin, owner
+  mutedUntil     DateTime?
   lastReadAt     DateTime     @default(now())
   joinedAt       DateTime     @default(now())
   deletedAt      DateTime?

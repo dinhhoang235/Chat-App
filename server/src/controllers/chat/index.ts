@@ -11,3 +11,4 @@ export * from './addMembers.js';
 export * from './removeMember.js';
 export * from './leaveGroup.js';
 export * from './getConversationMedia.js';
+export * from './muteConversation.js';

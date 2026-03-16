@@ -82,4 +82,6 @@ export const chatApi = {
     apiClient.delete(`/chats/${id}/disband`),
   leaveGroup: (id: string | number) =>
     apiClient.delete(`/chats/${id}/leave`),
+  muteConversation: (id: string | number, mutedUntil: Date | null) =>
+    apiClient.post(`/chats/${id}/mute`, { mutedUntil }),
 };

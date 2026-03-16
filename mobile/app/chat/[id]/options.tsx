@@ -28,8 +28,8 @@ export default function ChatOptions() {
     eyeOff, setEyeOff,
     muteVisible, setMuteVisible,
     muteSettingsVisible, setMuteSettingsVisible,
-    selectedMuteOption, setSelectedMuteOption,
-    excludeReminders, setExcludeReminders,
+    selectedMuteOption,
+    excludeReminders,
     addModalVisible, setAddModalVisible,
     blockVisible, setBlockVisible,
     blockMessages, setBlockMessages,
@@ -43,8 +43,9 @@ export default function ChatOptions() {
     performClearChat,
     performLeaveGroup,
     isOwner,
-    fetchGroupDetails,
+    fetchConversationDetails,
     recentImages,
+    handleMute,
   } = useChatOptions();
 
   return (
@@ -68,8 +69,14 @@ export default function ChatOptions() {
           isGroup={isGroup}
           isMuted={isMuted}
           onSearch={() => { open(id); router.back(); }}
-          onToggleMute={() => setMuteVisible(true)}
-          onMemberAdded={fetchGroupDetails}
+          onToggleMute={() => {
+            if (isMuted) {
+              handleMute('Bật thông báo');
+            } else {
+              setMuteVisible(true);
+            }
+          }}
+          onMemberAdded={fetchConversationDetails}
           colors={colors}
         />
 
@@ -228,22 +235,15 @@ export default function ChatOptions() {
         onClose={() => setMuteVisible(false)}
         onOpenSettings={() => { setMuteVisible(false); setMuteSettingsVisible(true); }}
         options={['Bật thông báo', 'Trong 1 giờ', 'Trong 4 giờ', 'Đến 8 giờ sáng', 'Cho đến khi được mở lại']}
-        onSelect={(opt) => {
-          if (opt === 'Bật thông báo') {
-            setSelectedMuteOption('Không tắt');
-            setExcludeReminders(false);
-          } else {
-            setSelectedMuteOption(opt);
-          }
-        }}
+        onSelect={(opt) => handleMute(opt)}
       />
 
       <MuteSettingsModal
         visible={muteSettingsVisible}
         onClose={() => setMuteSettingsVisible(false)}
-        initialOption={selectedMuteOption !== 'Không tắt' ? selectedMuteOption : 'Trong 1 giờ'}
+        initialOption={selectedMuteOption !== 'Không tắt' ? (selectedMuteOption === 'Đã tắt' ? 'Trong 1 giờ' : selectedMuteOption) : 'Trong 1 giờ'}
         initialExclude={excludeReminders}
-        onSave={(opt, exclude) => { setSelectedMuteOption(opt); setExcludeReminders(exclude); setMuteSettingsVisible(false); }}
+        onSave={(opt, exclude) => handleMute(opt, exclude)}
       />
 
       <BlockSettingsModal

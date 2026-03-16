@@ -58,9 +58,9 @@ const QuickActions = ({
 
       <TouchableOpacity className="items-center" onPress={onToggleMute}>
         <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: isMuted ? colors.tint : colors.surface, borderWidth: 1, borderColor: isMuted ? colors.tint : colors.border }}>
-          <MaterialIcons name="notifications-off" size={20} color={isMuted ? '#fff' : colors.text} />
+          <MaterialIcons name={isMuted ? "notifications" : "notifications-off"} size={20} color={isMuted ? '#fff' : colors.text} />
         </View>
-        <Text style={{ color: colors.text }}>{isMuted ? 'Đã tắt' : 'Tắt thông báo'}</Text>
+        <Text style={{ color: colors.text }}>{isMuted ? 'Bật thông báo' : 'Tắt thông báo'}</Text>
       </TouchableOpacity>
 
       <AddToGroupModal

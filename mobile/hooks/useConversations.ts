@@ -74,6 +74,7 @@ export function useConversations() {
           isGroup: conv.isGroup,
           targetUserId: otherParticipant?.userId.toString(),
           status: otherParticipant?.user.status || 'offline',
+          isMuted: !!(conv.participants.find((p: any) => p.userId === user?.id)?.mutedUntil && new Date(conv.participants.find((p: any) => p.userId === user?.id).mutedUntil) > new Date()),
           updatedAt: updatedAt
         };
       }).sort((a: any, b: any) => b.updatedAt - a.updatedAt);
@@ -145,6 +146,39 @@ export function useConversations() {
     setSelectedIds([]);
   };
 
+  const handleMute = async (id: string, duration: string) => {
+    let mutedUntil: Date | null = null;
+    const now = new Date();
+
+    if (duration === 'Trong 1 giờ') {
+      mutedUntil = new Date(now.getTime() + 60 * 60 * 1000);
+    } else if (duration === 'Trong 4 giờ') {
+      mutedUntil = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+    } else if (duration === 'Đến 8 giờ sáng') {
+      mutedUntil = new Date();
+      mutedUntil.setHours(8, 0, 0, 0);
+      if (mutedUntil <= now) mutedUntil.setDate(mutedUntil.getDate() + 1);
+    } else if (duration === 'Cho đến khi được mở lại') {
+      mutedUntil = new Date('2099-12-31T23:59:59Z');
+    }
+
+    try {
+      await chatApi.muteConversation(id, mutedUntil);
+      setData(prev => prev.map(m => m.id === id ? { ...m, isMuted: true } : m));
+    } catch (err) {
+      console.error("Mute error:", err);
+    }
+  };
+
+  const handleUnmute = async (id: string) => {
+    try {
+      await chatApi.muteConversation(id, null);
+      setData(prev => prev.map(m => m.id === id ? { ...m, isMuted: false } : m));
+    } catch (err) {
+      console.error("Unmute error:", err);
+    }
+  };
+
   return {
     data,
     setData,
@@ -160,6 +194,8 @@ export function useConversations() {
     handleCancelSelection,
     handleMarkRead,
     handleDeleteSelected,
+    handleMute,
+    handleUnmute,
     router,
     colors
   };

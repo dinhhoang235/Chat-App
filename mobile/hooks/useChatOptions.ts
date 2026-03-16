@@ -64,15 +64,33 @@ export function useChatOptions() {
     return (params as any).avatars ? ((params as any).avatars as string).split(',') : [];
   }, [groupDetails, params]);
 
-  const fetchGroupDetails = useCallback(async () => {
-    if (!isGroup) return;
+  const fetchConversationDetails = useCallback(async () => {
     try {
       const response = await chatApi.getConversationDetails(id);
       setGroupDetails(response.data);
+
+      if (user) {
+        const me = response.data.participants?.find((p: any) => p.userId === user.id);
+        if (me?.mutedUntil) {
+          const until = new Date(me.mutedUntil);
+          if (until > new Date()) {
+            // Estimate which option it was, or just set to 'Cho đến khi được mở lại' if far
+            if (until.getFullYear() > 2090) {
+              setSelectedMuteOption('Cho đến khi được mở lại');
+            } else {
+              setSelectedMuteOption('Đã tắt'); // Generic label if we can't match exactly
+            }
+          } else {
+            setSelectedMuteOption('Không tắt');
+          }
+        } else {
+          setSelectedMuteOption('Không tắt');
+        }
+      }
     } catch (error) {
-      console.error('Fetch group details error:', error);
+      console.error('Fetch conversation details error:', error);
     }
-  }, [id, isGroup]);
+  }, [id, user]);
 
   // preview images for media row
   const [recentImages, setRecentImages] = useState<string[]>([]);
@@ -133,8 +151,8 @@ export function useChatOptions() {
   }, [id, loadRecentImages]);
 
   useEffect(() => {
-    fetchGroupDetails();
-  }, [fetchGroupDetails]);
+    fetchConversationDetails();
+  }, [fetchConversationDetails]);
 
   // Listen for member updates
   useEffect(() => {
@@ -142,7 +160,7 @@ export function useChatOptions() {
 
     const handleUpdate = (data: any) => {
       if (data.conversationId?.toString() === id.toString()) {
-        fetchGroupDetails();
+        fetchConversationDetails();
       }
     };
 
@@ -150,7 +168,7 @@ export function useChatOptions() {
     return () => {
       socketService.off('conversation_updated', handleUpdate);
     };
-  }, [id, isGroup, fetchGroupDetails]);
+  }, [id, isGroup, fetchConversationDetails]);
 
   useEffect(() => {
     if (!targetUserId) return;
@@ -200,6 +218,37 @@ export function useChatOptions() {
     return currentUserParticipant?.role === 'owner';
   }, [isGroup, groupDetails, user]);
 
+  const handleMute = async (option: string, exclude: boolean = false) => {
+    let mutedUntil: Date | null = null;
+    const now = new Date();
+
+    if (option === 'Trong 1 giờ') {
+      mutedUntil = new Date(now.getTime() + 60 * 60 * 1000);
+    } else if (option === 'Trong 4 giờ') {
+      mutedUntil = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+    } else if (option === 'Đến 8 giờ sáng') {
+      const next8AM = new Date();
+      next8AM.setHours(8, 0, 0, 0);
+      if (next8AM <= now) next8AM.setDate(next8AM.getDate() + 1);
+      mutedUntil = next8AM;
+    } else if (option === 'Cho đến khi được mở lại') {
+      mutedUntil = new Date('2099-12-31T23:59:59Z');
+    } else if (option === 'Bật thông báo' || option === 'Không tắt') {
+      mutedUntil = null;
+    }
+
+    try {
+      await chatApi.muteConversation(id, mutedUntil);
+      setSelectedMuteOption(mutedUntil ? option : 'Không tắt');
+      setExcludeReminders(exclude);
+      setMuteVisible(false);
+      setMuteSettingsVisible(false);
+    } catch (err) {
+      console.error('Mute error:', err);
+      Alert.alert('Lỗi', 'Không thể tắt thông báo');
+    }
+  };
+
   return {
     router,
     params,
@@ -230,7 +279,8 @@ export function useChatOptions() {
     performClearChat,
     performLeaveGroup,
     isOwner,
-    fetchGroupDetails,
+    fetchConversationDetails,
     recentImages,
+    handleMute,
   };
 }

@@ -118,6 +118,13 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
       participants.forEach(p => {
         // @ts-ignore pushToken may not exist on user type yet
         const token = (p.user as any).pushToken;
+
+        // Skip if conversation is muted for this user
+        if (p.mutedUntil && new Date(p.mutedUntil) > new Date()) {
+          console.log(`skipping push for user ${p.userId} because conversation is muted until ${p.mutedUntil}`);
+          return;
+        }
+
         if (!token || token === '') {
           console.log(`no push token for user ${p.userId}`);
         }

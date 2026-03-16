@@ -10,9 +10,10 @@ type Props = {
   initialOption?: string;
   initialExclude?: boolean;
   onSave: (opt: string, excludeReminders: boolean) => void;
+  title?: string;
 };
 
-export default function MuteSettingsModal({ visible, onClose, initialOption = 'Trong 1 giờ', initialExclude = false, onSave }: Props) {
+export default function MuteSettingsModal({ visible, onClose, initialOption = 'Trong 1 giờ', initialExclude = false, onSave, title = 'Tắt thông báo tin nhắn' }: Props) {
   const [selected, setSelected] = useState<string>(initialOption);
   const [excludeReminders, setExcludeReminders] = useState<boolean>(initialExclude);
   const { scheme, colors } = useTheme();
@@ -38,7 +39,7 @@ export default function MuteSettingsModal({ visible, onClose, initialOption = 'T
                 <MaterialIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
 
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>Tắt thông báo tin nhắn</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{title}</Text>
 
               <View style={{ width: 24 }} />
             </View>

@@ -13,7 +13,8 @@ import {
   addMembers,
   removeMember,
   leaveGroup,
-  getConversationMedia
+  getConversationMedia,
+  muteConversation
 } from '../controllers/chat/index.js';
 import { upload } from '../middleware/upload.js';
 import { Server } from 'socket.io';
@@ -40,6 +41,7 @@ export const chatRoutes = (io: Server) => {
   // Group member management
   router.post('/:conversationId/members', addMembers(io));
   router.delete('/:conversationId/members/:userId', removeMember(io));
+  router.post('/:conversationId/mute', muteConversation);
 
   return router;
 };

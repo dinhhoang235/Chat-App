@@ -26,6 +26,8 @@ export default function Messages() {
     handleCancelSelection,
     handleMarkRead,
     handleDeleteSelected,
+    handleMute,
+    handleUnmute,
     router,
     colors
   } = useConversations();
@@ -42,10 +44,18 @@ export default function Messages() {
     toggle();
   };
 
-  const handleRowAction = (action: string, id: string) => {
+  const handleRowAction = (action: string, id: string, data?: any) => {
     if (action === 'select') {
       setSelectionMode(true);
       setSelectedIds([id]);
+      return;
+    }
+    if (action === 'mute') {
+      handleMute(id, data);
+      return;
+    }
+    if (action === 'unmute') {
+      handleUnmute(id);
       return;
     }
     console.log('Row action', action, id);
@@ -101,7 +111,7 @@ export default function Messages() {
                   }); 
                 } 
               }}
-              onAction={(action) => handleRowAction(action, item.id)}
+              onAction={(action, data) => handleRowAction(action, item.id, data)}
               selectionMode={selectionMode}
               selected={selectedIds.includes(item.id)}
               onToggleSelect={(id) => toggleSelect(id)}

@@ -20,9 +20,10 @@ type Props = {
     isGroup?: boolean;
     membersCount?: number;
     status?: string;
+    isMuted?: boolean;
   };
   onPress?: () => void;
-  onAction?: (action: string) => void;
+  onAction?: (action: string, data?: any) => void;
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
@@ -42,7 +43,11 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
   const menuItems = [
     { key: 'mark_unread', label: 'Đánh dấu chưa đọc', icon: 'drafts' },
     { key: 'pin', label: 'Ghim', icon: 'push-pin' },
-    { key: 'mute', label: 'Tắt thông báo', icon: 'notifications-off' },
+    { 
+      key: 'mute', 
+      label: message.isMuted ? 'Bật thông báo' : 'Tắt thông báo', 
+      icon: message.isMuted ? 'notifications' : 'notifications-off' 
+    },
     { key: 'hide', label: 'Ẩn', icon: 'visibility-off' },
     { key: 'delete', label: 'Xóa', icon: 'delete', destructive: true },
     { key: 'select', label: 'Chọn nhiều', icon: 'check-circle' },
@@ -53,7 +58,11 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
   const handleAction = (action: string) => {
     setMenuVisible(false);
     if (action === 'mute') {
-      setMuteVisible(true);
+      if (message.isMuted) {
+        onAction?.('unmute');
+      } else {
+        setMuteVisible(true);
+      }
       return;
     }
     if (action === 'select') {
@@ -178,7 +187,12 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
         </View>
 
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{message.time}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {message.isMuted && (
+              <MaterialIcons name="notifications-off" size={14} color={colors.textSecondary} style={{ marginRight: 4 }} />
+            )}
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{message.time}</Text>
+          </View>
           {message.unread && message.unread > 0 ? (
             <View style={{ backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, marginTop: 8 }}>
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{message.unread}</Text>
@@ -206,7 +220,7 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
         onClose={() => setMuteVisible(false)}
         onOpenSettings={() => { setMuteVisible(false); setMuteSettingsVisible(true); }}
         options={['Trong 1 giờ', 'Trong 4 giờ', 'Đến 8 giờ sáng', 'Cho đến khi được mở lại']}
-        onSelect={(opt) => { console.log('Mute:', opt, 'on', message.id); /* TODO: save state */ }}
+        onSelect={(opt) => { onAction?.('mute', opt); }}
       />
 
       <MuteSettingsModal

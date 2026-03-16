@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { contacts } from '@/constants/mockData';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 
 export default function GroupLink() {
@@ -39,8 +39,8 @@ export default function GroupLink() {
 
   const saveQr = async () => {
     try {
-      const filename = `${(FileSystem as any).documentDirectory}qr-${id}.png`;
-      const { uri } = await (FileSystem as any).downloadAsync(qrUri, filename);
+      const filename = FileSystem.documentDirectory + `qr-${id}.png`;
+      const { uri } = await FileSystem.downloadAsync(qrUri, filename);
 
       const permission = await MediaLibrary.requestPermissionsAsync();
       if (!permission.granted) {

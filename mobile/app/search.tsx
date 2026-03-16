@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/context/themeContext';
 import { SearchBar, SearchHistory, ResultsList } from '@/components';
+import ScannerModal from '@/components/modals/ScannerModal';
+import { useProfileScanner } from '@/hooks/useProfileScanner';
 import { userAPI } from '@/services/user';
 import { sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '@/services/friendship';
 
@@ -23,6 +25,7 @@ export default function GlobalSearch() {
     const { colors } = useTheme();
     const router = useRouter();
     const [query, setQuery] = useState('');
+    const { scannerVisible, openScanner, closeScanner, handleScan } = useProfileScanner();
     const [history, setHistory] = useState<any[]>([]);
 
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -249,7 +252,7 @@ export default function GlobalSearch() {
                 onChange={setQuery}
                 onSubmit={() => {}}
                 onBack={() => router.back()}
-                onQR={() => Alert.alert('Quét mã QR', 'Chức năng quét mã QR chưa được triển khai.')}
+                onQR={openScanner}
                 colors={colors}
             />
 
@@ -312,6 +315,11 @@ export default function GlobalSearch() {
                     </>
                 )}
             </View>
+            <ScannerModal 
+                visible={scannerVisible} 
+                onClose={closeScanner} 
+                onScan={handleScan} 
+            />
         </SafeAreaView>
     );
 }

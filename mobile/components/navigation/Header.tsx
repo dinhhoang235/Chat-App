@@ -2,6 +2,9 @@ import { View, Text, TouchableOpacity, TextStyle } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "@/context/themeContext";
+import React from "react";
+import { useProfileScanner } from "@/hooks/useProfileScanner";
+import ScannerModal from "../modals/ScannerModal";
 
 interface HeaderProps {
   title?: string;
@@ -53,6 +56,7 @@ const Header = ({
 }: HeaderProps) => {
   const router = useRouter();
   const theme = useTheme();
+  const { scannerVisible, openScanner, closeScanner, handleScan } = useProfileScanner();
 
   const handleBack = () => {
     if (onBackPress) return onBackPress();
@@ -156,13 +160,19 @@ const Header = ({
                 </TouchableOpacity>
               )}
 
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: 34 }} className="flex-row items-center">
-                <MaterialIcons name="search" color={iconColor} size={28} />
-                {/* Make the header search navigate to a full-screen /search route so the keyboard autofocuses there */}
-                <TouchableOpacity onPress={() => router.push('/search')} style={{ flex: 1, marginLeft: 12 }}>
-                  <View style={{ height: 34, borderRadius: 18, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: colors.surface }}>
-                    <Text style={{ color: colors.textSecondary }}>Tìm kiếm...</Text>
-                  </View>
+              <View style={{ flex: 1 }} className="flex-row items-center">
+                <View style={{ flex: 1, height: 34, borderRadius: 18, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface }}>
+                  <TouchableOpacity 
+                    onPress={() => router.push('/search')} 
+                    style={{ flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }}
+                  >
+                    <MaterialIcons name="search" color={colors.textSecondary} size={20} />
+                    <Text style={{ color: colors.textSecondary, marginLeft: 8 }}>Tìm kiếm...</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity onPress={() => openScanner()} className="px-3">
+                  <MaterialIcons name="qr-code-scanner" color={iconColor} size={24} />
                 </TouchableOpacity>
 
                 {rightActions && rightActions.map((a, idx) => (
@@ -197,6 +207,11 @@ const Header = ({
           </>
         )}
       </View>
+      <ScannerModal 
+        visible={scannerVisible} 
+        onClose={closeScanner} 
+        onScan={handleScan} 
+      />
     </View>
   );
 };

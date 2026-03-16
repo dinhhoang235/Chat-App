@@ -1,7 +1,9 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, Image } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, Image, Alert, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import { useTheme } from '@/context/themeContext';
 import { getInitials } from '@/utils/initials';
 import { getAvatarUrl } from '@/utils/avatar';
@@ -20,7 +22,41 @@ export default function MyQrModal({ visible, onClose, name, phone, avatarUri, da
   const rowBg = colors.surface;
   const overlayColor = scheme === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.55)';
 
-  const qrUri = data ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(data)}` : 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=chatapp';
+  const qrUri = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(data || 'chatapp-user')}`;
+
+  const handleDownload = async () => {
+    try {
+      // Request permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Lỗi', 'Ứng dụng cần quyền truy cập thư viện ảnh để tải xuống.');
+        return;
+      }
+
+      // Download file to cache
+      const fileUri = FileSystem.documentDirectory + `qr_code_${Date.now()}.png`;
+      const downloadRes = await FileSystem.downloadAsync(qrUri, fileUri);
+
+      // Save to library
+      await MediaLibrary.saveToLibraryAsync(downloadRes.uri);
+      
+      Alert.alert('Thành công', 'Mã QR đã được lưu vào thư viện ảnh của bạn.');
+    } catch (error) {
+      console.error('Download error:', error);
+      Alert.alert('Lỗi', 'Không thể tải xuống mã QR.');
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Mã QR của ${name || 'tôi'} trên DiskordMes: ${qrUri}`,
+        url: qrUri,
+      });
+    } catch (error) {
+       console.error('Share error:', error);
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -57,14 +93,14 @@ export default function MyQrModal({ visible, onClose, name, phone, avatarUri, da
               </View>
 
               <View style={{ flexDirection: 'row', marginTop: 20, justifyContent: 'space-around', width: '80%' }}>
-                <TouchableOpacity onPress={() => { /* placeholder share */ }} style={{ alignItems: 'center' }}>
+                <TouchableOpacity onPress={handleShare} style={{ alignItems: 'center' }}>
                   <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
                     <MaterialIcons name="share" size={22} color={colors.text} />
                   </View>
                   <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Chia sẻ</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={() => { /* placeholder download */ }} style={{ alignItems: 'center' }}>
+                <TouchableOpacity onPress={handleDownload} style={{ alignItems: 'center' }}>
                   <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
                     <MaterialIcons name="file-download" size={22} color={colors.text} />
                   </View>

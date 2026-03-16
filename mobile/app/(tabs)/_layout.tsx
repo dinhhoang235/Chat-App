@@ -1,3 +1,4 @@
+import React from 'react';
 import { Tabs, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from '@/context/themeContext';
@@ -91,5 +92,14 @@ function AddMenuWrapper() {
   const handleAddContact = () => { close(); router.push('/new-contact'); };
   const handleCreateGroup = () => { close(); router.push('/new-group'); };
 
-  return <AddMenu visible={visible} addLayout={addLayout} headerLayout={headerLayout} onClose={close} onAddContact={handleAddContact} onCreateGroup={handleCreateGroup} />;
+  return (
+    <AddMenu 
+      visible={visible} 
+      addLayout={addLayout} 
+      headerLayout={headerLayout} 
+      onClose={close} 
+      onAddContact={handleAddContact} 
+      onCreateGroup={handleCreateGroup} 
+    />
+  );
 }

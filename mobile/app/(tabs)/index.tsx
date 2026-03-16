@@ -116,7 +116,6 @@ export default function Messages() {
           onSearch={handleSearch}
           onFilterPress={handleFilter}
           onAddPress={handleAdd}
-          leftAddAction={{ icon: 'qr-code-scanner', onPress: () => console.log('QR pressed'), size: 24 }}
           onAddLayout={(layout) => setAddLayout?.(layout)}
           onHeaderLayout={(layout) => setHeaderLayout?.(layout)}
         />

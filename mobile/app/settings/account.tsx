@@ -158,7 +158,14 @@ export default function AccountSettings() {
           <MaterialIcons name="chevron-right" size={20} color="#9CA3AF" />
         </TouchableOpacity>
 
-        <MyQrModal visible={qrVisible} onClose={() => setQrVisible(false)} name={user?.fullName} phone={user?.phone} data={`chatapp:user:${user?.phone ?? 'me'}`} />
+        <MyQrModal 
+          visible={qrVisible} 
+          onClose={() => setQrVisible(false)} 
+          name={user?.fullName} 
+          phone={user?.phone} 
+          avatarUri={user?.avatar}
+          data={`chatapp://profile/${user?.id}`} 
+        />
 
       </ScrollView>
     </SafeAreaView>

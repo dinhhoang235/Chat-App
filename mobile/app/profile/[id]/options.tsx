@@ -346,7 +346,14 @@ export default function ProfileOptions() {
         }}
       />
 
-      <MyQrModal visible={qrVisible} onClose={() => setQrVisible(false)} name={auth.user?.fullName} phone={auth.user?.phone} avatarUri={undefined} data={auth.user?.phone ?? 'chatapp'} />
+      <MyQrModal 
+        visible={qrVisible} 
+        onClose={() => setQrVisible(false)} 
+        name={auth.user?.fullName} 
+        phone={auth.user?.phone} 
+        avatarUri={auth.user?.avatar} 
+        data={`chatapp://profile/${auth.user?.id}`} 
+      />
 
     </SafeAreaView>
   );

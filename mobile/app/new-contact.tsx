@@ -6,12 +6,21 @@ import { Header } from '@/components';
 import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { userAPI } from '@/services/user';
+import { useAuth } from '@/context/authContext';
+import ScannerModal from '@/components/modals/ScannerModal';
+import { useProfileScanner } from '@/hooks/useProfileScanner';
+import { Image } from 'expo-image';
 
 export default function NewContact() {
   const { colors } = useTheme();
+  const { user: currentUser } = useAuth();
   const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const { scannerVisible, openScanner, closeScanner, handleScan } = useProfileScanner();
+
+  const myProfileLink = `chatapp://profile/${currentUser?.id}`;
+  const qrUri = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(myProfileLink)}`;
 
   const handleSearchContact = async () => {
     if (!phoneNumber.trim()) {
@@ -71,15 +80,16 @@ export default function NewContact() {
 
       <View style={{ padding: 16 }}>
         <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 18 }}>
-          <View style={{ width: 180, height: 180, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-            {/* Placeholder QR - replace with real Image when available */}
-            <View style={{ width: 120, height: 120, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#000', fontWeight: '700' }}>QR</Text>
-            </View>
+          <View style={{ width: 180, height: 180, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+            <Image 
+              source={{ uri: qrUri }} 
+              style={{ width: 160, height: 160 }} 
+              contentFit="contain"
+            />
           </View>
 
-          <Text style={{ color: colors.text, fontWeight: '700', marginTop: 12 }}>Đình Hoàng</Text>
-          <Text style={{ color: colors.textSecondary, marginTop: 6, fontSize: 12 }}>Quét mã để thêm bạn Zalo với tôi</Text>
+          <Text style={{ color: colors.text, fontWeight: '700', marginTop: 12 }}>{currentUser?.fullName}</Text>
+          <Text style={{ color: colors.textSecondary, marginTop: 6, fontSize: 12 }}>Quét mã để thêm bạn với tôi</Text>
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
@@ -110,7 +120,10 @@ export default function NewContact() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
+        <TouchableOpacity 
+          onPress={openScanner}
+          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
+        >
           <MaterialIcons name="qr-code-scanner" size={22} color={colors.icon} />
           <Text style={{ color: colors.text, marginLeft: 12, fontWeight: '700' }}>Quét mã QR</Text>
         </TouchableOpacity>
@@ -124,6 +137,11 @@ export default function NewContact() {
           <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Xem lời mời kết bạn đã gửi tại trang Danh bạ Zalo</Text>
         </View>
       </View>
+      <ScannerModal 
+        visible={scannerVisible} 
+        onClose={closeScanner} 
+        onScan={handleScan} 
+      />
     </SafeAreaView>
   );
 }

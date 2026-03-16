@@ -25,7 +25,6 @@ export default function ChatOptions() {
     isOnline,
     groupDetails,
     pinned, setPinned,
-    eyeOff, setEyeOff,
     muteVisible, setMuteVisible,
     muteSettingsVisible, setMuteSettingsVisible,
     selectedMuteOption,
@@ -138,7 +137,6 @@ export default function ChatOptions() {
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="push-pin" title="Ghim trò chuyện" rightNode={<Switch value={pinned} onValueChange={setPinned} />} onPress={() => setPinned(v => !v)} />
-              <Row icon="visibility-off" title="Ẩn trò chuyện" rightNode={<Switch value={eyeOff} onValueChange={setEyeOff} />} onPress={() => setEyeOff(v => !v)} />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="flag" title="Báo xấu" onPress={() => setReportVisible(true)} />

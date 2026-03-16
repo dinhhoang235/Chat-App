@@ -48,7 +48,6 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
       label: message.isMuted ? 'Bật thông báo' : 'Tắt thông báo', 
       icon: message.isMuted ? 'notifications' : 'notifications-off' 
     },
-    { key: 'hide', label: 'Ẩn', icon: 'visibility-off' },
     { key: 'delete', label: 'Xóa', icon: 'delete', destructive: true },
     { key: 'select', label: 'Chọn nhiều', icon: 'check-circle' },
   ];

@@ -13,7 +13,6 @@ export function useChatOptions() {
   const { user } = useAuth();
 
   const [pinned, setPinned] = useState(false);
-  const [eyeOff, setEyeOff] = useState(false);
   const [muteVisible, setMuteVisible] = useState(false);
   const [muteSettingsVisible, setMuteSettingsVisible] = useState(false);
   const [selectedMuteOption, setSelectedMuteOption] = useState<string>('Không tắt');
@@ -261,7 +260,6 @@ export function useChatOptions() {
     isOnline,
     groupDetails,
     pinned, setPinned,
-    eyeOff, setEyeOff,
     muteVisible, setMuteVisible,
     muteSettingsVisible, setMuteSettingsVisible,
     selectedMuteOption, setSelectedMuteOption,

@@ -81,6 +81,19 @@ export default function Messages() {
     console.log('Row action', action, id);
   };
 
+  const handleDeleteBulk = () => {
+    if (selectedIds.length === 0) return;
+    
+    Alert.alert(
+      'Xóa cuộc trò chuyện',
+      `Bạn có chắc chắn muốn xóa ${selectedIds.length} cuộc trò chuyện đã chọn? Hành động này không thể hoàn tác.`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Xóa', style: 'destructive', onPress: () => handleDeleteSelected() }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
       {selectionMode ? (
@@ -143,7 +156,7 @@ export default function Messages() {
       )}
 
       {selectionMode ? (
-        <BottomActionBar onMarkRead={handleMarkRead} onDelete={handleDeleteSelected} onLayout={(h) => setBottomBarHeight(h)} />
+        <BottomActionBar onMarkRead={handleMarkRead} onDelete={handleDeleteBulk} onLayout={(h) => setBottomBarHeight(h)} />
       ) : null}
 
       <StartChatModal 

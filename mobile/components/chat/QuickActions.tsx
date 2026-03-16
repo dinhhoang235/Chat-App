@@ -11,6 +11,7 @@ interface QuickActionsProps {
   onSearch: () => void;
   onToggleMute: () => void;
   onMemberAdded?: () => void;
+  onDelete?: () => void;
   colors: any;
 }
 
@@ -21,6 +22,7 @@ const QuickActions = ({
   onSearch,
   onToggleMute,
   onMemberAdded,
+  onDelete,
   colors,
 }: QuickActionsProps) => {
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -61,6 +63,13 @@ const QuickActions = ({
           <MaterialIcons name={isMuted ? "notifications" : "notifications-off"} size={20} color={isMuted ? '#fff' : colors.text} />
         </View>
         <Text style={{ color: colors.text }}>{isMuted ? 'Bật thông báo' : 'Tắt thông báo'}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity className="items-center" onPress={onDelete}>
+        <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+          <MaterialIcons name="delete" size={20} color={colors.danger} />
+        </View>
+        <Text style={{ color: colors.danger }}>Xóa lịch sử</Text>
       </TouchableOpacity>
 
       <AddToGroupModal

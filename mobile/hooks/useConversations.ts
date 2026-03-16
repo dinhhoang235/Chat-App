@@ -140,10 +140,27 @@ export function useConversations() {
     setData((prev) => prev.map(m => selectedIds.includes(m.id) ? { ...m, unread: 0 } : m));
   };
 
-  const handleDeleteSelected = () => {
-    setData((prev) => prev.filter(m => !selectedIds.includes(m.id)));
-    setSelectionMode(false);
-    setSelectedIds([]);
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      await chatApi.deleteConversation(id);
+      setData((prev) => prev.filter(m => m.id !== id));
+    } catch (err) {
+      console.error("Delete conversation error:", err);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    try {
+      // For now, delete each one sequentially since there's no bulk delete API
+      for (const id of selectedIds) {
+        await chatApi.deleteConversation(id);
+      }
+      setData((prev) => prev.filter(m => !selectedIds.includes(m.id)));
+      setSelectionMode(false);
+      setSelectedIds([]);
+    } catch (err) {
+      console.error("Delete selected error:", err);
+    }
   };
 
   const handleMute = async (id: string, duration: string) => {
@@ -194,6 +211,7 @@ export function useConversations() {
     handleCancelSelection,
     handleMarkRead,
     handleDeleteSelected,
+    handleDeleteConversation,
     handleMute,
     handleUnmute,
     router,

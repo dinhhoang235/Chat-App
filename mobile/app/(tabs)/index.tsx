@@ -1,4 +1,4 @@
-import { FlatList, View, ActivityIndicator } from "react-native";
+import { FlatList, View, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from 'react';
 import { Header, SelectionHeader, BottomActionBar, MessageRow, StartChatModal, EmptyConversations } from '@/components';
@@ -26,6 +26,7 @@ export default function Messages() {
     handleCancelSelection,
     handleMarkRead,
     handleDeleteSelected,
+    handleDeleteConversation,
     handleMute,
     handleUnmute,
     router,
@@ -56,6 +57,17 @@ export default function Messages() {
     }
     if (action === 'unmute') {
       handleUnmute(id);
+      return;
+    }
+    if (action === 'delete') {
+      Alert.alert(
+        'Xóa cuộc trò chuyện',
+        'Bạn có chắc chắn muốn xóa cuộc trò chuyện này? Hành động này không thể hoàn tác.',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { text: 'Xóa', style: 'destructive', onPress: () => handleDeleteConversation(id) }
+        ]
+      );
       return;
     }
     console.log('Row action', action, id);

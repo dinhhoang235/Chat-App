@@ -77,6 +77,7 @@ export default function ChatOptions() {
             }
           }}
           onMemberAdded={fetchConversationDetails}
+          onDelete={() => setConfirmVisible(true)}
           colors={colors}
         />
 

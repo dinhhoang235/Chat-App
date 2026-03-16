@@ -21,6 +21,7 @@ type Props = {
     membersCount?: number;
     status?: string;
     isMuted?: boolean;
+    isPinned?: boolean;
   };
   onPress?: () => void;
   onAction?: (action: string, data?: any) => void;
@@ -42,7 +43,7 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
 
   const menuItems = [
     { key: 'mark_unread', label: 'Đánh dấu chưa đọc', icon: 'drafts' },
-    { key: 'pin', label: 'Ghim', icon: 'push-pin' },
+    { key: 'pin', label: message.isPinned ? 'Bỏ ghim' : 'Ghim', icon: 'push-pin' },
     { 
       key: 'mute', 
       label: message.isMuted ? 'Bật thông báo' : 'Tắt thông báo', 
@@ -189,6 +190,9 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {message.isMuted && (
               <MaterialIcons name="notifications-off" size={14} color={colors.textSecondary} style={{ marginRight: 4 }} />
+            )}
+            {message.isPinned && (
+              <MaterialIcons name="push-pin" size={12} color={colors.textSecondary} style={{ marginRight: 4, transform: [{ rotate: '45deg' }] }} />
             )}
             <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{message.time}</Text>
           </View>

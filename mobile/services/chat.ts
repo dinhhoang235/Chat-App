@@ -84,4 +84,6 @@ export const chatApi = {
     apiClient.delete(`/chats/${id}/leave`),
   muteConversation: (id: string | number, mutedUntil: Date | null) =>
     apiClient.post(`/chats/${id}/mute`, { mutedUntil }),
+  pinConversation: (id: string | number, pinned: boolean) =>
+    apiClient.post(`/chats/${id}/pin`, { pinned }),
 };

@@ -24,7 +24,7 @@ export default function ChatOptions() {
     groupAvatars,
     isOnline,
     groupDetails,
-    pinned, setPinned,
+    pinned, handleTogglePin,
     muteVisible, setMuteVisible,
     muteSettingsVisible, setMuteSettingsVisible,
     selectedMuteOption,
@@ -67,6 +67,7 @@ export default function ChatOptions() {
           conversationId={id}
           isGroup={isGroup}
           isMuted={isMuted}
+          isPinned={pinned}
           onSearch={() => { open(id); router.back(); }}
           onToggleMute={() => {
             if (isMuted) {
@@ -75,6 +76,7 @@ export default function ChatOptions() {
               setMuteVisible(true);
             }
           }}
+          onTogglePin={handleTogglePin}
           onMemberAdded={fetchConversationDetails}
           onDelete={() => setConfirmVisible(true)}
           colors={colors}
@@ -136,7 +138,7 @@ export default function ChatOptions() {
               ) : null}
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
-              <Row icon="push-pin" title="Ghim trò chuyện" rightNode={<Switch value={pinned} onValueChange={setPinned} />} onPress={() => setPinned(v => !v)} />
+              <Row icon="push-pin" title="Ghim trò chuyện" rightNode={<Switch value={pinned} onValueChange={handleTogglePin} />} onPress={handleTogglePin} />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
               <Row icon="flag" title="Báo xấu" onPress={() => setReportVisible(true)} />
@@ -183,7 +185,7 @@ export default function ChatOptions() {
             </View>
 
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>
-              <Row icon="push-pin" title="Ghim trò chuyện" rightNode={<Switch value={pinned} onValueChange={setPinned} />} onPress={() => setPinned(v => !v)} />
+              <Row icon="push-pin" title="Ghim trò chuyện" rightNode={<Switch value={pinned} onValueChange={handleTogglePin} />} onPress={handleTogglePin} />
               <Row icon="notifications" title="Báo cuộc gọi đến" rightNode={<Switch value={true} />} onPress={() => { }} />
             </View>
             <View className="mt-4 border-t" style={{ borderTopColor: colors.border }}>

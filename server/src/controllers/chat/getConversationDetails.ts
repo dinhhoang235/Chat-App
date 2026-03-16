@@ -51,7 +51,7 @@ export const getConversationDetails = async (req: AuthRequest, res: Response): P
         role: p.role,
         lastReadAt: p.lastReadAt,
         joinedAt: p.joinedAt,
-        // @ts-ignore
+        isPinned: p.isPinned,
         mutedUntil: p.mutedUntil,
         user: {
           ...p.user,

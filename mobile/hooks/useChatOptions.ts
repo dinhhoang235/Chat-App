@@ -70,6 +70,7 @@ export function useChatOptions() {
 
       if (user) {
         const me = response.data.participants?.find((p: any) => p.userId === user.id);
+        setPinned(!!me?.isPinned);
         if (me?.mutedUntil) {
           const until = new Date(me.mutedUntil);
           if (until > new Date()) {
@@ -248,6 +249,17 @@ export function useChatOptions() {
     }
   };
 
+  const handleTogglePin = async () => {
+    const newVal = !pinned;
+    try {
+      await chatApi.pinConversation(id, newVal);
+      setPinned(newVal);
+    } catch (err) {
+      console.error('Pin error:', err);
+      Alert.alert('Lỗi', 'Không thể ghim cuộc trò chuyện');
+    }
+  };
+
   return {
     router,
     params,
@@ -259,7 +271,7 @@ export function useChatOptions() {
     groupAvatars,
     isOnline,
     groupDetails,
-    pinned, setPinned,
+    pinned, handleTogglePin,
     muteVisible, setMuteVisible,
     muteSettingsVisible, setMuteSettingsVisible,
     selectedMuteOption, setSelectedMuteOption,

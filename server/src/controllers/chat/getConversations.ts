@@ -65,7 +65,7 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
         }
       });
 
-      // Add status for the other participant
+      // Add status for each participant
       const participantsWithStatus = await Promise.all(conv.participants.map(async (p) => {
         const status = await getUserStatus(p.userId);
         return {
@@ -79,6 +79,7 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
 
       return {
         ...conv,
+        isPinned: !!participant?.isPinned,
         messages: lastMessage,
         participants: participantsWithStatus,
         membersCount: conv.participants.length,
@@ -88,7 +89,13 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
       };
     }));
 
-    return res.json(mappedConversations);
+    const sortedConversations = [...mappedConversations].sort((a: any, b: any) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return b.updatedAt - a.updatedAt;
+    });
+
+    return res.json(sortedConversations);
   } catch (err) {
     console.error('Get conversations error:', err);
     return res.status(500).json({ message: 'Error fetching conversations' });

@@ -12,3 +12,4 @@ export * from './removeMember.js';
 export * from './leaveGroup.js';
 export * from './getConversationMedia.js';
 export * from './muteConversation.js';
+export * from './pinConversation.js';

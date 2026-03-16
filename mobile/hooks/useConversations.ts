@@ -75,9 +75,14 @@ export function useConversations() {
           targetUserId: otherParticipant?.userId.toString(),
           status: otherParticipant?.user.status || 'offline',
           isMuted: !!(conv.participants.find((p: any) => p.userId === user?.id)?.mutedUntil && new Date(conv.participants.find((p: any) => p.userId === user?.id).mutedUntil) > new Date()),
+          isPinned: !!conv.participants.find((p: any) => p.userId === user?.id)?.isPinned,
           updatedAt: updatedAt
         };
-      }).sort((a: any, b: any) => b.updatedAt - a.updatedAt);
+      }).sort((a: any, b: any) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return b.updatedAt - a.updatedAt;
+      });
       setData(mapped);
     } catch (err: any) {
       // 401 may occur if auth isn't ready; we already guard but log others
@@ -196,6 +201,22 @@ export function useConversations() {
     }
   };
 
+  const handlePin = async (id: string, pinned: boolean) => {
+    try {
+      await chatApi.pinConversation(id, pinned);
+      setData(prev => {
+        const newData = prev.map(m => m.id === id ? { ...m, isPinned: pinned } : m);
+        return [...newData].sort((a: any, b: any) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return b.updatedAt - a.updatedAt;
+        });
+      });
+    } catch (err) {
+      console.error("Pin error:", err);
+    }
+  };
+
   return {
     data,
     setData,
@@ -214,6 +235,7 @@ export function useConversations() {
     handleDeleteConversation,
     handleMute,
     handleUnmute,
+    handlePin,
     router,
     colors
   };

@@ -29,6 +29,7 @@ export default function Messages() {
     handleDeleteConversation,
     handleMute,
     handleUnmute,
+    handlePin,
     router,
     colors
   } = useConversations();
@@ -45,18 +46,25 @@ export default function Messages() {
     toggle();
   };
 
-  const handleRowAction = (action: string, id: string, data?: any) => {
+  const handleRowAction = (action: string, id: string, payload?: any) => {
     if (action === 'select') {
       setSelectionMode(true);
       setSelectedIds([id]);
       return;
     }
     if (action === 'mute') {
-      handleMute(id, data);
+      handleMute(id, payload);
       return;
     }
     if (action === 'unmute') {
       handleUnmute(id);
+      return;
+    }
+    if (action === 'pin') {
+      const conv = data.find((m: any) => m.id === id);
+      if (conv) {
+        handlePin(id, !conv.isPinned);
+      }
       return;
     }
     if (action === 'delete') {
@@ -123,7 +131,7 @@ export default function Messages() {
                   }); 
                 } 
               }}
-              onAction={(action, data) => handleRowAction(action, item.id, data)}
+              onAction={(action, payload) => handleRowAction(action, item.id, payload)}
               selectionMode={selectionMode}
               selected={selectedIds.includes(item.id)}
               onToggleSelect={(id) => toggleSelect(id)}

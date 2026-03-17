@@ -16,9 +16,9 @@ interface ChatComposerProps {
   insets: { bottom: number };
   onImagePress?: () => void;
   /** if true, show image icon as active (blue) */
-  imageActive?: boolean;
-  /** unified sheet opener: 'gallery' | 'actions' */
-  onOpenSheet?: (type: 'gallery' | 'actions') => void;
+  imageActive?: 'gallery' | 'actions' | 'emoji' | boolean;
+  /** unified sheet opener: 'gallery' | 'actions' | 'emoji' */
+  onOpenSheet?: (type: 'gallery' | 'actions' | 'emoji') => void;
   onMorePress?: () => void;
   attachments?: {uri: string}[];
   onRemoveAttachment?: (arg: number | string) => void;
@@ -112,8 +112,17 @@ export default function ChatComposer({
             <MaterialIcons name="chevron-left" size={26} color={colors.icon} />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity className="mr-3">
-            <MaterialIcons name="emoji-emotions" size={26} color={colors.icon} />
+          <TouchableOpacity 
+            className="mr-3" 
+            onPress={() => {
+              if (onOpenSheet) onOpenSheet('emoji');
+            }}
+          >
+            <MaterialIcons 
+              name="emoji-emotions" 
+              size={26} 
+              color={imageActive === 'emoji' ? colors.tint : colors.icon} 
+            />
           </TouchableOpacity>
         )}
 
@@ -215,7 +224,7 @@ export default function ChatComposer({
                   name="image"
                   size={26}
                   color={
-                    imageActive || imagePressed ? colors.tint : colors.icon
+                    (imageActive === 'gallery' || imageActive === true) || imagePressed ? colors.tint : colors.icon
                   }
                 />
               </TouchableOpacity>

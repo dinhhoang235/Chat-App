@@ -19,4 +19,5 @@ export { default as ProfileBioModal } from './ProfileBioModal';
 export { default as ProfileEditModal } from './ProfileEditModal';
 export { default as ReportModal } from './ReportModal';
 export { default as StartChatModal } from './StartChatModal';
+export { default as EmojiSheet } from './EmojiSheet';
 export { default as ScannerModal } from './ScannerModal';

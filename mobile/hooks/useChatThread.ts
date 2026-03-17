@@ -296,6 +296,7 @@ export function useChatThread() {
 
   const [composerVisible, setComposerVisible] = useState(false);
   const [galleryVisible, setGalleryVisible] = useState(false);
+  const [emojiVisible, setEmojiVisible] = useState(false);
   const [messageText, setMessageText] = useState('');
 
   // attachments picked from image picker (max 10)
@@ -328,6 +329,20 @@ export function useChatThread() {
     handleType();
   };
 
+  const handleEmojiSelect = (emoji: string) => {
+    setMessageText(prev => prev + emoji);
+    handleType();
+  };
+
+  const handleBackspace = () => {
+    setMessageText(prev => {
+      const chars = Array.from(prev);
+      if (chars.length === 0) return prev;
+      return chars.slice(0, -1).join('');
+    });
+    handleType();
+  };
+
   const safeInsets = useSafeAreaInsets();
   // Khởi tạo inset từ initialWindowMetrics để tránh bị 0 ở frame đầu tiên
   const insets = useMemo(() => ({
@@ -352,7 +367,7 @@ export function useChatThread() {
       sheetTimeoutRef.current = null;
     }
 
-    const isAnySheetVisible = composerVisible || galleryVisible;
+    const isAnySheetVisible = composerVisible || galleryVisible || emojiVisible;
     if (isAnySheetVisible) {
       if (keyboardHeight.value > 0) {
         // Nếu bàn phím đang mở (VD: từ bàn phím bấm sang More)
@@ -372,7 +387,7 @@ export function useChatThread() {
         sheetHeightSV.value = withTiming(0, { duration: 333 });
       }
     }
-  }, [composerVisible, galleryVisible, lastKeyboardHeight, sheetHeightSV, keyboardHeight]);
+  }, [composerVisible, galleryVisible, emojiVisible, lastKeyboardHeight, sheetHeightSV, keyboardHeight]);
 
   const animatedContentStyle = useAnimatedStyle(() => {
     return {
@@ -914,8 +929,12 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     setComposerVisible,
     galleryVisible,
     setGalleryVisible,
+    emojiVisible,
+    setEmojiVisible,
     messageText,
     onTextChange,
+    handleEmojiSelect,
+    handleBackspace,
     insets,
     animatedContentStyle,
     fetchMessages,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ChatComposer } from '@/components';
+import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ChatComposer } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 
@@ -31,8 +31,14 @@ export default function ChatThread() {
     setCurrentResultIndex,
     composerVisible,
     setComposerVisible,
+    galleryVisible,
+    setGalleryVisible,
+    emojiVisible,
+    setEmojiVisible,
     messageText,
     onTextChange,
+    handleEmojiSelect,
+    handleBackspace,
     insets,
     animatedContentStyle,
     fetchMessages,
@@ -46,8 +52,6 @@ export default function ChatThread() {
     groupAvatars,
     membersCount,
     lastKeyboardHeight,
-    galleryVisible,
-    setGalleryVisible,
     processedMessages,
     currentResultIndices,
     statusText,
@@ -65,6 +69,8 @@ export default function ChatThread() {
     setComposerVisible,
     galleryVisible,
     setGalleryVisible,
+    emojiVisible,
+    setEmojiVisible,
     lastKeyboardHeight
   );
 
@@ -291,7 +297,7 @@ export default function ChatThread() {
                   colors={colors}
                   insets={insets}
                   onOpenSheet={openSheet}
-                  imageActive={galleryVisible}
+                  imageActive={galleryVisible ? 'gallery' : (emojiVisible ? 'emoji' : (composerVisible ? 'actions' : false))}
                   attachments={attachments}
                   onRemoveAttachment={removeAttachment}
                   onClearAttachments={clearAttachments}
@@ -300,6 +306,7 @@ export default function ChatThread() {
                   onFocus={() => {
                     if (galleryVisible) setGalleryVisible(false);
                     if (composerVisible) setComposerVisible(false);
+                    if (emojiVisible) setEmojiVisible(false);
                   }}
                 />
               )}
@@ -313,6 +320,16 @@ export default function ChatThread() {
             attachments={attachments}
             addAttachment={(file: any) => addAttachments([file])}
             removeAttachment={removeAttachment}
+            height={sheetHeight}
+          />
+
+          <EmojiSheet
+            visible={emojiVisible}
+            onClose={() => setEmojiVisible(false)}
+            onEmojiSelected={(emoji) => {
+              handleEmojiSelect(emoji.emoji);
+            }}
+            onBackspacePress={handleBackspace}
             height={sheetHeight}
           />
 

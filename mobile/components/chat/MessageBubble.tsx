@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useChatThread } from '@/hooks/useChatThread';
-import { View, Text, TouchableOpacity, Linking, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Animated } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { Image } from 'expo-image';
 import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -23,16 +24,18 @@ type ChatMessage = {
   status?: 'sending' | 'sent' | 'error';
   fileInfo?: { url: string; name?: string; size?: number; mime?: string };
   images?: any[]; // for image_group
+  replyTo?: any;
 };
 
 const IMAGE_SIZE_CACHE = new Map<string, {width: number, height: number}>();
 
-export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean }) {
+export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const { allMedia } = useChatThread();
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const swipeableRef = React.useRef<Swipeable>(null);
 
   // derive list of image URIs (and their message ids) from entire thread
   // we also keep the corresponding message ids so we can find the correct
@@ -345,23 +348,93 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     );
   }
 
+  const renderLeftActions = (progress: any, dragX: any) => {
+    const scale = dragX.interpolate({
+      inputRange: [0, 50, 100],
+      outputRange: [0, 1, 1],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <View style={{ width: 68, backgroundColor: colors.background }}>
+        <View className="flex-row justify-start px-4 my-2">
+          <Animated.View style={{ transform: [{ scale }], width: 40, height: 40, justifyContent: 'center', alignItems: 'center' }}>
+            <MaterialIcons name="reply" size={24} color={colors.icon} />
+          </Animated.View>
+        </View>
+      </View>
+    );
+  };
+
+  const replyBlock = message.replyTo && (
+    <View style={{ backgroundColor: isOutgoing ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)', borderRadius: 8, padding: 8, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: colors.tint, flexDirection: 'row', alignItems: 'center' }}>
+      {(message.replyTo.type === 'image' || message.replyTo.type === 'image_group') && (
+        <View style={{ width: 36, height: 36, marginRight: 8, borderRadius: 4, overflow: 'hidden' }}>
+          <Image 
+            source={{ 
+              uri: (() => {
+                let url = message.replyTo.type === 'image_group' ? message.replyTo.images?.[0]?.fileInfo?.url : message.replyTo.fileInfo?.url;
+                if (!url && message.replyTo.type === 'image') {
+                  try {
+                    const info = typeof message.replyTo.content === 'string' ? JSON.parse(message.replyTo.content) : message.replyTo.content;
+                    url = info?.url;
+                  } catch {
+                    url = message.replyTo.content;
+                  }
+                }
+                if (!url) return undefined;
+                if (url.startsWith('http')) return url;
+                if (!url.startsWith('/media')) url = `/media${url}`;
+                return getAvatarUrl(url) || url;
+              })()
+            }} 
+            style={{ width: '100%', height: '100%', backgroundColor: colors.surfaceVariant }}
+            contentFit="cover"
+          />
+        </View>
+      )}
+      <View style={{ flexShrink: 1, justifyContent: 'center' }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: isOutgoing ? colors.bubbleMeText : colors.bubbleOtherText, marginBottom: 2 }}>
+          {message.replyTo.sender?.fullName || 'Người dùng'}
+        </Text>
+        <Text style={{ fontSize: 13, color: isOutgoing ? 'rgba(255,255,255,0.85)' : colors.textSecondary }} numberOfLines={1} ellipsizeMode="tail">
+          {message.replyTo.type === 'text' ? message.replyTo.content?.replace(/\n/g, ' ') : (message.replyTo.type === 'image' || message.replyTo.type === 'image_group' ? '[Hình ảnh]' : '[Tệp]')}
+        </Text>
+      </View>
+    </View>
+  );
+
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-      <View className={`flex-row ${message.fromMe ? 'justify-end' : 'justify-start'} px-4 my-2`}> 
-        {!message.fromMe && (
-          <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ opacity: isLastInGroup ? 1 : 0 }}>
-            <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant, overflow: 'hidden' }}>
-              {message.contactAvatar ? (
-                <Image 
-                  source={{ uri: message.contactAvatar }} 
-                  style={{ width: 40, height: 40 }} 
-                />
-              ) : (
-                <Text style={{ color: colors.text, fontWeight: '700' }}>{message.contactName ? message.contactName.slice(0,1) : 'A'}</Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
+    <View style={{ position: 'relative' }}>
+      {!message.fromMe && (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 1 }} pointerEvents="box-none">
+          <View className={`flex-row justify-start px-4 my-2`}>
+            <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ opacity: isLastInGroup ? 1 : 0 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant, overflow: 'hidden' }}>
+                {message.contactAvatar ? (
+                  <Image source={{ uri: message.contactAvatar }} style={{ width: 40, height: 40 }} />
+                ) : (
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>{message.contactName ? message.contactName.slice(0,1) : 'A'}</Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+      <Swipeable
+        ref={swipeableRef}
+        renderLeftActions={renderLeftActions}
+        onSwipeableWillOpen={() => {
+          if (onReply) onReply();
+          swipeableRef.current?.close();
+        }}
+        containerStyle={{ zIndex: 2 }}
+      >
+        <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+        <View className={`flex-row ${message.fromMe ? 'justify-end' : 'justify-start'} px-4 my-2`}> 
+          {!message.fromMe && (
+            <View style={{ width: 40, height: 40 }} />
+          )}
 
         <View style={{ maxWidth: '72%', marginLeft: isOutgoing ? 'auto' : 12 }} className={`${isOutgoing ? 'items-end' : 'items-start'}`}> 
             {/* for image attachments we don’t show the standard bubble styling */}
@@ -373,6 +446,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
             borderRadius: 18,
             marginBottom: isLastInGroup ? 0 : -8
           }}>
+            {replyBlock}
             {contentElement}
           </View>
 
@@ -428,6 +502,8 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           )}
         </View>
       </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      </Swipeable>
+    </View>
   );
 }

@@ -52,7 +52,9 @@ export default function ChatThread() {
     currentResultIndices,
     statusText,
     handleSend,
-    pickDocument
+    pickDocument,
+    replyingTo,
+    setReplyingTo
   } = useChatThread();
 
 
@@ -253,6 +255,7 @@ export default function ChatThread() {
                             if (item.fromMe) return router.push('/profile/me');
                             router.push(`/profile/${item.senderId}`);
                           }}
+                          onReply={() => setReplyingTo(item)}
                         />
                       );
                     }}
@@ -292,6 +295,8 @@ export default function ChatThread() {
                   attachments={attachments}
                   onRemoveAttachment={removeAttachment}
                   onClearAttachments={clearAttachments}
+                  replyingTo={replyingTo}
+                  onCancelReply={() => setReplyingTo(null)}
                   onFocus={() => {
                     if (galleryVisible) setGalleryVisible(false);
                     if (composerVisible) setComposerVisible(false);

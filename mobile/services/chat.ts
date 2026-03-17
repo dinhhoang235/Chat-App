@@ -8,10 +8,11 @@ export const chatApi = {
     apiClient.get(`/chats/${id}/media`, { params: { cursor, limit } }),
   getMessages: (id: string | number, cursor?: number, limit: number = 20) => 
     apiClient.get(`/chats/${id}/messages`, { params: { cursor, limit } }),
-  sendMessage: (id: string | number, content: string, type: string = 'text', file?: any) => {
+  sendMessage: (id: string | number, content: string, type: string = 'text', file?: any, replyToId?: string | number) => {
     if (file) {
       const formData = new FormData();
       if (content) formData.append('content', content);
+      if (replyToId) formData.append('replyToId', replyToId.toString());
       // ensure file object is proper for RN
       let upload = file;
       if (file.uri) {
@@ -28,7 +29,9 @@ export const chatApi = {
         transformRequest: (data) => data,
       });
     }
-    return apiClient.post(`/chats/${id}/messages`, { content, type });
+    const body: any = { content, type };
+    if (replyToId) body.replyToId = replyToId;
+    return apiClient.post(`/chats/${id}/messages`, body);
   },
 
   markAsRead: (id: string | number) => 

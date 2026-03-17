@@ -82,6 +82,9 @@ model Message {
   sender         User?        @relation(fields: [senderId], references: [id], onDelete: Cascade)
   content        String       @db.Text
   type           String       @default("text") // text, image, sticker, file, system
+  replyToId      Int?
+  replyTo        Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies        Message[]    @relation("MessageReplies")
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

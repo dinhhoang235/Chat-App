@@ -9,7 +9,7 @@ import Expo from 'expo-server-sdk';
 
 export const sendMessage = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { conversationId } = req.params;
-  let { content, type = 'text' } = req.body;
+  let { content, type = 'text', replyToId } = req.body;
   const userId = req.userId;
 
   if (!userId) {
@@ -49,7 +49,8 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
         content,
         type,
         conversationId: convId,
-        senderId: userId
+        senderId: userId,
+        replyToId: replyToId ? parseInt(replyToId) : undefined
       },
       include: {
         sender: {
@@ -57,6 +58,18 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
             id: true,
             fullName: true,
             avatar: true
+          }
+        },
+        replyTo: {
+          select: {
+            id: true,
+            content: true,
+            type: true,
+            sender: {
+              select: {
+                fullName: true
+              }
+            }
           }
         },
         conversation: {

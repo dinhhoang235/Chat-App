@@ -80,6 +80,18 @@ export const getMessages = (io: Server) => async (req: AuthRequest, res: Respons
               fullName: true,
               avatar: true
             }
+          },
+          replyTo: {
+            select: {
+              id: true,
+              content: true,
+              type: true,
+              sender: {
+                select: {
+                  fullName: true
+                }
+              }
+            }
           }
         }
       });

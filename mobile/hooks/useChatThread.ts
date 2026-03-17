@@ -42,6 +42,7 @@ export function useChatThread() {
   
   const [targetUserStatus, setTargetUserStatus] = useState<{status: string, lastSeen: number | null} | null>(null);
   const [targetUser, setTargetUser] = useState<any>(null);
+  const [replyingTo, setReplyingTo] = useState<any>(null);
 
   const [groupDetails, setGroupDetails] = useState<any>(null);
   const [allMedia, setAllMedia] = useState<any[]>([]);
@@ -660,6 +661,9 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     // Scroll to bottom (index 0 in inverted list)
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
 
+    const replyToSnapshot = replyingTo;
+    setReplyingTo(null);
+
     const tempId = `temp-${Date.now()}`;
     const tempMessage = {
       id: tempId,
@@ -669,6 +673,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       createdAt: new Date().toISOString(),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'sending',
+      replyTo: replyToSnapshot
     };
 
     try {
@@ -707,7 +712,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
 
       setMessages(prev => [tempMessage, ...prev]);
 
-      await chatApi.sendMessage(Number(targetConversationId), text);
+      await chatApi.sendMessage(Number(targetConversationId), text, 'text', undefined, replyToSnapshot?.id);
     } catch (err) {
       console.error('Send error:', err);
       setMessages(prev => prev.filter(m => m.id !== tempId));
@@ -726,6 +731,9 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     }
 
     const tempId = `temp-${Date.now()}`;
+    const replyToSnapshot = replyingTo;
+    setReplyingTo(null);
+
     const tempMessage: any = {
       id: tempId,
       content: file.uri,
@@ -734,6 +742,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       createdAt: new Date().toISOString(),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'sending',
+      replyTo: replyToSnapshot,
       type: file.type.startsWith('image/') ? 'image' : 'file',
       fileName: file.name,
     };
@@ -787,7 +796,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         }
       }
 
-      await chatApi.sendMessage(Number(targetConversationId), caption || '', '', uploadFile);
+      await chatApi.sendMessage(Number(targetConversationId), caption || '', '', uploadFile, replyToSnapshot?.id);
     } catch (err) {
       console.error('Attachment send error:', err);
       alert('Không thể gửi tệp, vui lòng thử lại');
@@ -927,6 +936,8 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     allMedia,
     fetchAllMedia,
     loadingMoreMedia,
-    hasMoreMedia
+    hasMoreMedia,
+    replyingTo,
+    setReplyingTo
   };
 }

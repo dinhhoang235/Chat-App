@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { View, TextInput, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ActivityIndicator } from 'react-native';
+import { View, TextInput, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ActivityIndicator, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { getAvatarUrl } from '@/utils/avatar';
 
 interface ChatComposerProps {
   messageText: string;
@@ -22,6 +24,8 @@ interface ChatComposerProps {
   onRemoveAttachment?: (arg: number | string) => void;
   onClearAttachments?: () => void;
   onFocus?: () => void;
+  replyingTo?: any;
+  onCancelReply?: () => void;
 }
 
 export default function ChatComposer({
@@ -42,6 +46,8 @@ export default function ChatComposer({
   onRemoveAttachment,
   onClearAttachments,
   onFocus,
+  replyingTo,
+  onCancelReply,
 }: ChatComposerProps) {
   const [imagePressed, setImagePressed] = useState(false);
 
@@ -54,6 +60,46 @@ export default function ChatComposer({
         marginTop: -14,
       }}
     >
+      {replyingTo && (
+        <View className="flex-row items-center justify-between px-4 py-2" style={{ borderBottomColor: colors.surfaceVariant, borderBottomWidth: 1 }}>
+          <View className="flex-1 mr-2">
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+              Đang trả lời {replyingTo.contactName || replyingTo.sender?.fullName || 'Người dùng'}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
+              {replyingTo.type === 'image' || replyingTo.type === 'image_group' ? '[Hình ảnh]' : (replyingTo.type === 'text' ? replyingTo.content : '[Tệp]')}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {(replyingTo.type === 'image' || replyingTo.type === 'image_group') && (
+              <Image 
+                source={{ 
+                  uri: (() => {
+                    let url = replyingTo.type === 'image_group' ? replyingTo.images?.[0]?.fileInfo?.url : replyingTo.fileInfo?.url;
+                    if (!url && replyingTo.type === 'image') {
+                      try {
+                        const info = typeof replyingTo.content === 'string' ? JSON.parse(replyingTo.content) : replyingTo.content;
+                        url = info?.url;
+                      } catch {
+                        url = replyingTo.content;
+                      }
+                    }
+                    if (!url) return undefined;
+                    if (url.startsWith('http')) return url;
+                    if (!url.startsWith('/media')) url = `/media${url}`;
+                    return getAvatarUrl(url) || url;
+                  })()
+                }} 
+                style={{ width: 36, height: 36, borderRadius: 6, marginRight: 8, backgroundColor: colors.surfaceVariant }}
+                contentFit="cover"
+              />
+            )}
+            <TouchableOpacity onPress={onCancelReply} style={{ padding: 4 }}>
+              <MaterialIcons name="close" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
       <View
         className="px-4 flex-row items-center"
         style={{

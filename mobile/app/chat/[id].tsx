@@ -246,6 +246,16 @@ export default function ChatThread() {
                       <ActivityIndicator style={{ marginVertical: 10 }} color={colors.tint} />
                     ) : null}
                     renderItem={({ item, index }: any) => {
+                      if (item.type === 'date_separator') {
+                        return (
+                          <View className="items-center my-4">
+                            <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '500' }}>
+                              {item.date}
+                            </Text>
+                          </View>
+                        );
+                      }
+
                       const nextMessage = processedMessages[index - 1]; 
                       const isLastInConsecutiveGroup = !nextMessage || nextMessage.senderId !== item.senderId;
                       const isThreadLast = index === 0;

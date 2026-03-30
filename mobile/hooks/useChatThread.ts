@@ -211,6 +211,36 @@ export function useChatThread() {
   const processedMessages = useMemo(() => {
     if (!messages || messages.length === 0) return [];
 
+    const withDates: any[] = [];
+    const formatDate = (dateStr: string) => {
+      const d = new Date(dateStr);
+      return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    };
+
+    const getSeparatorText = (dateStr: string) => {
+      const d = new Date(dateStr);
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+
+      const isSameDay = (d1: Date, d2: Date) =>
+        d1.getDate() === d2.getDate() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getFullYear() === d2.getFullYear();
+
+      const hours = d.getHours().toString().padStart(2, '0');
+      const minutes = d.getMinutes().toString().padStart(2, '0');
+      const time = `${hours}:${minutes}`;
+
+      if (isSameDay(d, today)) {
+        return `${time} Hôm nay`;
+      } else if (isSameDay(d, yesterday)) {
+        return `${time} Hôm qua`;
+      } else {
+        return `${time} ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+      }
+    };
+
     const grouped: any[] = [];
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
@@ -245,7 +275,32 @@ export function useChatThread() {
 
       grouped.push(msg);
     }
-    return grouped;
+
+    // Now inject date separators into the grouped list
+    for (let i = 0; i < grouped.length; i++) {
+      const msg = grouped[i];
+      withDates.push(msg);
+
+      const nextMsg = grouped[i + 1];
+      const currentDate = formatDate(msg.createdAt);
+      const nextDate = nextMsg ? formatDate(nextMsg.createdAt) : null;
+
+      if (!nextMsg || currentDate !== nextDate) {
+        // If there's no next message (oldest message) OR the next message is from a different day,
+        // we add a date separator here.
+        // Wait, in an inverted list, msg is newer than nextMsg.
+        // So after we've pushed all messages of "Today", we see "Yesterday".
+        // We push a separator for "Today" here.
+        withDates.push({
+          id: `date-${msg.id || i}`,
+          type: 'date_separator',
+          date: getSeparatorText(msg.createdAt),
+          createdAt: msg.createdAt, // keep for sorting/ref
+        });
+      }
+    }
+
+    return withDates;
   }, [messages]);
 
   // Search logic - find indices of messages that match the search query

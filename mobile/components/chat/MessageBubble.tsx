@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useChatThread } from '@/hooks/useChatThread';
 import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Animated } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -29,7 +29,7 @@ type ChatMessage = {
 
 const IMAGE_SIZE_CACHE = new Map<string, {width: number, height: number}>();
 
-export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void }) {
+export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const { allMedia } = useChatThread();
@@ -66,6 +66,26 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       threadImageIds: ids 
     };
   }, [allMedia]);
+
+  const highlightAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isHighlighted) {
+      Animated.sequence([
+        Animated.timing(highlightAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.delay(1500),
+        Animated.timing(highlightAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  }, [isHighlighted, highlightAnim]);
 
   // Unify URI building for cache and source for this message
   const fullImageUri = useMemo(() => {
@@ -107,6 +127,24 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     borderColor = colors.bubbleMe;
     textColor = colors.bubbleMeText;
   }
+
+  const animatedBorderStyle = {
+    borderColor: highlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [borderColor, colors.tint],
+    }),
+    borderWidth: 1, // Keep fixed width or animate if desired
+    shadowColor: colors.tint,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: highlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 0.5],
+    }),
+    shadowRadius: highlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 4],
+    }),
+  };
 
   // helper to render highlighted parts
   const renderHighlighted = (text?: string) => {
@@ -366,8 +404,30 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     );
   };
 
+  const renderRightActions = (progress: any, dragX: any) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, -50, 0],
+      outputRange: [1, 1, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <View style={{ width: 68, backgroundColor: colors.background }}>
+        <View className="flex-row justify-end px-4 my-2">
+          <Animated.View style={{ transform: [{ scale }], width: 40, height: 40, justifyContent: 'center', alignItems: 'center' }}>
+            <MaterialIcons name="reply" size={24} color={colors.icon} />
+          </Animated.View>
+        </View>
+      </View>
+    );
+  };
+
   const replyBlock = message.replyTo && (
-    <View style={{ backgroundColor: isOutgoing ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)', borderRadius: 8, padding: 8, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: colors.tint, flexDirection: 'row', alignItems: 'center' }}>
+    <TouchableOpacity 
+      activeOpacity={0.7} 
+      onPress={() => message.replyTo.id && onReplyPress?.(message.replyTo.id)}
+      style={{ backgroundColor: isOutgoing ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)', borderRadius: 8, padding: 8, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: colors.tint, flexDirection: 'row', alignItems: 'center' }}
+    >
       {(message.replyTo.type === 'image' || message.replyTo.type === 'image_group') && (
         <View style={{ width: 36, height: 36, marginRight: 8, borderRadius: 4, overflow: 'hidden' }}>
           <Image 
@@ -401,7 +461,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           {message.replyTo.type === 'text' ? message.replyTo.content?.replace(/\n/g, ' ') : (message.replyTo.type === 'image' || message.replyTo.type === 'image_group' ? '[Hình ảnh]' : '[Tệp]')}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -423,7 +483,8 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       )}
       <Swipeable
         ref={swipeableRef}
-        renderLeftActions={renderLeftActions}
+        renderLeftActions={!message.fromMe ? renderLeftActions : undefined}
+        renderRightActions={message.fromMe ? renderRightActions : undefined}
         onSwipeableWillOpen={() => {
           if (onReply) onReply();
           swipeableRef.current?.close();
@@ -438,17 +499,16 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
 
         <View style={{ maxWidth: '72%', marginLeft: isOutgoing ? 'auto' : 12 }} className={`${isOutgoing ? 'items-end' : 'items-start'}`}> 
             {/* for image attachments we don’t show the standard bubble styling */}
-        <View style={{
+        <Animated.View style={[{
             backgroundColor: (message.type === 'image' || message.type === 'image_group') ? 'transparent' : bubbleBg,
             borderWidth: (message.type === 'image' || message.type === 'image_group') ? 0 : 1,
-            borderColor,
             padding: (message.type === 'image' || message.type === 'image_group') ? 0 : 12,
             borderRadius: 18,
             marginBottom: isLastInGroup ? 0 : -8
-          }}>
+          }, (message.type !== 'image' && message.type !== 'image_group') ? animatedBorderStyle : {}]}>
             {replyBlock}
             {contentElement}
-          </View>
+          </Animated.View>
 
           {isLastInGroup && (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, justifyContent: isOutgoing ? 'flex-end' : 'flex-start' }}>

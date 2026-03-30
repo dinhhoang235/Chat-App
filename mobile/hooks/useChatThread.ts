@@ -43,6 +43,7 @@ export function useChatThread() {
   const [targetUserStatus, setTargetUserStatus] = useState<{status: string, lastSeen: number | null} | null>(null);
   const [targetUser, setTargetUser] = useState<any>(null);
   const [replyingTo, setReplyingTo] = useState<any>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
   const [groupDetails, setGroupDetails] = useState<any>(null);
   const [allMedia, setAllMedia] = useState<any[]>([]);
@@ -302,6 +303,22 @@ export function useChatThread() {
 
     return withDates;
   }, [messages]);
+
+  const scrollToMessageId = useCallback((messageId: string) => {
+    // messageId could be from replyTo which might be a number or string
+    const targetId = messageId.toString();
+    const idx = processedMessages.findIndex(m => m.id?.toString() === targetId);
+    
+    if (idx !== -1) {
+      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+      setHighlightedMessageId(targetId);
+      setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, 2000);
+    } else {
+      console.log('Message not found in current list:', targetId);
+    }
+  }, [processedMessages]);
 
   // Search logic - find indices of messages that match the search query
   useEffect(() => {
@@ -1012,6 +1029,8 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     loadingMoreMedia,
     hasMoreMedia,
     replyingTo,
-    setReplyingTo
+    setReplyingTo,
+    highlightedMessageId,
+    scrollToMessageId
   };
 }

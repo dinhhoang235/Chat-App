@@ -58,7 +58,9 @@ export default function ChatThread() {
     handleSend,
     pickDocument,
     replyingTo,
-    setReplyingTo
+    setReplyingTo,
+    highlightedMessageId,
+    scrollToMessageId
   } = useChatThread();
 
 
@@ -272,6 +274,8 @@ export default function ChatThread() {
                             router.push(`/profile/${item.senderId}`);
                           }}
                           onReply={() => setReplyingTo(item)}
+                          isHighlighted={item.id?.toString() === highlightedMessageId}
+                          onReplyPress={(replyId: string) => scrollToMessageId(replyId)}
                         />
                       );
                     }}

@@ -1,128 +1,79 @@
-# Ứng Dụng Chat Backend
+# Ứng Dụng Chat Backend - High Performance
 
-Node.js + Express + Prisma + MySQL + Redis
+Hệ thống Backend thời gian thực được tối ưu hóa cho hiệu năng cao và khả năng mở rộng.
 
-## Yêu Cầu
+## 🚀 Công Nghệ Sử Dụng
 
-- Node.js >= 20
-- Docker & Docker Compose
+*   **Core:** Node.js (v20+) & Express JS
+*   **Database:** 
+    *   **MySQL:** Lưu trữ dữ liệu chính (Users, Messages, Conversations).
+    *   **Redis:** Caching tin nhắn và phiên đăng nhập để tăng tốc độ truy xuất.
+*   **ORM:** Prisma (Type-safe database client).
+*   **Realtime:** Socket.io (Hỗ trợ chat thời gian thực).
+*   **Storage (🔥 New 2025):** 
+    *   **MinIO v2025:** Object Storage chuẩn S3 để lưu trữ ảnh, video và file đính kèm.
+    *   **Presigned URLs:** Cơ chế upload trực tiếp từ Mobile lên Storage để tiết kiệm 50% băng thông Server.
+*   **Infrastructure:** 
+    *   **Docker & Docker Compose:** Container hóa toàn bộ dịch vụ.
+    *   **Nginx:** Reverse Proxy, cân bằng tải và bảo mật luồng dữ liệu.
 
-## Cài Đặt Nhanh
+## 📦 Yêu Cầu Hệ Thống
 
-```bash
-npm install
-```
+*   Docker & Docker Compose
+*   Node.js >= 20 (cho develop cục bộ)
 
-## Chạy Ứng Dụng
+## 🛠️ Cài Đặt & Khởi Chạy
 
-```bash
-# Bắt đầu Docker (MySQL + Redis)
-docker compose up -d
+1. **Cài đặt thư viện:**
+   ```bash
+   npm install
+   ```
 
-# Đồng bộ database
-docker compose exec app npx prisma db push
+2. **Khởi chạy hạ tầng (MySQL, Redis, MinIO, Nginx):**
+   ```bash
+   docker compose up -d
+   ```
 
-# Bắt đầu server
-npm run dev
-```
+3. **Cấu hình Database:**
+   ```bash
+   npx prisma db push
+   ```
 
-Server chạy trên `http://localhost:3000`
+4. **Chạy Server:**
+   ```bash
+   npm run dev
+   ```
 
-## Lệnh Quan Trọng
+## 🖼️ Luồng Lưu Trữ Tối Ưu (Storage Flow)
 
-```bash
-# Docker
-docker compose up -d          # Bắt đầu dịch vụ
-docker compose down           # Dừng dịch vụ
-docker compose ps             # Kiểm tra trạng thái
-docker compose logs -f        # Xem logs
+Hệ thống sử dụng cơ chế **Presigned Uploads** để tối ưu hóa tài nguyên server:
 
-# Database
-npx prisma generate           # Tạo lại Prisma Client (sau khi sửa schema)
-npx prisma db push
-npx prisma migrate dev --name <migration_name>  # Tạo migration (thay <migration_name> bằng tên phù hợp)
-npx prisma studio             # Xem & chỉnh sửa data
+1. **Get Token:** Mobile gọi `POST /api/storage/upload-url` để lấy "vé upload" từ Backend.
+2. **Direct Upload:** Mobile upload file thẳng lên **MinIO** thông qua **Nginx Proxy** (cổng 80).
+3. **Notify:** Sau khi upload xong, Mobile gửi tin nhắn kèm link ảnh đã có cho Backend.
 
-# Server
-npm run dev                   # Phát triển
-npm start                     # Sản xuất
-npm run build                 # Build
-```
-
-## API Endpoints
-
-- `POST /api/users/login` - Đăng nhập: `{ phone, password }`
-- `POST /api/users/signup` - Đăng ký: `{ phone, fullName, password }`
-- `GET /api/users` - Danh sách users
-- `GET /api/users/:id` - Lấy user
-- `PUT /api/users/:id` - Cập nhật user
-- `DELETE /api/users/:id` - Xóa user
-
-## Cài Đặt .env
+## 🔑 Biến Môi Trường (.env)
 
 ```env
+# Server
 PORT=3000
-MYSQL_USER=chatuser
-MYSQL_PASSWORD=admin123
-MYSQL_DATABASE=chat_app
-MYSQL_PORT=3306
-MYSQL_ROOT_PASSWORD=admin123
+JWT_SECRET=your_secret
+
+# Database
+DATABASE_URL="mysql://chatuser:admin123@localhost:3306/chat_app"
+
+# MinIO (Object Storage)
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ROOT_USER=admin
+MINIO_ROOT_PASSWORD=admin123
+MINIO_BUCKET=chatapp
+MINIO_REGION=us-east-1
 ```
 
-## Connect MySQL
+## 🛠️ Quản Trị Hệ Thống
 
-```bash
-docker compose exec mysql mysql -u chatuser -p'admin123' -D chat_app
-SELECT * FROM users;
-```
+*   **MinIO Console:** `http://localhost:9001` (Quản lý file, bucket)
+*   **Prisma Studio:** `npx prisma studio` (Quản lý dữ liệu DB)
+*   **Nginx Proxy:** Chạy tại cổng `80` (Mọi traffic từ Mobile nên đi qua cổng này)
 
-## Xử Lý Sự Cố
-
-```bash
-docker compose logs -f       # Xem logs
-docker compose restart       # Restart
-docker compose down -v       # Reset (mất dữ liệu)
-```
-
-## Hướng Dẫn Thêm Field Mới Vào Models
-
-**Bước 1: Sửa schema**
-```bash
-# Mở file prisma/schema.prisma và thêm field mới
-# Ví dụ: thêm field "role" vào User model
-```
-
-**Bước 2: Tạo migration**
-```bash
-npx prisma migrate dev --name <tên_migration>
-# Ví dụ: npx prisma migrate dev --name add_role_to_user
-```
-
-**Bước 3: Chọn khi được hỏi**
-- "Do you want to generate Prisma Client?" → Y
-
-**Nếu bị lỗi:**
-
-**Lỗi: Shadow database không được phép**
-```bash
-docker compose exec mysql mysql -u root -p'admin123' -e "GRANT ALL PRIVILEGES ON *.* TO 'chatuser'@'%'; FLUSH PRIVILEGES;"
-```
-
-**Lỗi: Drift detected (schema không sync)**
-```bash
-npx prisma migrate reset    # Reset database (mất dữ liệu)
-# hoặc
-npx prisma db push          # Push schema trực tiếp (không reset)
-```
-
-**Kiểm tra status migration**
-```bash
-npx prisma migrate status   # Xem trạng thái
-npx prisma studio          # Xem data trong bảng
-```
-
-**Tóm tắt nhanh:**
-```bash
-# Sửa schema.prisma → chạy:
-npx prisma migrate dev --name <tên>
-```

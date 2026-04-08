@@ -13,14 +13,14 @@ export const compressImage = async (imageUri: string, type: ImageType) => {
   try {
     const isAvatar = type === 'avatar';
 
-    const imageRef = await ImageManipulator.manipulate(imageUri)
-      .resize({ width: isAvatar ? 600 : 1440 })
-      .renderAsync();
-
-    const result = await imageRef.saveAsync({
-      compress: isAvatar ? 0.92 : 0.95,
-      format: SaveFormat.JPEG,
-    });
+    const result = await ImageManipulator.manipulateAsync(
+      imageUri,
+      [{ resize: { width: isAvatar ? 600 : 1440 } }],
+      { 
+        compress: isAvatar ? 0.92 : 0.95, 
+        format: SaveFormat.JPEG 
+      }
+    );
 
     return result.uri;
   } catch (error) {

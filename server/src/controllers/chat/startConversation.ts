@@ -1,9 +1,8 @@
 import { Response } from 'express';
 import { Server } from 'socket.io';
-import fs from 'fs';
-import path from 'path';
 import prisma from '../../db.js';
 import { AuthRequest } from '../../middleware/auth.js';
+import { uploadFile } from '../../utils/minio.js';
 
 export const startConversation = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { targetUserId } = req.body;
@@ -59,13 +58,12 @@ export const startConversation = (io: Server) => async (req: AuthRequest, res: R
     if (req.file) {
       // enforce size limit
       if (req.file.size > 5 * 1024 * 1024) {
-        fs.unlink(req.file.path, () => {});
         return res.status(400).json({ message: 'File must be under 5MB' });
       }
-      const folder = path.basename(path.dirname(req.file.path));
-      const relPath = `/${folder}/${req.file.filename}`;
+      
+      const { url: fileUrl } = await uploadFile(req.file);
       const info = {
-        url: relPath,
+        url: fileUrl,
         name: req.file.originalname,
         size: req.file.size,
         mime: req.file.mimetype

@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { Server } from 'socket.io';
 import prisma from '../../db.js';
 import { AuthRequest } from '../../middleware/auth.js';
+import { uploadFile } from '../../utils/minio.js';
 
 export const createGroup = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { name, participantIds } = req.body;
@@ -27,7 +28,8 @@ export const createGroup = (io: Server) => async (req: AuthRequest, res: Respons
     if (files && files.length > 0) {
       const avatarFile = files.find(f => f.fieldname === 'group_avatar');
       if (avatarFile) {
-        avatarPath = `/media/groups/${avatarFile.filename}`;
+        const { url: fileUrl } = await uploadFile(avatarFile);
+        avatarPath = fileUrl;
       }
     }
 

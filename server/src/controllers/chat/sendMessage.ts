@@ -1,15 +1,14 @@
 import { Response } from 'express';
 import { Server } from 'socket.io';
-import fs from 'fs';
-import path from 'path';
 import prisma from '../../db.js';
 import { AuthRequest } from '../../middleware/auth.js';
 import { cacheMessage } from '../../utils/redis.js';
 import Expo from 'expo-server-sdk';
+import { uploadFile } from '../../utils/minio.js';
 
 export const sendMessage = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { conversationId } = req.params;
-  let { content, type = 'text', replyToId } = req.body;
+  let { content, type = 'text', replyToId, tempId } = req.body;
   const userId = req.userId;
 
   if (!userId) {
@@ -23,20 +22,21 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
     if (req.file) {
       // enforce <5MB for attachments
       if (req.file.size > 5 * 1024 * 1024) {
-        // remove oversize file
-        fs.unlink(req.file.path, () => {});
         return res.status(400).json({ message: 'File must be under 5MB' });
       }
-      const folder = path.basename(path.dirname(req.file.path)); // attachments, etc
-      const relPath = `/${folder}/${req.file.filename}`;
+      
+      const { url: fileUrl, fileName } = await uploadFile(req.file);
+      
+      const isImage = req.file.mimetype.startsWith('image/');
+      
       const info = {
-        url: relPath,
-        name: req.file.originalname,
+        url: fileUrl,
+        name: isImage ? fileName : req.file.originalname, // Ảnh dùng UUID, File dùng tên gốc
         size: req.file.size,
         mime: req.file.mimetype
       };
       content = JSON.stringify(info);
-      if (req.file.mimetype.startsWith('image/')) {
+      if (isImage) {
         type = 'image';
       } else {
         type = 'file';
@@ -99,7 +99,7 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
     });
 
     // 3. Broadcast via socket
-    io.to(`conversation:${convId}`).emit('new_message', message);
+    io.to(`conversation:${convId}`).emit('new_message', { ...message, tempId });
     
     // 3. Cache the new message
     cacheMessage(convId, message).catch(e => console.error(e));

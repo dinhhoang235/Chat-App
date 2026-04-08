@@ -113,7 +113,6 @@ export function useChatOptions() {
             }
             if (url) {
               if (!url.startsWith('http')) {
-                if (!url.startsWith('/media')) url = `/media${url}`;
                 url = getAvatarUrl(url) || url;
               }
               imgs.push(url);

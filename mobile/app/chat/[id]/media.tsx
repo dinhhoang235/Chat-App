@@ -40,7 +40,6 @@ export default function ChatMedia() {
   const renderImage = ({ item, index }: { item: ChatMessage; index: number }) => {
     let uri = item.fileInfo?.url;
     if (uri && !uri.startsWith('http')) {
-      if (!uri.startsWith('/media')) uri = `/media${uri}`;
       uri = getAvatarUrl(uri) || uri;
     }
     return (
@@ -64,7 +63,6 @@ export default function ChatMedia() {
     const { fileInfo } = item;
     let uri = fileInfo?.url;
     if (uri && !uri.startsWith('http')) {
-      if (!uri.startsWith('/media')) uri = `/media${uri}`;
       uri = getAvatarUrl(uri) || uri;
     }
     const name = fileInfo?.name || 'File';
@@ -165,7 +163,9 @@ export default function ChatMedia() {
         images={imageMessages.map(m => {
           let uri = m.fileInfo?.url || '';
           if (uri && !uri.startsWith('http')) {
-            if (!uri.startsWith('/media')) uri = `/media${uri}`;
+            if (!uri.startsWith('/media') && !uri.startsWith('/storage')) {
+              uri = `/media${uri.startsWith('/') ? '' : '/'}${uri}`;
+            }
             uri = getAvatarUrl(uri) || uri;
           }
           return uri;

@@ -6,29 +6,44 @@ const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL;
 
 class SocketService {
   private socket: Socket | null = null;
+  private emitQueue: { event: string; data: any }[] = [];
+  private listenerQueue: { event: string; callback: (data: any) => void }[] = [];
 
   connect() {
-    if (this.socket?.connected) return;
+    if (this.socket) return; 
 
     tokenStorage.getAccessToken().then(token => {
       if (!token) return;
 
-      this.socket = io(SOCKET_URL, {
-        auth: { token },
-        transports: ['websocket'],
-      });
+      if (!this.socket) {
+        this.socket = io(SOCKET_URL, {
+          auth: { token },
+          transports: ['websocket'],
+        });
 
-      this.socket.on('connect', () => {
-        console.log('Connected to socket server');
-      });
+        this.socket.on('connect', () => {
+          console.log('Connected to socket server');
+          // Send all queued emits
+          while (this.emitQueue.length > 0) {
+            const item = this.emitQueue.shift();
+            if (item) this.socket?.emit(item.event, item.data);
+          }
+        });
 
-      this.socket.on('disconnect', () => {
-        console.log('Disconnected from socket server');
-      });
+        // Register all queued listeners
+        while (this.listenerQueue.length > 0) {
+          const item = this.listenerQueue.shift();
+          if (item) this.socket.on(item.event, item.callback);
+        }
 
-      this.socket.on('connect_error', (error) => {
-        console.log('Socket connect error:', error.message);
-      });
+        this.socket.on('disconnect', () => {
+          console.log('Disconnected from socket server');
+        });
+
+        this.socket.on('connect_error', (error) => {
+          console.log('Socket connect error:', error.message);
+        });
+      }
     });
   }
 
@@ -44,25 +59,39 @@ class SocketService {
   }
 
   emit(event: string, data: any) {
-    this.socket?.emit(event, data);
+    if (this.socket?.connected) {
+      this.socket.emit(event, data);
+    } else {
+      this.emitQueue.push({ event, data });
+      if (!this.socket) this.connect();
+    }
   }
 
   on(event: string, callback: (data: any) => void) {
     if (this.socket) {
       this.socket.on(event, callback);
     } else {
-      // If socket not connected yet, try connecting or wait
-      console.log(`Socket not connected, cannot listen to ${event}. Attempting connect...`);
+      this.listenerQueue.push({ event, callback });
       this.connect();
-      // We could queue listeners here if needed, but for now just log
     }
   }
 
   off(event: string, callback?: (data: any) => void) {
-    if (callback) {
-      this.socket?.off(event, callback);
+    if (this.socket) {
+      if (callback) {
+        this.socket.off(event, callback);
+      } else {
+        this.socket.off(event);
+      }
     } else {
-      this.socket?.off(event);
+      // Remove from queue if it hasn't been registered yet
+      if (callback) {
+        this.listenerQueue = this.listenerQueue.filter(
+          l => l.event !== event || l.callback !== callback
+        );
+      } else {
+        this.listenerQueue = this.listenerQueue.filter(l => l.event !== event);
+      }
     }
   }
 }

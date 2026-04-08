@@ -49,7 +49,6 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       if (m.type === 'image' && m.fileInfo?.url) {
         let uri = m.fileInfo?.url || '';
         if (uri && !uri.startsWith('http')) {
-          if (!uri.startsWith('/media')) uri = `/media${uri}`;
           uri = getAvatarUrl(uri) || uri;
         }
         uris.push(uri);
@@ -93,7 +92,6 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     let url = message.fileInfo.url;
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    if (!url.startsWith('/media')) url = `/media${url}`;
     return getAvatarUrl(url) || url;
   }, [message.type, message.fileInfo]);
 
@@ -255,7 +253,6 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         {message.images.map((img, idx) => {
           let uri = img.fileInfo?.url || '';
           if (uri && !uri.startsWith('http')) {
-            if (!uri.startsWith('/media')) uri = `/media${uri}`;
             uri = getAvatarUrl(uri) || uri;
           }
           
@@ -324,7 +321,6 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     let { url, name, size, mime } = message.fileInfo;
     let uri = url;
     if (!uri.startsWith('http')) {
-      if (!uri.startsWith('/media')) uri = `/media${uri}`;
       uri = getAvatarUrl(uri) || uri;
     }
 
@@ -444,7 +440,6 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
                 }
                 if (!url) return undefined;
                 if (url.startsWith('http')) return url;
-                if (!url.startsWith('/media')) url = `/media${url}`;
                 return getAvatarUrl(url) || url;
               })()
             }} 

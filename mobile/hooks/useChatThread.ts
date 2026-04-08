@@ -660,14 +660,20 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         }
 
         let tempIdx = -1;
-        if (message.type === 'file' || message.type === 'image') {
-          tempIdx = prev.findIndex(
-            m => m.status === 'sending' && m.type === message.type && m.fileName && incomingFileName && m.fileName === incomingFileName && m.senderId === message.senderId
-          );
-        } else {
-          tempIdx = prev.findIndex(
-            m => m.status === 'sending' && m.content === message.content && m.senderId === message.senderId
-          );
+        if (message.tempId) {
+          tempIdx = prev.findIndex(m => m.id?.toString() === message.tempId.toString());
+        }
+        
+        if (tempIdx === -1) {
+          if (message.type === 'file' || message.type === 'image') {
+            tempIdx = prev.findIndex(
+              m => m.status === 'sending' && m.type === message.type && m.fileName && incomingFileName && m.fileName === incomingFileName && m.senderId === message.senderId
+            );
+          } else {
+            tempIdx = prev.findIndex(
+              m => m.status === 'sending' && m.content === message.content && m.senderId === message.senderId
+            );
+          }
         }
 
         const mappedMessage: any = {
@@ -799,7 +805,23 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
 
       setMessages(prev => [tempMessage, ...prev]);
 
-      await chatApi.sendMessage(Number(targetConversationId), text, 'text', undefined, replyToSnapshot?.id);
+      const response = await chatApi.sendMessage(Number(targetConversationId), text, 'text', undefined, replyToSnapshot?.id, tempId);
+      const sentMessage = response.data;
+      
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.id === tempId);
+        if (idx !== -1) {
+          const newMessages = [...prev];
+          newMessages[idx] = {
+            ...sentMessage,
+            fromMe: true,
+            time: new Date(sentMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: 'sent',
+          };
+          return newMessages;
+        }
+        return prev;
+      });
     } catch (err) {
       console.error('Send error:', err);
       setMessages(prev => prev.filter(m => m.id !== tempId));
@@ -883,7 +905,31 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         }
       }
 
-      await chatApi.sendMessage(Number(targetConversationId), caption || '', '', uploadFile, replyToSnapshot?.id);
+      const response = await chatApi.sendMessage(Number(targetConversationId), caption || '', '', uploadFile, replyToSnapshot?.id, tempId);
+      const sentMessage = response.data;
+
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.id === tempId);
+        if (idx !== -1) {
+          const newMessages = [...prev];
+          const mapped: any = {
+            ...sentMessage,
+            fromMe: true,
+            time: new Date(sentMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: 'sent',
+          };
+          if (sentMessage.type === 'image' || sentMessage.type === 'file') {
+            try {
+              mapped.fileInfo = typeof sentMessage.content === 'string' ? JSON.parse(sentMessage.content) : sentMessage.content;
+            } catch {
+              if (sentMessage.type === 'image') mapped.fileInfo = { url: sentMessage.content };
+            }
+          }
+          newMessages[idx] = mapped;
+          return newMessages;
+        }
+        return prev;
+      });
     } catch (err) {
       console.error('Attachment send error:', err);
       alert('Không thể gửi tệp, vui lòng thử lại');

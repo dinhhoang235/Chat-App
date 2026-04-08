@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../../db.js';
-import fs from 'fs';
+import { uploadFile } from '../../utils/minio.js';
 
 export const updateUser = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -11,12 +11,6 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
     // Handle multipart/form-data where req.body might be undefined
     const body = req.body || {};
     const { fullName, bio, gender, dateOfBirth, pushToken } = body;
-
-    // Get current user to check old images
-    const currentUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { avatar: true, coverImage: true }
-    });
 
     // Only include fields that are provided
     const data: any = {};
@@ -32,34 +26,8 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
     // Handle file uploads
     for (const file of files) {
       const fieldName = file.fieldname; // 'avatar' or 'coverImage'
-      const filePath = `/media/${fieldName === 'avatar' ? 'avatars' : 'covers'}/${file.filename}`;
-      
-      data[fieldName] = filePath;
-
-      // Delete old file if it exists
-      if (fieldName === 'avatar' && currentUser?.avatar) {
-        try {
-          // Reconstruct file system path from media path
-          const mediaPath = currentUser.avatar.replace('/media/', '');
-          const fullPath = `${__dirname}/../../media/${mediaPath}`;
-          if (fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
-          }
-        } catch (err) {
-          console.error('Error deleting old avatar:', err);
-        }
-      } else if (fieldName === 'coverImage' && currentUser?.coverImage) {
-        try {
-          // Reconstruct file system path from media path
-          const mediaPath = currentUser.coverImage.replace('/media/', '');
-          const fullPath = `${__dirname}/../../media/${mediaPath}`;
-          if (fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
-          }
-        } catch (err) {
-          console.error('Error deleting old cover image:', err);
-        }
-      }
+      const { url } = await uploadFile(file);
+      data[fieldName] = url;
     }
 
     const user = await prisma.user.update({

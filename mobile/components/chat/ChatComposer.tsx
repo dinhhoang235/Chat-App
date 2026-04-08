@@ -86,7 +86,6 @@ export default function ChatComposer({
                     }
                     if (!url) return undefined;
                     if (url.startsWith('http')) return url;
-                    if (!url.startsWith('/media')) url = `/media${url}`;
                     return getAvatarUrl(url) || url;
                   })()
                 }} 

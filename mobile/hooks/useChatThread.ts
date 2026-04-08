@@ -835,8 +835,9 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     caption?: string
   ) => {
     if (!file) return;
-    if (file.size && file.size > 5 * 1024 * 1024) {
-      alert('File must be smaller than 5MB');
+    // Tăng giới hạn lên 100MB nhờ Chunked Upload
+    if (file.size && file.size > 100 * 1024 * 1024) {
+      alert('Tệp quá lớn, giới hạn là 100MB');
       return;
     }
 
@@ -865,7 +866,6 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         setMessages([tempMessage]);
         setCreatingConversation(true);
         try {
-          // 1. MẪU XỬ LÝ: Nén ảnh nếu là hình ảnh
           let uploadFileUri = file.uri;
           let uploadFileName = file.name;
           const isImage = file.type.startsWith('image/');
@@ -878,9 +878,17 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
             }
           }
 
-          // 2. MẪU XỬ LÝ: Upload qua Presigned URL
-          const { uploadUrl, finalUrl, headers } = await storageApi.getUploadUrl(uploadFileName, file.type);
-          await storageApi.uploadToPresignedUrl(uploadUrl, uploadFileUri, headers['Content-Type']);
+          // Upload (Chunked if large)
+          let finalUrl = '';
+          const isLargeFile = file.size && file.size > 5 * 1024 * 1024;
+          
+          if (isLargeFile) {
+            finalUrl = await storageApi.uploadFileChunked(uploadFileUri, uploadFileName, file.type, file.size!);
+          } else {
+            const { uploadUrl, finalUrl: fetchedUrl, headers } = await storageApi.getUploadUrl(uploadFileName, file.type);
+            await storageApi.uploadToPresignedUrl(uploadUrl, uploadFileUri, headers['Content-Type']);
+            finalUrl = fetchedUrl;
+          }
 
           const fileInfo = {
             url: finalUrl,
@@ -899,11 +907,10 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
           const conv = response.data;
           const convId = conv.id || conv.conversationId;
           if (convId) {
-            targetConversationId = convId.toString(); // <--- update variable
+            targetConversationId = convId.toString(); 
             setConversationId(targetConversationId);
             const lastMessage = conv.messages?.[0];
             if (lastMessage) {
-              // Parse content if it's JSON (it should be)
               let mappedMessage = {
                 ...lastMessage,
                 fromMe: true,
@@ -918,7 +925,6 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
               setMessages([mappedMessage]);
             }
           }
-          // after creating the conversation we've already sent the file
           return;
         } catch (err) {
           console.error('Error creating conversation on attachment send:', err);
@@ -931,33 +937,34 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
 
       setMessages(prev => [tempMessage, ...prev]);
 
-      // 1. MẪU XỬ LÝ: Nén ảnh nếu là hình ảnh
       let uploadFileUri = file.uri;
       let uploadFileName = file.name;
       const isImage = file.type.startsWith('image/');
 
       if (isImage) {
         try {
-          // Nén ảnh về chất lượng 0.8, resize max 1200px để tiết kiệm băng thông
-          uploadFileUri = await compressImage(file.uri, 'cover'); // Dùng type 'cover' để lấy cấu hình resize ảnh lớn
+          uploadFileUri = await compressImage(file.uri, 'cover');
         } catch (e) {
           console.warn('Compression failed, using original', e);
         }
       }
 
-      // 2. MẪU XỬ LÝ: Upload qua Presigned URL (Trực tiếp lên MinIO)
+      // Upload (Chunked if large)
       let finalFileUrl = '';
       try {
-        // Lấy link upload
-        const { uploadUrl, finalUrl, headers } = await storageApi.getUploadUrl(uploadFileName, file.type);
+        const isLargeFile = file.size && file.size > 5 * 1024 * 1024;
         
-        // Upload trực tiếp từ Mobile -> MinIO
-        await storageApi.uploadToPresignedUrl(uploadUrl, uploadFileUri, headers['Content-Type']);
-        
-        finalFileUrl = finalUrl;
+        if (isLargeFile) {
+          // Chunked upload
+          finalFileUrl = await storageApi.uploadFileChunked(uploadFileUri, uploadFileName, file.type, file.size!);
+        } else {
+          // Lấy link upload (Single PUT)
+          const { uploadUrl, finalUrl, headers } = await storageApi.getUploadUrl(uploadFileName, file.type);
+          await storageApi.uploadToPresignedUrl(uploadUrl, uploadFileUri, headers['Content-Type']);
+          finalFileUrl = finalUrl;
+        }
       } catch (e) {
-        console.error('Direct upload failed, falling back to server upload', e);
-        // Fallback logic if needed, but for now we throw
+        console.error('Upload failed', e);
         throw new Error('Upload failed');
       }
 
@@ -973,7 +980,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         Number(targetConversationId), 
         JSON.stringify(fileInfo), 
         isImage ? 'image' : 'file', 
-        undefined, // Không gửi file qua multipart nữa
+        undefined, 
         replyToSnapshot?.id, 
         tempId
       );
@@ -1059,8 +1066,8 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       }
 
       if (uri) {
-        if (size && size > 5 * 1024 * 1024) {
-          Alert.alert('Tệp quá lớn', 'Vui lòng chọn tệp nhỏ hơn 5MB.');
+        if (size && size > 100 * 1024 * 1024) {
+          Alert.alert('Tệp quá lớn', 'Vui lòng chọn tệp nhỏ hơn 100MB.');
           return;
         }
         handleSendAttachment({ uri, name: name || 'file', type: mime || 'application/octet-stream', size });

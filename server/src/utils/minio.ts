@@ -97,4 +97,70 @@ export const uploadFile = async (file: Express.Multer.File): Promise<{ url: stri
   };
 };
 
+export const initMultipartUpload = async (objectName: string, metadata?: Minio.ItemBucketMetadata): Promise<string> => {
+  try {
+    // Minio SDK 8.x uses initiateNewMultipartUpload internally
+    // @ts-ignore
+    const method = minioClient.initiateNewMultipartUpload || minioClient.initiateMultipartUpload;
+    if (typeof method !== 'function') {
+      console.error('Multipart initiation method not found on minioClient');
+      throw new Error('Multipart upload not supported');
+    }
+    
+    // @ts-ignore
+    const uploadId = await method.call(minioClient, bucketName, objectName, metadata || {});
+    return uploadId;
+  } catch (error) {
+    console.error('Error in initMultipartUpload:', error);
+    throw error;
+  }
+};
+
+export const getPresignedUrlForPart = async (objectName: string, uploadId: string, partNumber: number, requestHost?: string): Promise<string> => {
+  // S3 requires 'uploadId' and 'partNumber' query params
+  const url = await minioClient.presignedUrl('PUT', bucketName, objectName, 600, {
+    uploadId,
+    partNumber: partNumber.toString()
+  });
+
+  let requestHostResult = 'localhost';
+  if (requestHost) {
+    requestHostResult = requestHost.split(':')[0];
+  }
+
+  let rewrittenUrl = url.replace(config.endPoint || 'minio', requestHostResult);
+  return rewrittenUrl.replace(requestHostResult, `${requestHostResult}/storage`).replace(`:${config.port}`, '');
+};
+
+export const completeMultipartUpload = async (
+  objectName: string,
+  uploadId: string,
+  parts: Array<{ partNumber?: number; part?: number; etag?: string }>
+): Promise<void> => {
+  // MinIO SDK expects each part item to have shape: { part: number, etag: string }
+  const normalizedParts = parts
+    .map((p) => {
+      const part = Number(p.part ?? p.partNumber);
+      const etag = (p.etag || '').replace(/"/g, '');
+      return { part, etag };
+    })
+    .filter((p) => Number.isInteger(p.part) && p.part > 0 && Boolean(p.etag))
+    .sort((a, b) => a.part - b.part);
+
+  if (normalizedParts.length === 0) {
+    throw new Error('No valid multipart parts to complete upload');
+  }
+    
+  // @ts-ignore
+  const method = minioClient.completeMultipartUpload;
+  
+  try {
+    // @ts-ignore
+    await method.call(minioClient, bucketName, objectName, uploadId, normalizedParts);
+  } catch (error) {
+    console.error('MinIO internal completeMultipartUpload error:', error);
+    throw error;
+  }
+};
+
 export default minioClient;

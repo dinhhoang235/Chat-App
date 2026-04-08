@@ -40,13 +40,7 @@ export function useConversations() {
         } else if (lastMsg.type === 'image') {
           lastMessageText = isFromMe ? 'Bạn: [Hình ảnh]' : '[Hình ảnh]';
         } else if (lastMsg.type === 'file') {
-          // show name if available
-          let fileName = '';
-          try {
-            const info = typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
-            fileName = info?.name ? ` ${info.name}` : '';
-          } catch {}
-          lastMessageText = isFromMe ? `Bạn: [File]${fileName}` : `[File]${fileName}`;
+          lastMessageText = isFromMe ? 'Bạn: [File]' : '[File]';
         } else {
           // fallback to raw text content
           lastMessageText = isFromMe ? `Bạn: ${lastMsg.content}` : lastMsg.content;

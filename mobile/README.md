@@ -1,54 +1,82 @@
-# Welcome to your Expo app 👋
+# DiskordMes - Ứng dụng Chat Di động (Mobile App)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS & Android) được xây dựng trên nền tảng **Expo** và **React Native**. Ứng dụng cung cấp trải nghiệm nhắn tin mượt mà, hỗ trợ gửi tệp tin, hình ảnh và các tính năng tương tác hiện đại.
 
-## Get started
+## 🚀 Tính năng chính
 
-1. Install dependencies
+- **Nhắn tin thời gian thực**: Sử dụng Socket.io để đảm bảo tin nhắn được truyền tải tức thì.
+- **Trò chuyện nhóm**: Tạo và quản lý nhóm trò chuyện dễ dàng.
+- **Tìm kiếm & Kết bạn**:
+  - Tìm kiếm người dùng qua tên đăng nhập.
+  - Hỗ trợ quét mã QR để kết nối nhanh chóng.
+  - Quản lý yêu cầu kết bạn.
+- **Chia sẻ đa phương tiện**:
+  - Gửi hình ảnh từ thư viện hoặc chụp trực tiếp từ camera.
+  - Hỗ trợ gửi các tệp tin tài liệu (lên đến 5MB).
+  - Nén ảnh trước khi tải lên để tiết kiệm băng thông.
+- **Thông báo đẩy (Push Notifications)**: Nhận thông báo tin nhắn mới ngay cả khi không mở ứng dụng.
+- **Giao diện hiện đại**:
+  - Hỗ trợ Dark Mode/Light Mode tự động.
+  - Hiệu ứng mượt mà với React Native Reanimated.
+  - Thiết kế Responsive với NativeWind (Tailwind CSS).
 
+## 🛠 Công nghệ sử dụng
+
+- **Framework**: [Expo](https://expo.dev/) (SDK 54) & [React Native](https://reactnative.dev/)
+- **Navigation**: [Expo Router](https://docs.expo.dev/router/introduction/) (File-based routing)
+- **Styling**: [NativeWind](https://www.nativewind.dev/) (Tailwind CSS cho React Native)
+- **Real-time**: [Socket.io Client](https://socket.io/)
+- **State Management**: React Context API & Hooks
+- **Media**: Expo Camera, Expo Image Picker, Expo Document Picker
+- **Animations**: React Native Reanimated & Gesture Handler
+
+## 📁 Cấu trúc thư mục
+
+- `app/`: Định nghĩa các màn hình và luồng điều hướng (Expo Router).
+- `components/`: Các thành phần giao diện dùng chung (Chat, Avatars, Modals, Lists...).
+- `services/`: Các dịch vụ xử lý logic API, Socket, Auth và Lưu trữ.
+- `hooks/`: Các custom hooks xử lý logic nghiệp vụ (Chat thread, Typing indicator, Keyboard...).
+- `context/`: Quản lý trạng thái toàn cục (với Auth, Notification...).
+- `constants/`: Các hằng số về màu sắc, kích thước, cấu hình.
+- `utils/`: Các hàm tiện ích bổ trợ.
+
+## 🏁 Bắt đầu
+
+### 📋 Yêu cầu hệ thống
+
+- Node.js (phiên bản LTS)
+- npm hoặc yarn
+- Expo Go (cho thử nghiệm nhanh) hoặc Development Build
+
+### ⚙️ Cài đặt
+
+1. Cài đặt các phụ thuộc:
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Cấu hình biến môi trường:
+   Tạo tệp `.env` dựa trên `.env.example`:
+   ```env
+   EXPO_PUBLIC_API_URL=http://your-server-ip:3000/api
+   EXPO_PUBLIC_SOCKET_URL=http://your-server-ip:3000
+   ```
 
+3. Khởi chạy ứng dụng:
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+Quét mã QR bằng ứng dụng **Expo Go** (trên Android) hoặc ứng dụng **Camera** (trên iOS) để xem ứng dụng.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 📱 Build và Deployment
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Ứng dụng sử dụng **EAS (Expo Application Services)** để build và phân phối.
 
-## Get a fresh project
+- Build cho Android: `eas build --platform android`
+- Build cho iOS: `eas build --platform ios`
 
-When you're ready, run:
+---
 
-```bash
-npm run reset-project
-```
+Được phát triển bởi đội ngũ DiskordMes. Nếu bạn có bất kỳ thắc mắc nào, vui lòng liên hệ qua Discord hoặc GitHub.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Attachment support
-
-The chat interface now supports sending images and arbitrary files (up to 5 MB). Images can be picked via the image icon next to the input, and files via the document/file button in the composer action sheet.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.

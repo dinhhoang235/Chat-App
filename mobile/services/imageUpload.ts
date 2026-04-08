@@ -1,4 +1,5 @@
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { SaveFormat } from 'expo-image-manipulator';
 import apiClient from './api';
 
 export type ImageType = 'avatar' | 'cover';

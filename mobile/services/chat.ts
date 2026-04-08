@@ -38,11 +38,12 @@ export const chatApi = {
 
   markAsRead: (id: string | number) => 
     apiClient.post(`/chats/${id}/read`),
-  startConversation: (targetUserId: number, firstMessage?: string, file?: any) => {
+  startConversation: (targetUserId: number, firstMessage?: string, file?: any, type: string = 'text') => {
     if (file) {
       const formData = new FormData();
       formData.append('targetUserId', targetUserId.toString());
       if (firstMessage) formData.append('firstMessage', firstMessage);
+      if (type) formData.append('type', type);
       let upload = file;
       if (file.uri) {
         upload = {
@@ -57,7 +58,7 @@ export const chatApi = {
         transformRequest: (data) => data,
       });
     }
-    return apiClient.post('/chats/start', { targetUserId, firstMessage });
+    return apiClient.post('/chats/start', { targetUserId, firstMessage, type });
   },
   deleteConversation: (id: string | number) => 
     apiClient.delete(`/chats/${id}`),

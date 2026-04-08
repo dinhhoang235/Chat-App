@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { setActiveConversationId, activeConversationId } from '@/services/notificationState';
-import * as FileSystem from 'expo-file-system';
 import { FlatList, Alert } from 'react-native';
 import { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useKeyboardSheetHeight } from './useKeyboardSheetHeight';
@@ -9,9 +8,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSearch } from '@/context/searchContext';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets, initialWindowMetrics } from 'react-native-safe-area-context';
-import { chatApi } from '@/services/chat';
-import { socketService } from '@/services/socket';
 import { userAPI } from '@/services/user';
+import { chatApi } from '@/services/chat';
+import { storageApi } from '@/services/storage';
+import { compressImage } from '@/services/imageUpload';
+import { socketService } from '@/services/socket';
 import { useAuth } from '@/context/authContext';
 import { getAvatarUrl } from '@/utils/avatar';
 import { useTyping } from './useTyping';
@@ -864,7 +865,37 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         setMessages([tempMessage]);
         setCreatingConversation(true);
         try {
-          const response = await chatApi.startConversation(Number(targetUserIdState), caption || '', file);
+          // 1. MẪU XỬ LÝ: Nén ảnh nếu là hình ảnh
+          let uploadFileUri = file.uri;
+          let uploadFileName = file.name;
+          const isImage = file.type.startsWith('image/');
+
+          if (isImage) {
+            try {
+              uploadFileUri = await compressImage(file.uri, 'cover');
+            } catch (e) {
+              console.warn('Compression failed, using original', e);
+            }
+          }
+
+          // 2. MẪU XỬ LÝ: Upload qua Presigned URL
+          const { uploadUrl, finalUrl, headers } = await storageApi.getUploadUrl(uploadFileName, file.type);
+          await storageApi.uploadToPresignedUrl(uploadUrl, uploadFileUri, headers['Content-Type']);
+
+          const fileInfo = {
+            url: finalUrl,
+            name: file.name,
+            size: file.size,
+            mime: file.type
+          };
+
+          const response = await chatApi.startConversation(
+            Number(targetUserIdState), 
+            JSON.stringify(fileInfo),
+            undefined,
+            isImage ? 'image' : 'file'
+          );
+          
           const conv = response.data;
           const convId = conv.id || conv.conversationId;
           if (convId) {
@@ -872,12 +903,19 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
             setConversationId(targetConversationId);
             const lastMessage = conv.messages?.[0];
             if (lastMessage) {
-              setMessages([{
+              // Parse content if it's JSON (it should be)
+              let mappedMessage = {
                 ...lastMessage,
                 fromMe: true,
                 time: new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 status: 'sent',
-              }]);
+              };
+              try {
+                mappedMessage.fileInfo = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content;
+              } catch {
+                if (lastMessage.type === 'image') mappedMessage.fileInfo = { url: lastMessage.content };
+              }
+              setMessages([mappedMessage]);
             }
           }
           // after creating the conversation we've already sent the file
@@ -893,19 +931,53 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
 
       setMessages(prev => [tempMessage, ...prev]);
 
-      // prepare upload file; convert content:// to file:// via copy
-      let uploadFile = file;
-      if (file.uri && file.uri.startsWith('content://')) {
+      // 1. MẪU XỬ LÝ: Nén ảnh nếu là hình ảnh
+      let uploadFileUri = file.uri;
+      let uploadFileName = file.name;
+      const isImage = file.type.startsWith('image/');
+
+      if (isImage) {
         try {
-          const dest = `${(FileSystem as any).cacheDirectory}${file.name}`;
-          await (FileSystem as any).copyAsync({ from: file.uri, to: dest });
-          uploadFile = { uri: dest, name: file.name, type: file.type };
+          // Nén ảnh về chất lượng 0.8, resize max 1200px để tiết kiệm băng thông
+          uploadFileUri = await compressImage(file.uri, 'cover'); // Dùng type 'cover' để lấy cấu hình resize ảnh lớn
         } catch (e) {
-          console.warn('Failed to copy content URI, using original', e);
+          console.warn('Compression failed, using original', e);
         }
       }
 
-      const response = await chatApi.sendMessage(Number(targetConversationId), caption || '', '', uploadFile, replyToSnapshot?.id, tempId);
+      // 2. MẪU XỬ LÝ: Upload qua Presigned URL (Trực tiếp lên MinIO)
+      let finalFileUrl = '';
+      try {
+        // Lấy link upload
+        const { uploadUrl, finalUrl, headers } = await storageApi.getUploadUrl(uploadFileName, file.type);
+        
+        // Upload trực tiếp từ Mobile -> MinIO
+        await storageApi.uploadToPresignedUrl(uploadUrl, uploadFileUri, headers['Content-Type']);
+        
+        finalFileUrl = finalUrl;
+      } catch (e) {
+        console.error('Direct upload failed, falling back to server upload', e);
+        // Fallback logic if needed, but for now we throw
+        throw new Error('Upload failed');
+      }
+
+      // 3. Gửi tin nhắn kèm metadata file
+      const fileInfo = {
+        url: finalFileUrl,
+        name: file.name,
+        size: file.size,
+        mime: file.type
+      };
+
+      const response = await chatApi.sendMessage(
+        Number(targetConversationId), 
+        JSON.stringify(fileInfo), 
+        isImage ? 'image' : 'file', 
+        undefined, // Không gửi file qua multipart nữa
+        replyToSnapshot?.id, 
+        tempId
+      );
+      
       const sentMessage = response.data;
 
       setMessages(prev => {

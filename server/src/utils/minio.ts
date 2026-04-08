@@ -62,13 +62,24 @@ export const initMinio = async () => {
 };
 
 // 4. Tạo Presigned URL để upload trực tiếp từ Client
-export const getPresignedUrl = async (objectName: string): Promise<string> => {
+export const getPresignedUrl = async (objectName: string, requestHost?: string): Promise<string> => {
   // Link có hiệu lực trong 10 phút (600 giây)
-  const url = await minioClient.presignedPutObject(bucketName, objectName, 600);
+  // Sử dụng presignedUrl('PUT') để linh hoạt hơn
+  const url = await minioClient.presignedUrl('PUT', bucketName, objectName, 600);
   
-  // Trình duyệt/Mobile cần truy cập qua Nginx (localhost / port 80) thay vì port 9000 trực tiếp
-  // Chúng ta sẽ thay đổi domain trả về để trỏ vào Nginx proxy
-  return url.replace(`:${config.port}`, '').replace(config.endPoint || '', 'localhost'); // Giả định Nginx chạy port 80
+  let requestHostResult = 'localhost';
+  if (requestHost) {
+    requestHostResult = requestHost.split(':')[0];
+  }
+
+  // Thay thế domain nội bộ bằng domain/IP mà Client có thể kết nối
+  // Quan trọng: Chèn /storage để đi qua proxy Nginx
+  let rewrittenUrl = url.replace(config.endPoint || 'minio', requestHostResult);
+  
+  // Nginx proxy của chúng ta map /storage/ -> minio:9000/
+  // URL gốc: http://minio:9000/chatapp/file.jpg
+  // URL mới: http://domain/storage/chatapp/file.jpg
+  return rewrittenUrl.replace(requestHostResult, `${requestHostResult}/storage`).replace(`:${config.port}`, '');
 };
 
 export const uploadFile = async (file: Express.Multer.File): Promise<{ url: string; fileName: string }> => {

@@ -94,7 +94,7 @@ export const startConversation = (io: Server) => async (req: AuthRequest, res: R
         messages: {
           create: {
             content: firstMessage,
-            type: messageType,
+            type: req.body.type || messageType,
             senderId: userId
           }
         }

@@ -21,8 +21,10 @@ export const getUploadUrl = async (req: AuthRequest, res: Response): Promise<any
     const ext = path.extname(fileName);
     const objectName = `${userId}/${randomUUID()}${ext}`;
     
+    const host = req.get('host');
+    
     // Lấy link upload (Presigned URL)
-    const uploadUrl = await getPresignedUrl(objectName);
+    const uploadUrl = await getPresignedUrl(objectName, host);
     
     // Link để xem file sau khi upload thành công (Link công khai qua Nginx)
     const finalUrl = `/storage/${process.env.MINIO_BUCKET}/${objectName}`;

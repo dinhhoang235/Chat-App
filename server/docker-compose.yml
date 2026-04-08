@@ -27,6 +27,19 @@ services:
       - ./package.json:/app/package.json
       - ./tsconfig.json:/app/tsconfig.json
 
+  nginx:
+    image: nginx:alpine
+    container_name: chat-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./media:/app/media:ro
+    depends_on:
+      - app
+    networks:
+      - chat-network
+
   mysql:
     image: mysql:8.0
     container_name: chat-mysql

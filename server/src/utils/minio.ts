@@ -1,5 +1,7 @@
 import * as Minio from 'minio';
 import { randomUUID } from 'crypto';
+import fs from 'fs';
+import { promises as fsPromises } from 'fs';
 import path from 'path';
 
 // 1. Lấy cấu hình từ biến môi trường
@@ -86,9 +88,25 @@ export const uploadFile = async (file: Express.Multer.File): Promise<{ url: stri
   // Dùng UUID + extension gốc để tránh lỗi ký tự đặc biệt trong tên file
   const ext = path.extname(file.originalname) || '';
   const fileName = `${randomUUID()}${ext}`;
-  await minioClient.putObject(bucketName, fileName, file.buffer, file.size, {
+
+  const metadata = {
     'Content-Type': file.mimetype,
-  });
+  };
+
+  if (file.buffer) {
+    await minioClient.putObject(bucketName, fileName, file.buffer, file.size, metadata);
+  } else if ((file as any).path) {
+    const tempPath = (file as any).path as string;
+    const stream = fs.createReadStream(tempPath);
+
+    try {
+      await minioClient.putObject(bucketName, fileName, stream, file.size, metadata);
+    } finally {
+      await fsPromises.unlink(tempPath).catch(() => undefined);
+    }
+  } else {
+    throw new Error('Unsupported multer file shape: no buffer/path found');
+  }
 
   // Trả về url và fileName để dùng làm tên hiển thị (không dùng originalname)
   return {
@@ -161,6 +179,22 @@ export const completeMultipartUpload = async (
     console.error('MinIO internal completeMultipartUpload error:', error);
     throw error;
   }
+};
+
+export const abortMultipartUpload = async (objectName: string, uploadId: string): Promise<void> => {
+  const clientAny = minioClient as any;
+
+  if (typeof clientAny.abortMultipartUpload === 'function') {
+    await clientAny.abortMultipartUpload(bucketName, objectName, uploadId);
+    return;
+  }
+
+  if (typeof clientAny.removeIncompleteUpload === 'function') {
+    await clientAny.removeIncompleteUpload(bucketName, objectName);
+    return;
+  }
+
+  throw new Error('Abort multipart upload is not supported by current MinIO SDK');
 };
 
 export default minioClient;

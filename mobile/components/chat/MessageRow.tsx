@@ -72,7 +72,6 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
       return;
     }
 
-    console.log('Action:', action, 'on', message.id);
     onAction?.(action);
   };
 

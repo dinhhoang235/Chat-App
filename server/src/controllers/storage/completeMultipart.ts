@@ -14,6 +14,10 @@ export const completeMultipart = async (req: AuthRequest, res: Response): Promis
     return res.status(400).json({ message: 'Missing parameters' });
   }
 
+  if (typeof objectName !== 'string' || !objectName.startsWith(`${userId}/`)) {
+    return res.status(403).json({ message: 'Forbidden object access' });
+  }
+
   try {
     console.log(`Completing multipart upload for ${objectName}, uploadId: ${uploadId}`);
     await completeMultipartUpload(objectName, uploadId, parts);

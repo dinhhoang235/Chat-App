@@ -18,6 +18,8 @@ import { getAvatarUrl } from '@/utils/avatar';
 import { getInitials } from '@/utils/initials';
 import { useTyping } from './useTyping';
 import * as DocumentPicker from 'expo-document-picker';
+import * as VideoThumbnails from 'expo-video-thumbnails';
+import { prepareAttachmentForUpload } from '@/services/mediaUpload';
 
 export function useChatThread() {
   const { colors } = useTheme();
@@ -51,6 +53,7 @@ export function useChatThread() {
   const [allMedia, setAllMedia] = useState<any[]>([]);
   const [loadingMoreMedia, setLoadingMoreMedia] = useState(false);
   const [hasMoreMedia, setHasMoreMedia] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
   const fetchAllMedia = useCallback(async (isLoadMore = false) => {
     if (!id || id === 'new') return;
@@ -552,13 +555,18 @@ export function useChatThread() {
           seenBy: m.seenBy || [],
         };
         if (m.type === 'file' || m.type === 'image' || m.type === 'video') {
-          try {
-            const info = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
-            base.fileInfo = info;
-          } catch {
-            // content might already be a string path for image/video
-            if (m.type === 'image' || m.type === 'video') {
-              base.fileInfo = { url: m.content };
+          // If message already has a fileInfo (like temp messages), keep it.
+          // Otherwise try parsing from content string.
+          if (m.fileInfo && m.fileInfo.size) {
+            base.fileInfo = m.fileInfo;
+          } else {
+            try {
+              const info = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
+              base.fileInfo = info;
+            } catch {
+              if (m.type === 'image' || m.type === 'video') {
+                base.fileInfo = { url: m.content };
+              }
             }
           }
         }
@@ -692,11 +700,15 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
           status: 'sent',
         };
         if (message.type === 'file' || message.type === 'image' || message.type === 'video') {
-          try {
-            const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
-            mappedMessage.fileInfo = info;
-          } catch {
-            if (message.type === 'image' || message.type === 'video') mappedMessage.fileInfo = { url: message.content };
+          if (message.fileInfo && message.fileInfo.size) {
+             mappedMessage.fileInfo = message.fileInfo;
+          } else {
+            try {
+              const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
+              mappedMessage.fileInfo = info;
+            } catch {
+              if (message.type === 'image' || message.type === 'video') mappedMessage.fileInfo = { url: message.content };
+            }
           }
         }
 
@@ -840,8 +852,10 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     caption?: string
   ) => {
     if (!file) return;
+    const MAX_ATTACHMENT_SIZE_BYTES = 100 * 1024 * 1024;
+
     // Tăng giới hạn lên 100MB nhờ Chunked Upload
-    if (file.size && file.size > 100 * 1024 * 1024) {
+    if (file.size && file.size > MAX_ATTACHMENT_SIZE_BYTES) {
       alert('Tệp quá lớn, giới hạn là 100MB');
       return;
     }
@@ -850,9 +864,14 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     const replyToSnapshot = replyingTo;
     setReplyingTo(null);
 
+    const preparedAttachment = await prepareAttachmentForUpload(file);
+    const uploadFileUri = preparedAttachment.uploadUri;
+    const uploadFileName = preparedAttachment.uploadName;
+    const uploadSize = preparedAttachment.uploadSize ?? file.size;
+
     const tempMessage: any = {
       id: tempId,
-      content: file.uri,
+      content: uploadFileUri,
       fromMe: true,
       senderId: user?.id,
       createdAt: new Date().toISOString(),
@@ -861,6 +880,11 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       replyTo: replyToSnapshot,
       type: file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : 'file'),
       fileName: file.name,
+      fileInfo: {
+        url: uploadFileUri,
+        size: uploadSize,
+        mime: file.type
+      }
     };
 
     try {
@@ -871,36 +895,50 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         setMessages([tempMessage]);
         setCreatingConversation(true);
         try {
-          let uploadFileUri = file.uri;
-          let uploadFileName = file.name;
           const isImage = file.type.startsWith('image/');
-
-          if (isImage) {
-            try {
-              uploadFileUri = await compressImage(file.uri, 'cover');
-            } catch (e) {
-              console.warn('Compression failed, using original', e);
-            }
-          }
 
           // Upload (Chunked if large)
           let finalUrl = '';
-          const isLargeFile = file.size && file.size > 5 * 1024 * 1024;
+          let thumbnailUrl = '';
+          const isLargeFile = uploadSize && uploadSize > 5 * 1024 * 1024;
+          const isVideo = file.type.startsWith('video/');
+
+          // 1. Tạo thumbnail nếu là video
+          if (isVideo) {
+            try {
+              const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(file.uri, { time: 0 });
+              const thumbName = `thumb_${file.name.replace(/\.[^/.]+$/, "")}.jpg`;
+              const { uploadUrl: thumbTarget, finalUrl: thumbFinal, headers: thumbHeaders } = await storageApi.getUploadUrl(thumbName, 'image/jpeg');
+              await storageApi.uploadToPresignedUrl(thumbTarget, thumbUri, thumbHeaders['Content-Type']);
+              thumbnailUrl = thumbFinal;
+            } catch (e) {
+              console.warn('Thumbnail generation failed', e);
+            }
+          }
           
           if (isLargeFile) {
-            finalUrl = await storageApi.uploadFileChunked(uploadFileUri, uploadFileName, file.type, file.size!);
+            finalUrl = await storageApi.uploadFileChunked(
+              uploadFileUri, 
+              uploadFileName, 
+              file.type, 
+              uploadSize!,
+              (p) => setUploadProgress(prev => ({ ...prev, [tempId]: p }))
+            );
           } else {
             const { uploadUrl, finalUrl: fetchedUrl, headers } = await storageApi.getUploadUrl(uploadFileName, file.type);
+            setUploadProgress(prev => ({ ...prev, [tempId]: 0.1 })); // Bắt đầu upload
             await storageApi.uploadToPresignedUrl(uploadUrl, uploadFileUri, headers['Content-Type']);
             finalUrl = fetchedUrl;
+            setUploadProgress(prev => ({ ...prev, [tempId]: 1 })); // Xong
           }
 
           const fileInfo = {
             url: finalUrl,
             name: file.name,
-            size: file.size,
+            size: uploadSize,
             mime: file.type,
-            duration: file.duration
+            duration: file.duration,
+            thumbnailUrl: thumbnailUrl || undefined
           };
 
           const response = await chatApi.startConversation(
@@ -942,32 +980,44 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       }
 
       setMessages(prev => [tempMessage, ...prev]);
-
-      let uploadFileUri = file.uri;
-      let uploadFileName = file.name;
       const isImage = file.type.startsWith('image/');
-
-      if (isImage) {
-        try {
-          uploadFileUri = await compressImage(file.uri, 'cover');
-        } catch (e) {
-          console.warn('Compression failed, using original', e);
-        }
-      }
 
       // Upload (Chunked if large)
       let finalFileUrl = '';
+      let thumbnailUrl = '';
       try {
-        const isLargeFile = file.size && file.size > 5 * 1024 * 1024;
+        const isLargeFile = uploadSize && uploadSize > 5 * 1024 * 1024;
+        const isVideo = file.type.startsWith('video/');
+
+        // 1. Tạo thumbnail nếu là video
+        if (isVideo) {
+          try {
+            const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(file.uri, { time: 0 });
+            const thumbName = `thumb_${file.name.replace(/\.[^/.]+$/, "")}.jpg`;
+            const { uploadUrl: thumbTarget, finalUrl: thumbFinal, headers: thumbHeaders } = await storageApi.getUploadUrl(thumbName, 'image/jpeg');
+            await storageApi.uploadToPresignedUrl(thumbTarget, thumbUri, thumbHeaders['Content-Type']);
+            thumbnailUrl = thumbFinal;
+          } catch (e) {
+            console.warn('Thumbnail generation failed', e);
+          }
+        }
         
         if (isLargeFile) {
           // Chunked upload
-          finalFileUrl = await storageApi.uploadFileChunked(uploadFileUri, uploadFileName, file.type, file.size!);
+          finalFileUrl = await storageApi.uploadFileChunked(
+            uploadFileUri, 
+            uploadFileName, 
+            file.type, 
+            uploadSize!,
+            (p) => setUploadProgress(prev => ({ ...prev, [tempId]: p }))
+          );
         } else {
           // Lấy link upload (Single PUT)
           const { uploadUrl, finalUrl, headers } = await storageApi.getUploadUrl(uploadFileName, file.type);
+          setUploadProgress(prev => ({ ...prev, [tempId]: 0.1 })); // Bắt đầu
           await storageApi.uploadToPresignedUrl(uploadUrl, uploadFileUri, headers['Content-Type']);
           finalFileUrl = finalUrl;
+          setUploadProgress(prev => ({ ...prev, [tempId]: 1 }));
         }
       } catch (e) {
         console.error('Upload failed', e);
@@ -978,9 +1028,10 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       const fileInfo = {
         url: finalFileUrl,
         name: file.name,
-        size: file.size,
+        size: uploadSize,
         mime: file.type,
-        duration: file.duration
+        duration: file.duration,
+        thumbnailUrl: thumbnailUrl || undefined
       };
 
       const response = await chatApi.sendMessage(
@@ -1163,6 +1214,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     replyingTo,
     setReplyingTo,
     highlightedMessageId,
-    scrollToMessageId
+    scrollToMessageId,
+    uploadProgress
   };
 }

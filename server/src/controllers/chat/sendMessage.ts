@@ -5,6 +5,7 @@ import { AuthRequest } from '../../middleware/auth.js';
 import { cacheMessage } from '../../utils/redis.js';
 import Expo from 'expo-server-sdk';
 import { uploadFile } from '../../utils/minio.js';
+import { DIRECT_UPLOAD_MAX_SIZE_BYTES } from '../../constants/upload.js';
 
 export const sendMessage = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { conversationId } = req.params;
@@ -21,8 +22,8 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
     // if a file was uploaded, override content and type accordingly
     if (req.file) {
       // enforce <5MB for attachments
-      if (req.file.size > 5 * 1024 * 1024) {
-        return res.status(400).json({ message: 'File must be under 5MB' });
+      if (req.file.size > DIRECT_UPLOAD_MAX_SIZE_BYTES) {
+        return res.status(400).json({ message: 'File must be under 100MB' });
       }
       
       const { url: fileUrl, fileName } = await uploadFile(req.file);

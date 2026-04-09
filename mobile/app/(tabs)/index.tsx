@@ -88,7 +88,6 @@ export default function Messages() {
       );
       return;
     }
-    console.log('Row action', action, id);
   };
 
   const handleDeleteBulk = () => {

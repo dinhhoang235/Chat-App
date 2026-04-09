@@ -13,6 +13,7 @@ import {
 import BottomSheet from '@gorhom/bottom-sheet';
 import * as MediaLibrary from 'expo-media-library';
 import * as ImagePicker from 'expo-image-picker';
+import { getInfoAsync } from 'expo-file-system/legacy';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 
@@ -109,19 +110,31 @@ export default function GallerySheet({
     return () => { mounted = false; };
   }, [visible, loadAssets, hasPermission]);
 
-  const toggleAsset = useCallback((asset: MediaLibrary.Asset) => {
+  const toggleAsset = useCallback(async (asset: MediaLibrary.Asset) => {
     const uri = asset.uri;
     const existing = attachments.find(a => a.uri === uri);
-    const file: FileObject = {
-      uri,
-      name: asset.filename,
-      type: asset.mediaType === 'photo' ? 'image/jpeg' : (asset.mediaType === 'video' ? 'video/mp4' : undefined),
-      size: (asset as any).fileSize,
-      duration: asset.duration,
-    };
+    
     if (existing) {
       removeAttachment(uri);
     } else if (attachments.length < 10) {
+      // Fetch full info to get fileSize
+      let size = (asset as any).fileSize;
+      if (!size) {
+        try {
+          const info = await getInfoAsync(asset.uri);
+          if (info.exists) size = (info as any).size;
+        } catch (e) {
+          console.warn('Failed to get asset info from FileSystem', e);
+        }
+      }
+
+      const file: FileObject = {
+        uri,
+        name: asset.filename,
+        type: asset.mediaType === 'photo' ? 'image/jpeg' : (asset.mediaType === 'video' ? 'video/mp4' : undefined),
+        size,
+        duration: asset.duration,
+      };
       addAttachment(file);
     }
   }, [attachments, addAttachment, removeAttachment]);
@@ -160,11 +173,20 @@ export default function GallerySheet({
     const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
+      let size = (asset as any).fileSize;
+      if (!size) {
+        try {
+          const info = await getInfoAsync(asset.uri);
+          if (info.exists) size = (info as any).size;
+        } catch (e) {
+          console.warn('Failed to get camera file info', e);
+        }
+      }
       addAttachment({
         uri: asset.uri,
         name: asset.uri.split('/').pop(),
         type: asset.type ? `${asset.type}/jpeg` : 'image/jpeg',
-        size: (asset as any).fileSize,
+        size,
       });
     }
   }, [addAttachment]);

@@ -3,6 +3,7 @@ import { Server } from 'socket.io';
 import prisma from '../../db.js';
 import { AuthRequest } from '../../middleware/auth.js';
 import { uploadFile } from '../../utils/minio.js';
+import { DIRECT_UPLOAD_MAX_SIZE_BYTES } from '../../constants/upload.js';
 
 export const startConversation = (io: Server) => async (req: AuthRequest, res: Response): Promise<any> => {
   const { targetUserId } = req.body;
@@ -57,8 +58,8 @@ export const startConversation = (io: Server) => async (req: AuthRequest, res: R
     let messageType = 'text';
     if (req.file) {
       // enforce size limit
-      if (req.file.size > 5 * 1024 * 1024) {
-        return res.status(400).json({ message: 'File must be under 5MB' });
+      if (req.file.size > DIRECT_UPLOAD_MAX_SIZE_BYTES) {
+        return res.status(400).json({ message: 'File must be under 100MB' });
       }
       
       const { url: fileUrl } = await uploadFile(req.file);

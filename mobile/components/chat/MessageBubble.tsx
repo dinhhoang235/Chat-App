@@ -1,33 +1,47 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useChatThread } from '@/hooks/useChatThread';
-import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Animated, StyleSheet } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { Image } from 'expo-image';
 import { useTheme } from '@/context/themeContext';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { getAvatarUrl } from '@/utils/avatar';
-import { FullscreenImageViewer } from '@/components/modals';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { getInitials } from '@/utils/initials';
+import FullscreenImageViewer from '../modals/FullscreenImageViewer';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import CircularProgress from './CircularProgress';
 
 const InlineVideoPlayer = ({ url }: { url: string }) => {
   const [videoDuration, setVideoDuration] = useState(0);
+  const durationRef = useRef<number>(0);
+  const durationCheckedRef = useRef(false);
 
-  const player = useVideoPlayer(url, p => {
+  const playerSetup = useCallback((p: any) => {
     p.loop = true;
     p.muted = true;
     p.play();
-  });
+  }, []);
+
+  const player = useVideoPlayer(url, playerSetup);
 
   useEffect(() => {
+    durationCheckedRef.current = false;
+    durationRef.current = 0;
+    
     const intv = setInterval(() => {
-      if (player.duration && player.duration > 0) {
+      if (!durationCheckedRef.current && player?.duration && player.duration > 0) {
         setVideoDuration(player.duration * 1000);
+        durationRef.current = player.duration * 1000;
+        durationCheckedRef.current = true;
         clearInterval(intv);
       }
     }, 250);
-    return () => clearInterval(intv);
-  }, [player]);
+    
+    return () => {
+      clearInterval(intv);
+    };
+  }, [player, url]);
 
   return (
     <>
@@ -62,14 +76,15 @@ type ChatMessage = {
   seenBy?: { id: number; fullName?: string; avatar?: string }[];
   isLastInGroup?: boolean;
   status?: 'sending' | 'sent' | 'error';
-  fileInfo?: { url: string; name?: string; size?: number; mime?: string };
+  fileInfo?: { url: string; name?: string; size?: number; mime?: string; thumbnailUrl?: string };
   images?: any[]; // for image_group
   replyTo?: any;
+  progress?: number;
 };
 
 const IMAGE_SIZE_CACHE = new Map<string, {width: number, height: number}>();
 
-export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void }) {
+export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const { allMedia } = useChatThread();
@@ -141,6 +156,50 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     }
     return null;
   });
+
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (message.status === 'sending') {
+      const loop = Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        })
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+  }, [message.status, rotateAnim]);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const [localThumb, setLocalThumb] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (message.status === 'sending' && message.fileInfo?.url) {
+      if (message.type === 'video') {
+        // Video thumbnail generation
+        (async () => {
+          try {
+            const { uri } = await VideoThumbnails.getThumbnailAsync(message.fileInfo!.url!, {
+              time: 0,
+            });
+            setLocalThumb(uri);
+          } catch (e) {
+            console.warn('Local video thumb failed', e);
+          }
+        })();
+      } else if (message.type === 'image') {
+        // For images, we just use the local URI as the thumb
+        setLocalThumb(message.fileInfo.url);
+      }
+    }
+  }, [message.status, message.fileInfo, message.type]);
 
   if (message.type === 'separator' || message.type === 'system') {
     const textToShow = message.text || message.content;
@@ -223,10 +282,13 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       url = getAvatarUrl(url) || url;
     }
     const maxWidth = screenWidth * 0.75;
+    const displayThumb = message.fileInfo.thumbnailUrl ? (message.fileInfo.thumbnailUrl.startsWith('http') ? message.fileInfo.thumbnailUrl : getAvatarUrl(message.fileInfo.thumbnailUrl)) : localThumb;
+
     contentElement = (
       <>
         <TouchableOpacity
         onPress={() => {
+          if (message.status === 'sending') return;
           let idx = -1;
           if (message.id != null) {
             idx = threadImageIds.indexOf(message.id.toString());
@@ -246,7 +308,52 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         activeOpacity={0.9}
       >
         <View style={{ borderRadius: 12, overflow: 'hidden', backgroundColor: '#000', width: maxWidth, height: maxWidth * 1 }} pointerEvents="none">
-          <InlineVideoPlayer url={url} />
+          {message.status === 'sending' ? (
+            <Image source={{ uri: displayThumb || url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+          ) : (
+            <>
+               <InlineVideoPlayer url={url} />
+               {displayThumb && (
+                  <Image 
+                    source={{ uri: displayThumb }} 
+                    style={{ ...StyleSheet.absoluteFillObject, zIndex: -1 }} 
+                    contentFit="cover"
+                  />
+               )}
+            </>
+          )}
+          
+          {message.status === 'sending' && (
+            <View style={{ 
+              ...StyleSheet.absoluteFillObject, 
+              backgroundColor: 'rgba(0,0,0,0.3)', 
+              justifyContent: 'center', 
+              alignItems: 'center' 
+            }}>
+              <CircularProgress 
+                size={60}
+                strokeWidth={4}
+                progress={progress || 0}
+                color="#0084FF"
+                backgroundColor="rgba(255,255,255,0.2)"
+              />
+              {message.fileInfo?.size && (
+                <Text style={{ 
+                  color: '#fff', 
+                  fontSize: 12, 
+                  marginTop: 12, 
+                  fontWeight: '700', 
+                  backgroundColor: 'rgba(0,0,0,0.4)',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  overflow: 'hidden'
+                }}>
+                  {(( (progress || 0) * message.fileInfo.size) / (1024 * 1024)).toFixed(1)}MB / {(message.fileInfo.size / (1024 * 1024)).toFixed(1)}MB
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       </TouchableOpacity>
       <FullscreenImageViewer
@@ -275,6 +382,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       <>
         <TouchableOpacity
           onPress={() => {
+            if (message.status === 'sending') return;
             let idx = -1;
             if (message.id != null) {
               idx = threadImageIds.indexOf(message.id.toString());
@@ -293,22 +401,56 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           }}
           activeOpacity={0.9}
         >
-          <Image
-            source={{ uri: fullImageUri }}
-            style={{
-              width: maxWidth,
-              height: imgSize ? (imgSize.height * (maxWidth / imgSize.width)) : maxWidth * 0.75,
-              borderRadius: 12,
-              backgroundColor: colors.surfaceVariant
-            }}
-            contentFit="cover"
-            onLoad={(e) => {
-              const { width, height } = e.source;
-              IMAGE_SIZE_CACHE.set(fullImageUri, { width, height });
-              setImgSize({ width, height });
-            }}
-            onError={(err) => console.log('Image load error:', fullImageUri, err)}
-          />
+          <View>
+            <Image
+              source={{ uri: fullImageUri }}
+              style={{
+                width: maxWidth,
+                height: imgSize ? (imgSize.height * (maxWidth / imgSize.width)) : maxWidth * 0.75,
+                borderRadius: 12,
+                backgroundColor: colors.surfaceVariant
+              }}
+              contentFit="cover"
+              onLoad={(e) => {
+                const { width, height } = e.source;
+                IMAGE_SIZE_CACHE.set(fullImageUri, { width, height });
+                setImgSize({ width, height });
+              }}
+              onError={(err) => console.log('Image load error:', fullImageUri, err)}
+            />
+            {message.status === 'sending' && (
+              <View style={{ 
+                ...StyleSheet.absoluteFillObject, 
+                backgroundColor: 'rgba(0,0,0,0.3)', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                borderRadius: 12
+              }}>
+                <CircularProgress 
+                  size={40}
+                  strokeWidth={2}
+                  progress={progress || 0}
+                  color="#0084FF"
+                  backgroundColor="rgba(255,255,255,0.2)"
+                />
+                {message.fileInfo?.size && (
+                  <Text style={{ 
+                    color: '#fff', 
+                    fontSize: 10, 
+                    marginTop: 6, 
+                    fontWeight: '700', 
+                    backgroundColor: 'rgba(0,0,0,0.4)',
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                    overflow: 'hidden'
+                  }}>
+                    {(( (progress || 0) * message.fileInfo.size) / (1024 * 1024)).toFixed(1)}MB / {(message.fileInfo.size / (1024 * 1024)).toFixed(1)}MB
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
         <FullscreenImageViewer
           visible={viewerVisible}
@@ -596,8 +738,9 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           {isLastInGroup && (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, justifyContent: isOutgoing ? 'flex-end' : 'flex-start' }}>
               <Text style={{ color: timeColor, fontSize: 12, marginRight: isOutgoing ? 0 : 8, marginLeft: isOutgoing ? 8 : 0 }}>
-                {isOutgoing && isThreadLast ? (
-                   message.status === 'sending' ? 'Đang gửi' : 
+                {message.status === 'sending' ? (
+                  <Text style={{ color: timeColor, fontSize: 12 }}>Đang gửi</Text>
+                ) : (isOutgoing && isThreadLast) ? (
                    (message.seenBy && message.seenBy.length > 0) ? '' : 'Đã gửi'
                 ) : message.time}
               </Text>

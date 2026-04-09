@@ -14,9 +14,18 @@ export const getMultipartUrl = async (req: AuthRequest, res: Response): Promise<
     return res.status(400).json({ message: 'Missing parameters' });
   }
 
+  if (typeof objectName !== 'string' || !objectName.startsWith(`${userId}/`)) {
+    return res.status(403).json({ message: 'Forbidden object access' });
+  }
+
+  const normalizedPartNumber = Number(partNumber);
+  if (!Number.isInteger(normalizedPartNumber) || normalizedPartNumber < 1) {
+    return res.status(400).json({ message: 'Invalid partNumber' });
+  }
+
   try {
     const host = req.get('host');
-    const uploadUrl = await getPresignedUrlForPart(objectName, uploadId, partNumber, host);
+    const uploadUrl = await getPresignedUrlForPart(objectName, uploadId, normalizedPartNumber, host);
 
     res.json({
       uploadUrl

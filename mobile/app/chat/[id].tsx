@@ -60,10 +60,10 @@ export default function ChatThread() {
     replyingTo,
     setReplyingTo,
     highlightedMessageId,
-    scrollToMessageId
+    scrollToMessageId,
+    uploadProgress
   } = useChatThread();
-
-
+  
   // unified sheet control (gallery/composer) moved to hook
   const { openSheet, closeAll, sheetHeight } = useSheetControl(
     inputRef,
@@ -75,6 +75,40 @@ export default function ChatThread() {
     setEmojiVisible,
     lastKeyboardHeight
   );
+
+  const renderItem = React.useCallback(({ item, index }: any) => {
+    if (item.type === 'date_separator') {
+      return (
+        <View className="items-center my-4">
+          <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '500' }}>
+            {item.date}
+          </Text>
+        </View>
+      );
+    }
+
+    const nextMessage = processedMessages[index - 1]; 
+    const isLastInConsecutiveGroup = !nextMessage || nextMessage.senderId !== item.senderId;
+    const isThreadLast = index === 0;
+
+    return (
+      <MessageBubble
+        message={item}
+        highlightQuery={searchQuery}
+        isLastInGroup={isLastInConsecutiveGroup}
+        isThreadLast={isThreadLast}
+        onPress={() => { if (composerVisible) closeAll(); }}
+        onAvatarPress={() => {
+          if (item.fromMe) return router.push('/profile/me');
+          router.push(`/profile/${item.senderId}`);
+        }}
+        onReply={() => setReplyingTo(item)}
+        isHighlighted={item.id?.toString() === highlightedMessageId}
+        onReplyPress={(replyId: string) => scrollToMessageId(replyId)}
+        progress={uploadProgress[item.id]}
+      />
+    );
+  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -223,7 +257,6 @@ export default function ChatThread() {
                         fetchMessages(true);
                       }
                     }}
-                    onEndReachedThreshold={0.5}
                     ListHeaderComponent={() => isTyping ? (
                       <View className="px-4 py-2 flex-row items-center">
                         <Image
@@ -248,38 +281,8 @@ export default function ChatThread() {
                     ListFooterComponent={() => loadingMore ? (
                       <ActivityIndicator style={{ marginVertical: 10 }} color={colors.tint} />
                     ) : null}
-                    renderItem={({ item, index }: any) => {
-                      if (item.type === 'date_separator') {
-                        return (
-                          <View className="items-center my-4">
-                            <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '500' }}>
-                              {item.date}
-                            </Text>
-                          </View>
-                        );
-                      }
-
-                      const nextMessage = processedMessages[index - 1]; 
-                      const isLastInConsecutiveGroup = !nextMessage || nextMessage.senderId !== item.senderId;
-                      const isThreadLast = index === 0;
-
-                      return (
-                        <MessageBubble
-                          message={item}
-                          highlightQuery={searchQuery}
-                          isLastInGroup={isLastInConsecutiveGroup}
-                          isThreadLast={isThreadLast}
-                          onPress={() => { if (composerVisible) closeAll(); }}
-                          onAvatarPress={() => {
-                            if (item.fromMe) return router.push('/profile/me');
-                            router.push(`/profile/${item.senderId}`);
-                          }}
-                          onReply={() => setReplyingTo(item)}
-                          isHighlighted={item.id?.toString() === highlightedMessageId}
-                          onReplyPress={(replyId: string) => scrollToMessageId(replyId)}
-                        />
-                      );
-                    }}
+                    onEndReachedThreshold={0.5}
+                    renderItem={renderItem}
                   />
                 </View>
               )}
@@ -355,7 +358,6 @@ export default function ChatThread() {
             }}
             height={sheetHeight}
             onAction={(key) => {
-              console.log('composer action selected', key);
               closeAll();
               if (key === 'document') {
                 pickDocument();
@@ -363,8 +365,6 @@ export default function ChatThread() {
                 // TODO: implement location share
               } else if (key === 'gif') {
                 // TODO: open GIF picker
-              } else {
-                console.log('Composer action:', key);
               }
             }}
           />

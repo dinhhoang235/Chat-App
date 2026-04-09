@@ -11,14 +11,27 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
   - Hỗ trợ quét mã QR để kết nối nhanh chóng.
   - Quản lý yêu cầu kết bạn.
 - **Chia sẻ đa phương tiện**:
-  - Gửi hình ảnh từ thư viện hoặc chụp trực tiếp từ camera.
-  - Hỗ trợ gửi các tệp tin tài liệu.
-  - Nén ảnh trước khi tải lên để tiết kiệm băng thông.
+  - Gửi hình ảnh và **video** từ thư viện hoặc chụp trực tiếp.
+  - Trình phát video tích hợp (Integrated Video Player) với đầy đủ điều khiển.
+  - Hỗ trợ gửi các tệp tin tài liệu lên đến 100MB qua cơ chế **Multipart Upload**.
+  - Tự động nén ảnh và xử lý dữ liệu trước khi tải lên.
+- **Hệ thống Avatar thông minh**:
+  - Tự động hiển thị tên viết tắt (Initials) với màu sắc ngẫu nhiên khi không có ảnh đại diện.
+  - Avatar nhóm (Group Avatar) hiển thị lưới các thành viên.
+- **Thư viện Media trực quan**:
+  - Xem lại tất cả hình ảnh, tệp tin và liên kết đã chia sẻ trong cuộc trò chuyện.
+  - Hiển thị thời gian (Timestamp) chi tiết cho từng mục media.
 - **Thông báo đẩy (Push Notifications)**: Nhận thông báo tin nhắn mới ngay cả khi không mở ứng dụng.
 - **Giao diện hiện đại**:
   - Hỗ trợ Dark Mode/Light Mode tự động.
   - Hiệu ứng mượt mà với React Native Reanimated.
   - Thiết kế Responsive với NativeWind (Tailwind CSS).
+
+## 🆕 Cập nhật mới nhất
+- **Video Chat Support**: Tích hợp `expo-video` hỗ trợ gửi và xem video mượt mà trong cuộc hội thoại.
+- **Multipart Storage**: Triển khai MinIO Multipart Upload cho phép tải lên tệp tin dung lượng lớn với thanh tiến trình (Progress bar).
+- **Media Gallery Enhanced**: Trang quản lý media hỗ trợ phân loại ảnh/video/files cùng thời gian chi tiết.
+- **Improved Avatars**: Hệ thống initials fallback mới và hiển thị avatar nhóm chuyên nghiệp hơn.
 
 ## 🛠 Công nghệ sử dụng
 
@@ -27,7 +40,7 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 - **Styling**: [NativeWind](https://www.nativewind.dev/) (Tailwind CSS cho React Native)
 - **Real-time**: [Socket.io Client](https://socket.io/)
 - **State Management**: React Context API & Hooks
-- **Media**: Expo Camera, Expo Image Picker, Expo Document Picker
+- **Media**: Expo Camera, Expo Image Picker, Expo Document Picker, **Expo Video**, **Expo Image Manipulator**
 - **Animations**: React Native Reanimated & Gesture Handler
 
 ## 📁 Cấu trúc thư mục

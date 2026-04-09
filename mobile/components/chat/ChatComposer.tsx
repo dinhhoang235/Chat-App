@@ -67,16 +67,16 @@ export default function ChatComposer({
               Đang trả lời {replyingTo.contactName || replyingTo.sender?.fullName || 'Người dùng'}
             </Text>
             <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
-              {replyingTo.type === 'image' || replyingTo.type === 'image_group' ? '[Hình ảnh]' : (replyingTo.type === 'text' ? replyingTo.content : '[Tệp]')}
+              {replyingTo.type === 'image' || replyingTo.type === 'image_group' ? '[Hình ảnh]' : (replyingTo.type === 'video' ? '[Video]' : (replyingTo.type === 'text' ? replyingTo.content : '[Tệp]'))}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {(replyingTo.type === 'image' || replyingTo.type === 'image_group') && (
+            {(replyingTo.type === 'image' || replyingTo.type === 'image_group' || replyingTo.type === 'video') && (
               <Image 
                 source={{ 
                   uri: (() => {
                     let url = replyingTo.type === 'image_group' ? replyingTo.images?.[0]?.fileInfo?.url : replyingTo.fileInfo?.url;
-                    if (!url && replyingTo.type === 'image') {
+                    if (!url && (replyingTo.type === 'image' || replyingTo.type === 'video')) {
                       try {
                         const info = typeof replyingTo.content === 'string' ? JSON.parse(replyingTo.content) : replyingTo.content;
                         url = info?.url;

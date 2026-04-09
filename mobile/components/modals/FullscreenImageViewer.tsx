@@ -8,6 +8,8 @@ import {
   ScrollView,
   Text,
   useWindowDimensions,
+  Pressable,
+  StyleSheet,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -19,6 +21,9 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import Slider from '@react-native-community/slider';
+import VideoThumbnail from '../chat/VideoThumbnail';
 
 export type UserInfo = {
   name: string;
@@ -44,6 +49,8 @@ const ZoomableImage = ({
   onZoomChange,
   onClose,
   nativeGesture,
+  isActive,
+  showControls,
 }: {
   uri: string;
   width: number;
@@ -55,6 +62,8 @@ const ZoomableImage = ({
   onZoomChange: (zoomed: boolean) => void;
   onClose: () => void;
   nativeGesture: ReturnType<typeof Gesture.Native>;
+  isActive: boolean;
+  showControls: boolean;
 }) => {
   const scale = useSharedValue(1);
   const lastScale = useSharedValue(1);
@@ -166,27 +175,172 @@ const ZoomableImage = ({
     opacity: opacity.value,
   }));
 
+  const isVideo = uri.match(/\.(mp4|mov|m4v|avi|webm)(\?.*)?$/i);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekValue, setSeekValue] = useState(0);
+  
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  const [manuallyPaused, setManuallyPaused] = useState(false);
+  
+  const player = useVideoPlayer(isVideo ? uri : null, player => {
+    player.loop = true;
+    if (isVideo && isActive) {
+      player.play();
+    }
+  });
+
+  // Handle auto-play/pause on swipe
+  useEffect(() => {
+    if (!player || !isVideo) return;
+    if (isActive && !manuallyPaused) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isActive, manuallyPaused, isVideo, player]);
+
+  // Reset manual pause when swiping away
+  useEffect(() => {
+    if (!isActive) setManuallyPaused(false);
+  }, [isActive]);
+
+  // Sync player state for custom controls
+  useEffect(() => {
+    if (!player || !isVideo) return;
+    const sub = player.addListener('playingChange', (event) => {
+      setIsPlaying(event.isPlaying);
+    });
+    const interval = setInterval(() => {
+      if (!isSeeking && player.duration > 0) {
+        setCurrentTime(player.currentTime);
+        setDuration(player.duration);
+      }
+    }, 500);
+    return () => {
+      sub.remove();
+      clearInterval(interval);
+    };
+  }, [player, isVideo, isSeeking]);
+
   return (
-    <GestureDetector gesture={combinedGesture}>
-      <Animated.View
-        style={[
-          {
-            width,
-            height: height - insets.top - insets.bottom,
-            marginTop: insets.top,
-            justifyContent: 'center',
-            alignItems: 'center',
-          },
-          animatedStyle,
-        ]}
-      >
-        <Image
-          source={{ uri }}
-          style={{ width: '100%', height: '100%' }}
-          resizeMode="contain"
-        />
-      </Animated.View>
-    </GestureDetector>
+    <Animated.View
+      style={[
+        {
+          width,
+          height: height - insets.top - insets.bottom,
+          marginTop: insets.top,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        animatedStyle,
+      ]}
+    >
+      <GestureDetector gesture={combinedGesture}>
+        <View style={{ width: '100%', height: '100%' }}>
+          {isVideo ? (
+            <View style={{ width: '100%', height: '100%' }}>
+              <VideoView
+                style={{ width: '100%', height: '100%' }}
+                player={player}
+                nativeControls={false}
+                contentFit="contain"
+              />
+              {/* Transparent overlay to catch taps ONLY when NOT interacting with controls */}
+              <Pressable 
+                style={StyleSheet.absoluteFill} 
+                onPress={onToggleControls} 
+              />
+            </View>
+          ) : (
+            <Image
+              source={{ uri }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </GestureDetector>
+
+      {/* Custom Seek Bar Row — High-level sibling to avoid interception */}
+      {isVideo && showControls && (
+        <View 
+          pointerEvents="box-none" // Allows touches to reach children but container itself is transparent
+          style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', zIndex: 9999 }]}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()} // Stop bubbling to GestureDetector
+            style={{ 
+              backgroundColor: 'rgba(0,0,0,0.6)', 
+              paddingVertical: 12, 
+              paddingHorizontal: 16,
+              marginBottom: 110 + insets.bottom,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            {/* Play/Pause Button */}
+            <TouchableOpacity 
+               onPress={() => {
+                 if (isPlaying) {
+                   setManuallyPaused(true);
+                 } else {
+                   setManuallyPaused(false);
+                 }
+               }}
+               hitSlop={{ top: 25, bottom: 25, left: 30, right: 30 }}
+               style={{ 
+                 width: 50, 
+                 height: 50, 
+                 justifyContent: 'center', 
+                 alignItems: 'center', 
+                 marginRight: 15,
+                 marginLeft: 5, // Small gap from edge to avoid gesture conflict
+               }}
+            >
+              <MaterialIcons name={isPlaying ? "pause" : "play-arrow"} size={36} color="#fff" />
+            </TouchableOpacity>
+
+            {/* Current Time */}
+            <Text style={{ color: '#fff', fontSize: 13, fontVariant: ['tabular-nums'], marginRight: 10 }}>
+              {formatTime(isSeeking ? seekValue : currentTime)}
+            </Text>
+
+            {/* Slider */}
+            <Slider
+              style={{ flex: 1, height: 40 }}
+              minimumValue={0}
+              maximumValue={duration || 1}
+              value={isSeeking ? seekValue : currentTime}
+              onValueChange={(value) => {
+                setIsSeeking(true);
+                setSeekValue(value);
+              }}
+              onSlidingComplete={(value) => {
+                player.currentTime = value;
+                setCurrentTime(value);
+                setIsSeeking(false);
+              }}
+              minimumTrackTintColor="#00A3FF"
+              maximumTrackTintColor="rgba(255,255,255,0.4)"
+              thumbTintColor="#FFFFFF"
+            />
+
+            {/* Total Time */}
+            <Text style={{ color: '#fff', fontSize: 13, fontVariant: ['tabular-nums'], marginLeft: 10 }}>
+              {formatTime(duration)}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+    </Animated.View>
   );
 };
 
@@ -259,7 +413,7 @@ export default function FullscreenImageViewer({
 
   const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
 
-  const renderItem = ({ item }: { item: string }) => (
+  const renderItem = ({ item, index }: { item: string; index: number }) => (
     <ZoomableImage
       uri={item}
       width={width}
@@ -271,6 +425,8 @@ export default function FullscreenImageViewer({
       onZoomChange={setIsZoomed}
       onClose={onClose}
       nativeGesture={nativeGesture}
+      isActive={index === currentIndex}
+      showControls={showControls}
     />
   );
 
@@ -349,7 +505,9 @@ export default function FullscreenImageViewer({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 12 }}
           >
-            {displayImages.map((uri, idx) => (
+            {displayImages.map((uri, idx) => {
+              const isVid = uri.match(/\.(mp4|mov|m4v|avi|webm)(\?.*)?$/i);
+              return (
               <TouchableOpacity
                 key={uri + idx}
                 onPress={() => {
@@ -362,9 +520,16 @@ export default function FullscreenImageViewer({
                   borderColor: colors.tint,
                 }}
               >
-                <Image source={{ uri }} style={{ width: 48, height: 48 }} resizeMode="cover" />
+                {isVid ? (
+                  <VideoThumbnail uri={uri} style={{ width: 48, height: 48 }} />
+                ) : (
+                  <View style={{ width: 48, height: 48 }}>
+                    <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  </View>
+                )}
               </TouchableOpacity>
-            ))}
+              );
+            })}
           </ScrollView>
         </View>
 

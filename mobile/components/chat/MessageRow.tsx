@@ -1,10 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from "@/context/themeContext";
 import { MenuModal, MuteOptionsSheet, MuteSettingsModal } from '@/components/modals';
-import { GroupAvatar } from '@/components/avatars';
-import { getInitials } from '@/utils/initials';
+import { GroupAvatar, ChatAvatar } from '@/components/avatars';
 
 type Props = {
   message: {
@@ -16,7 +15,7 @@ type Props = {
     initials?: string;
     color?: string;
     avatar?: string;
-    avatars?: string[]; // for groups
+    avatars?: (string | any)[]; // for groups
     isGroup?: boolean;
     membersCount?: number;
     status?: string;
@@ -38,7 +37,6 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
   const [excludeReminders, setExcludeReminders] = useState<boolean>(false);
   const rowRef = useRef<any>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const initials = message.initials ?? getInitials(message.name);
   const isGroupConversation = !!message.isGroup;
 
   const menuItems = [
@@ -128,55 +126,33 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
               )}
             </TouchableOpacity>
 
-            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: isGroupConversation ? 'transparent' : (message.color || '#6B7280'), marginLeft: 8 }}>
+            <View style={{ marginLeft: 8 }}>
               {isGroupConversation ? (
                 <GroupAvatar avatars={message.avatars} size={48} membersCount={message.membersCount} />
-              ) : message.avatar ? (
-                <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
               ) : (
-                <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
-              )}
-              {!isGroupConversation && message.status === 'online' && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    right: 0,
-                    width: 14,
-                    height: 14,
-                    borderRadius: 7,
-                    backgroundColor: '#4CAF50',
-                    borderWidth: 2,
-                    borderColor: colors.header
-                  }}
+                <ChatAvatar
+                  avatar={message.avatar}
+                  name={message.name}
+                  online={message.status === 'online'}
+                  size={48}
+                  tintColor={message.color || colors.tint}
+                  borderColor={colors.background}
                 />
               )}
             </View>
           </View>
         ) : (
-          <View
-            style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: isGroupConversation ? 'transparent' : (message.color || '#6B7280') }}
-          >
+          <View>
             {isGroupConversation ? (
               <GroupAvatar avatars={message.avatars} size={48} membersCount={message.membersCount} />
-            ) : message.avatar ? (
-              <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
             ) : (
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
-            )}
-            {!isGroupConversation && message.status === 'online' && (
-              <View
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  right: 0,
-                  width: 14,
-                  height: 14,
-                  borderRadius: 7,
-                  backgroundColor: '#4CAF50',
-                  borderWidth: 2,
-                  borderColor: colors.header
-                }}
+              <ChatAvatar
+                avatar={message.avatar}
+                name={message.name}
+                online={message.status === 'online'}
+                size={48}
+                tintColor={message.color || colors.tint}
+                borderColor={colors.background}
               />
             )}
           </View>

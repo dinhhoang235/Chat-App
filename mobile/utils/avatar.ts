@@ -10,4 +10,10 @@ export function getAvatarUrl(avatar?: string | null): string | null {
   return `${prefix}${path}`;
 }
 
+
+export function getAvatarColor(name?: string): string {
+  // Use a consistent brand blue as requested by the user
+  return '#0084FF';
+}
+
 export default getAvatarUrl;

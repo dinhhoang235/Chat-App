@@ -126,6 +126,7 @@ export default function ChatThread() {
                       avatars={groupAvatars}
                       size={44}
                       membersCount={membersCount}
+                      borderColor={colors.header}
                     />
                   ) : (
                     <ChatAvatar

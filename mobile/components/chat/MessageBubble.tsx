@@ -7,6 +7,46 @@ import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getAvatarUrl } from '@/utils/avatar';
 import { FullscreenImageViewer } from '@/components/modals';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { getInitials } from '@/utils/initials';
+
+const InlineVideoPlayer = ({ url }: { url: string }) => {
+  const [videoDuration, setVideoDuration] = useState(0);
+
+  const player = useVideoPlayer(url, p => {
+    p.loop = true;
+    p.muted = true;
+    p.play();
+  });
+
+  useEffect(() => {
+    const intv = setInterval(() => {
+      if (player.duration && player.duration > 0) {
+        setVideoDuration(player.duration * 1000);
+        clearInterval(intv);
+      }
+    }, 250);
+    return () => clearInterval(intv);
+  }, [player]);
+
+  return (
+    <>
+      <VideoView
+        style={{ width: '100%', height: '100%' }}
+        player={player}
+        nativeControls={false}
+        contentFit="cover"
+      />
+      {videoDuration > 0 && (
+        <View style={{ position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>
+            {Math.floor(videoDuration / 60000).toString().padStart(2, '0')}:{Math.floor((videoDuration % 60000) / 1000).toString().padStart(2, '0')}
+          </Text>
+        </View>
+      )}
+    </>
+  );
+};
 
 type ChatMessage = {
   id: string;
@@ -14,7 +54,7 @@ type ChatMessage = {
   content?: string;
   time?: string;
   fromMe?: boolean;
-  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'file' | 'image_group';
+  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'video' | 'file' | 'image_group';
   contactName?: string;
   contactAvatar?: string;
   contactAvatarColor?: string;
@@ -46,7 +86,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     // Only use allMedia to build the full array of images for the viewer
     const sourceImages = allMedia && allMedia.length > 0 ? allMedia : [];
     sourceImages.forEach(m => {
-      if (m.type === 'image' && m.fileInfo?.url) {
+      if ((m.type === 'image' || m.type === 'video') && m.fileInfo?.url) {
         let uri = m.fileInfo?.url || '';
         if (uri && !uri.startsWith('http')) {
           uri = getAvatarUrl(uri) || uri;
@@ -177,7 +217,55 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
   // after computing styles/render helper we decide what content to show
   let contentElement: React.ReactNode = null;
 
-  if (message.type === 'sticker') {
+  if (message.type === 'video' && message.fileInfo && message.fileInfo.url) {
+    let url = message.fileInfo.url;
+    if (!url.startsWith('http')) {
+      url = getAvatarUrl(url) || url;
+    }
+    const maxWidth = screenWidth * 0.75;
+    contentElement = (
+      <>
+        <TouchableOpacity
+        onPress={() => {
+          let idx = -1;
+          if (message.id != null) {
+            idx = threadImageIds.indexOf(message.id.toString());
+          }
+          if (idx === -1) {
+            idx = threadImageUris.indexOf(url);
+          }
+          let imagesForViewer = threadImageUris;
+          if (idx === -1) {
+            imagesForViewer = [...threadImageUris, url];
+            idx = imagesForViewer.length - 1;
+          }
+
+          setSelectedIndex(idx);
+          setViewerVisible(true);
+        }}
+        activeOpacity={0.9}
+      >
+        <View style={{ borderRadius: 12, overflow: 'hidden', backgroundColor: '#000', width: maxWidth, height: maxWidth * 1 }} pointerEvents="none">
+          <InlineVideoPlayer url={url} />
+        </View>
+      </TouchableOpacity>
+      <FullscreenImageViewer
+        visible={viewerVisible}
+        images={
+          url && selectedIndex >= threadImageUris.length
+            ? [...threadImageUris, url]
+            : threadImageUris
+        }
+        initialIndex={selectedIndex}
+        userInfo={{
+          name: message.fromMe ? 'Bạn' : message.contactName || 'Người dùng',
+          avatarUrl: message.fromMe ? undefined : message.contactAvatar,
+        }}
+        onClose={() => setViewerVisible(false)}
+      />
+      </>
+    );
+  } else if (message.type === 'sticker') {
     contentElement = (
       <Image source={{ uri: 'https://via.placeholder.com/120x120.png?text=STK' }} style={{ width: 120, height: 120, borderRadius: 12 }} />
     );
@@ -355,7 +443,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           <View style={{ width: 288, backgroundColor: colors.tint, borderRadius: 12, overflow: 'hidden' }}>
             <View style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint, marginRight: 12 }}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>{(message.contactName || '').slice(0,2)}</Text>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{getInitials(message.contactName)}</Text>
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{message.contactName}</Text>
@@ -453,7 +541,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           {message.replyTo.sender?.fullName || 'Người dùng'}
         </Text>
         <Text style={{ fontSize: 13, color: isOutgoing ? 'rgba(255,255,255,0.85)' : colors.textSecondary }} numberOfLines={1} ellipsizeMode="tail">
-          {message.replyTo.type === 'text' ? message.replyTo.content?.replace(/\n/g, ' ') : (message.replyTo.type === 'image' || message.replyTo.type === 'image_group' ? '[Hình ảnh]' : '[Tệp]')}
+          {message.replyTo.type === 'text' ? message.replyTo.content?.replace(/\n/g, ' ') : (message.replyTo.type === 'image' || message.replyTo.type === 'image_group' ? '[Hình ảnh]' : (message.replyTo.type === 'video' ? '[Video]' : '[Tệp]'))}
         </Text>
       </View>
     </TouchableOpacity>
@@ -469,7 +557,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
                 {message.contactAvatar ? (
                   <Image source={{ uri: message.contactAvatar }} style={{ width: 40, height: 40 }} />
                 ) : (
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>{message.contactName ? message.contactName.slice(0,1) : 'A'}</Text>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>{getInitials(message.contactName)}</Text>
                 )}
               </View>
             </TouchableOpacity>
@@ -495,12 +583,12 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         <View style={{ maxWidth: '72%', marginLeft: isOutgoing ? 'auto' : 12 }} className={`${isOutgoing ? 'items-end' : 'items-start'}`}> 
             {/* for image attachments we don’t show the standard bubble styling */}
         <Animated.View style={[{
-            backgroundColor: (message.type === 'image' || message.type === 'image_group') ? 'transparent' : bubbleBg,
-            borderWidth: (message.type === 'image' || message.type === 'image_group') ? 0 : 1,
-            padding: (message.type === 'image' || message.type === 'image_group') ? 0 : 12,
+            backgroundColor: (message.type === 'image' || message.type === 'image_group' || message.type === 'video') ? 'transparent' : bubbleBg,
+            borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video') ? 0 : 1,
+            padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video') ? 0 : 12,
             borderRadius: 18,
             marginBottom: isLastInGroup ? 0 : -8
-          }, (message.type !== 'image' && message.type !== 'image_group') ? animatedBorderStyle : {}]}>
+          }, (message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video') ? animatedBorderStyle : {}]}>
             {replyBlock}
             {contentElement}
           </Animated.View>
@@ -547,7 +635,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
                   ) : (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                       <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                        {u.fullName ? u.fullName.slice(0,1) : '?'}
+                        {getInitials(u.fullName)}
                       </Text>
                     </View>
                   )}

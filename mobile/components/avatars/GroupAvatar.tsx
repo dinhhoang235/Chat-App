@@ -1,26 +1,59 @@
 import React from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTheme } from '@/context/themeContext';
+import { getInitials } from '@/utils/initials';
+import { getAvatarColor } from '@/utils/avatar';
+
+interface AvatarInfo {
+  url?: string | null;
+  name?: string;
+  initials?: string;
+}
 
 interface GroupAvatarProps {
-  avatars?: string[];
+  avatars?: (string | AvatarInfo)[];
   size?: number;
   membersCount?: number;
+  borderColor?: string;
 }
 
 const GroupAvatar = ({ 
   avatars = [], 
   size = 48, 
-  membersCount 
+  membersCount,
+  borderColor = '#fff'
 }: GroupAvatarProps) => {
   const countToDisplay = membersCount || avatars.length;
+  const { colors } = useTheme();
 
-  // If no avatars and it's a group, we still want the grid but with initials maybe?
-  // Let's stick to showing the grid if avatars exist or just the default group icon if everything is empty.
   if (avatars.length === 0) {
     return (
-      <View style={[styles.container, { width: size, height: size, borderRadius: size / 2, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }]}>
-        <MaterialIcons name="groups" size={size * 0.6} color="#9CA3AF" />
+      <View style={[styles.container, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center' }]}>
+        <MaterialIcons name="groups" size={size * 0.6} color={colors.textSecondary} />
+      </View>
+    );
+  }
+
+  const renderAvatarItem = (item: string | AvatarInfo | undefined, itemSize: number) => {
+    if (!item) {
+      return <MaterialIcons name="person" size={itemSize * 0.6} color={colors.textSecondary} />;
+    }
+
+    const url = typeof item === 'string' ? item : item.url;
+    const initials = typeof item === 'object' ? (item.initials || (item.name ? getInitials(item.name) : '?')) : '';
+    const name = typeof item === 'object' ? item.name : '';
+
+    if (url) {
+      return <Image source={{ uri: url }} style={styles.image} />;
+    }
+
+    // Modern initial-style placeholder
+    const bgColor = name ? getAvatarColor(name) : '#E5E7EB';
+    
+    return (
+      <View style={{ width: '100%', height: '100%', backgroundColor: bgColor, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#fff', fontWeight: '700', fontSize: itemSize * 0.45 }}>{initials}</Text>
       </View>
     );
   };
@@ -28,66 +61,99 @@ const GroupAvatar = ({
   if (avatars.length === 1 && countToDisplay <= 1) {
     return (
       <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }]}>
-        <Image source={{ uri: avatars[0] }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+        {renderAvatarItem(avatars[0], size)}
       </View>
     );
   }
 
-  const itemSize = size * 0.58; // Increase size to 58% to create more overlap
+  // Determine how many to show based on available avatars
+  const showCount = countToDisplay > 4;
 
+  // New design: Overlapping circles for a more premium look
   return (
-    <View style={[styles.container, { width: size, height: size }]}>
+    <View style={[styles.container, { width: size, height: size, borderRadius: size / 2, backgroundColor: 'transparent' }]}>
       <View style={styles.grid}>
-        {/* Bottom left - Avatar 3 (z-index thấp nhất) */}
-        <View style={[styles.item, { width: itemSize, height: itemSize, bottom: -2, left: -2, zIndex: 1 }]}>
-          {avatars[2] ? (
-            <Image source={{ uri: avatars[2] }} style={styles.image} />
-          ) : (
-            <MaterialIcons name="person" size={itemSize * 0.7} color="#9CA3AF" />
-          )}
-        </View>
+        {/* Bottom left - Avatar 3 or Placeholder */}
+        {countToDisplay === 3 && (
+          <View style={[styles.item, { 
+            width: size * 0.55, 
+            height: size * 0.55, 
+            bottom: 0, 
+            left: size * 0.225, 
+            zIndex: 1,
+            backgroundColor: '#F3F4F6',
+            borderColor
+          }]}>
+            {renderAvatarItem(avatars[2], size * 0.55)}
+          </View>
+        )}
 
-        {/* Bottom right - Count box or Avatar 4 (z-index thấp thứ 2) */}
-        <View style={[styles.item, {
-          width: itemSize,
-          height: itemSize,
-          bottom: -2,
-          right: -2,
-          zIndex: 2,
-          backgroundColor: countToDisplay > 4 ? '#E5E7EB' : (avatars[3] ? 'transparent' : '#F3F4F6'),
-          borderWidth: countToDisplay > 4 ? 0.5 : 1,
-          borderColor: countToDisplay > 4 ? '#D1D5DB' : '#fff'
+        {/* Regular Bottom Left and Bottom Right for 4+ members */}
+        {countToDisplay >= 4 && (
+          <View style={[styles.item, { 
+            width: size * 0.55, 
+            height: size * 0.55, 
+            bottom: 0, 
+            left: 0, 
+            zIndex: 1,
+            backgroundColor: '#F3F4F6',
+            borderColor
+          }]}>
+            {renderAvatarItem(avatars[2], size * 0.55)}
+          </View>
+        )}
+
+        {/* Bottom right - Count box or Avatar 4 or Placeholder */}
+        {countToDisplay >= 4 && (
+          <View style={[styles.item, {
+            width: size * 0.55,
+            height: size * 0.55,
+            bottom: 0,
+            right: 0,
+            zIndex: 2,
+            backgroundColor: showCount ? '#E5E7EB' : '#F3F4F6',
+            borderColor
+          }]}>
+            {showCount ? (
+              <Text style={[styles.countText, { fontSize: size * 0.22, color: '#4B5563' }]}>+{countToDisplay - 3 > 99 ? '99' : countToDisplay - 3}</Text>
+            ) : (
+              renderAvatarItem(avatars[3], size * 0.55)
+            )}
+          </View>
+        )}
+
+        {/* Top left - Avatar 1 or Placeholder */}
+        <View style={[styles.item, { 
+          width: size * 0.55, 
+          height: size * 0.55, 
+          top: 0, 
+          left: 0, 
+          zIndex: 3,
+          backgroundColor: '#F3F4F6',
+          borderColor
         }]}>
-          {countToDisplay > 4 ? (
-            <Text style={styles.countText}>{countToDisplay - 3 > 99 ? '99+' : countToDisplay - 3}</Text>
-          ) : avatars[3] ? (
-            <Image source={{ uri: avatars[3] }} style={styles.image} />
-          ) : (
-            <MaterialIcons name="person" size={itemSize * 0.7} color="#9CA3AF" />
-          )}
+          {renderAvatarItem(avatars[0], size * 0.55)}
         </View>
 
-        {/* Top left - Avatar 1 (z-index cao) */}
-        <View style={[styles.item, { width: itemSize, height: itemSize, top: -2, left: -2, zIndex: 3 }]}>
-          {avatars[0] ? (
-            <Image source={{ uri: avatars[0] }} style={styles.image} />
-          ) : (
-            <MaterialIcons name="person" size={itemSize * 0.7} color="#9CA3AF" />
-          )}
-        </View>
-
-        {/* Top right - Avatar 2 (z-index cao nhất) */}
-        <View style={[styles.item, { width: itemSize, height: itemSize, top: -2, right: -2, zIndex: 4 }]}>
-          {avatars[1] ? (
-            <Image source={{ uri: avatars[1] }} style={styles.image} />
-          ) : (
-            <MaterialIcons name="person" size={itemSize * 0.7} color="#9CA3AF" />
-          )}
-        </View>
+        {/* Top right - Avatar 2 or Placeholder */}
+        {countToDisplay >= 2 && (
+          <View style={[styles.item, { 
+            width: size * 0.55, 
+            height: size * 0.55, 
+            top: 0, 
+            right: 0, 
+            zIndex: 4,
+            backgroundColor: '#F3F4F6',
+            borderColor
+          }]}>
+            {renderAvatarItem(avatars[1], size * 0.55)}
+          </View>
+        )}
       </View>
     </View>
   );
 };
+
 export default GroupAvatar;
 
 const styles = StyleSheet.create({
@@ -103,19 +169,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: 999,
     overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#fff',
   },
   image: {
     width: '100%',
     height: '100%',
   },
   countText: {
-    color: '#6B7280',
-    fontSize: 10,
+    color: '#4B5563',
     fontWeight: '700',
   },
 });

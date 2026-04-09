@@ -6,3 +6,4 @@ export { default as MessageBubble } from './MessageBubble';
 export { default as MessageRow } from './MessageRow';
 export { default as QuickActions } from './QuickActions';
 export { default as TypingDots } from './TypingDots';
+export { default as VideoThumbnail } from './VideoThumbnail';

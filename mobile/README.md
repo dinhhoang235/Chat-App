@@ -12,7 +12,7 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
   - Quản lý yêu cầu kết bạn.
 - **Chia sẻ đa phương tiện**:
   - Gửi hình ảnh từ thư viện hoặc chụp trực tiếp từ camera.
-  - Hỗ trợ gửi các tệp tin tài liệu (lên đến 5MB).
+  - Hỗ trợ gửi các tệp tin tài liệu.
   - Nén ảnh trước khi tải lên để tiết kiệm băng thông.
 - **Thông báo đẩy (Push Notifications)**: Nhận thông báo tin nhắn mới ngay cả khi không mở ứng dụng.
 - **Giao diện hiện đại**:

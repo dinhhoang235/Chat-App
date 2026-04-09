@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, Switch, Alert, View, Image, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/context/themeContext';
 import { useSearch } from '@/context/searchContext';
-import { Header, MuteOptionsSheet, MuteSettingsModal, BlockSettingsModal, EditDisplayNameModal, AddToGroupModal, ChatOptionRow, ReportModal, ConfirmModal, LeaveGroupSheet, ChatOptionsHeaderInfo, QuickActions } from '@/components';
+import { Header, MuteOptionsSheet, MuteSettingsModal, BlockSettingsModal, EditDisplayNameModal, AddToGroupModal, ChatOptionRow, ReportModal, ConfirmModal, LeaveGroupSheet, ChatOptionsHeaderInfo, QuickActions, VideoThumbnail } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useChatOptions } from '@/hooks/useChatOptions';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -43,7 +43,7 @@ export default function ChatOptions() {
     performLeaveGroup,
     isOwner,
     fetchConversationDetails,
-    recentImages,
+    recentMedia,
     handleMute,
   } = useChatOptions();
 
@@ -87,13 +87,17 @@ export default function ChatOptions() {
                 title="Ảnh, file, link"
                 onPress={() => router.push(`/chat/${id}/media`)}
                 showChevron
-                bottomBorder={recentImages.length === 0}
+                bottomBorder={recentMedia.length === 0}
               />
-              {recentImages.length > 0 && (
+              {recentMedia.length > 0 && (
                 <View style={{ flexDirection: 'row', paddingLeft: 60, paddingVertical: 4 }}>
-                  {recentImages.slice(0, 4).map((uri: string, idx: number) => (
+                  {recentMedia.map((item, idx: number) => (
                     <TouchableOpacity key={idx} onPress={() => router.push(`/chat/${id}/media`)} style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', marginRight: 4 }}>
-                      <Image source={{ uri }} style={{ width: 62, height: 62 }} />
+                      {item.type === 'video' ? (
+                        <VideoThumbnail uri={item.uri} style={{ width: 62, height: 62 }} />
+                      ) : (
+                        <Image source={{ uri: item.uri }} style={{ width: 62, height: 62 }} />
+                      )}
                     </TouchableOpacity>
                   ))}
                   <TouchableOpacity
@@ -155,13 +159,17 @@ export default function ChatOptions() {
                 title="Ảnh, file, link"
                 onPress={() => router.push(`/chat/${id}/media`)}
                 showChevron
-                bottomBorder={recentImages.length === 0}
+                bottomBorder={recentMedia.length === 0}
               />
-              {recentImages.length > 0 && (
+              {recentMedia.length > 0 && (
                 <View style={{ flexDirection: 'row', paddingLeft: 60, paddingVertical: 4 }}>
-                  {recentImages.slice(0, 4).map((uri: string, idx: number) => (
+                  {recentMedia.map((item, idx: number) => (
                     <TouchableOpacity key={idx} onPress={() => router.push(`/chat/${id}/media`)} style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', marginRight: 4 }}>
-                      <Image source={{ uri }} style={{ width: 62, height: 62 }} />
+                      {item.type === 'video' ? (
+                        <VideoThumbnail uri={item.uri} style={{ width: 62, height: 62 }} />
+                      ) : (
+                        <Image source={{ uri: item.uri }} style={{ width: 62, height: 62 }} />
+                      )}
                     </TouchableOpacity>
                   ))}
                   <TouchableOpacity

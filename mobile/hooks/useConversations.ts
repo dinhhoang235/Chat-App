@@ -7,6 +7,7 @@ import { useSelection } from '@/context/selectionContext';
 import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
 import { getAvatarUrl } from '@/utils/avatar';
+import { getInitials } from '@/utils/initials';
 
 export function useConversations() {
   const { colors } = useTheme();
@@ -39,16 +40,51 @@ export function useConversations() {
           lastMessageText = 'Chưa có tin nhắn';
         } else if (lastMsg.type === 'image') {
           lastMessageText = isFromMe ? 'Bạn: [Hình ảnh]' : '[Hình ảnh]';
+        } else if (lastMsg.type === 'video') {
+          let durationStr = '';
+          try {
+            const content = typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
+            if (content.duration) {
+              const d = content.duration;
+              const mins = Math.floor(d / 60);
+              const secs = Math.floor(d % 60);
+              durationStr = ` ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+          } catch {
+            // Ignore parse errors
+          }
+          lastMessageText = isFromMe ? `Bạn: [Video]${durationStr}` : `[Video]${durationStr}`;
         } else if (lastMsg.type === 'file') {
           lastMessageText = isFromMe ? 'Bạn: [File]' : '[File]';
         } else {
-          // fallback to raw text content
-          lastMessageText = isFromMe ? `Bạn: ${lastMsg.content}` : lastMsg.content;
+          // Check if it's JSON content that should have been a media type
+          let mediaIcon = '';
+          try {
+            const content = typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
+            if (content.mime?.startsWith('video/')) {
+              mediaIcon = '[Video]';
+              if (content.duration) {
+                const d = content.duration;
+                const mins = Math.floor(d / 60);
+                const secs = Math.floor(d % 60);
+                mediaIcon += ` ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+              }
+            } else if (content.mime?.startsWith('image/')) {
+              mediaIcon = '[Hình ảnh]';
+            }
+          } catch {}
+
+          const contentText = mediaIcon || lastMsg.content;
+          lastMessageText = isFromMe ? `Bạn: ${contentText}` : contentText;
         }
 
-        const avatars = conv.participants
-          .map((p: any) => getAvatarUrl(p.user.avatar))
-          .filter(Boolean) as string[];
+        const avatars = [...conv.participants]
+          .sort((a: any, b: any) => a.id - b.id)
+          .map((p: any) => ({
+            url: p.user.avatar ? getAvatarUrl(p.user.avatar) : null,
+            name: p.user.fullName,
+            initials: getInitials(p.user.fullName)
+          }));
         
         const updatedAt = lastMsg 
           ? new Date(lastMsg.createdAt).getTime() 
@@ -60,7 +96,7 @@ export function useConversations() {
           lastMessage: lastMessageText,
           time: lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
           unread: conv._count?.messages || 0,
-          initials: (conv.name || otherParticipant?.user.fullName || 'Z')[0],
+          initials: getInitials(conv.name || otherParticipant?.user.fullName),
           color: conv.isGroup ? colors.tint : (otherParticipant?.user.avatar ? undefined : colors.tint),
           avatar: conv.avatar ? getAvatarUrl(conv.avatar) : (otherParticipant?.user.avatar ? getAvatarUrl(otherParticipant.user.avatar) : undefined),
           avatars: avatars,

@@ -1,11 +1,10 @@
 import React from 'react';
-import { View, Text, Image } from 'react-native';
-import { GroupAvatar } from '@/components/avatars';
-import { getInitials } from '@/utils/initials';
+import { View, Text } from 'react-native';
+import { GroupAvatar, ChatAvatar } from '@/components/avatars';
 
 interface ChatOptionsHeaderInfoProps {
   isGroup: boolean;
-  groupAvatars: string[];
+  groupAvatars: (string | any)[];
   membersCount: number;
   avatar?: string;
   isOnline?: boolean;
@@ -34,12 +33,15 @@ const ChatOptionsHeaderInfo = ({
         >
           {isGroup ? (
             <GroupAvatar avatars={groupAvatars} membersCount={membersCount} size={96} />
-          ) : avatar ? (
-            <Image source={{ uri: avatar }} style={{ width: 96, height: 96, borderRadius: 48 }} resizeMode="cover" />
           ) : (
-            <View style={{ width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }}>
-              <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700' }}>{getInitials(name)}</Text>
-            </View>
+            <ChatAvatar
+              avatar={avatar}
+              name={name}
+              online={isOnline}
+              size={96}
+              tintColor={colors.tint}
+              borderColor={colors.background}
+            />
           )}
         </View>
         {!isGroup && isOnline && (

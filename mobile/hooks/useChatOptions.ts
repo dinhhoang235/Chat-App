@@ -6,6 +6,7 @@ import { socketService } from '@/services/socket';
 import { useAuth } from '@/context/authContext';
 import { contacts } from '@/constants/mockData';
 import { getAvatarUrl } from '@/utils/avatar';
+import { getInitials } from '@/utils/initials';
 
 export function useChatOptions() {
   const router = useRouter();
@@ -38,17 +39,12 @@ export function useChatOptions() {
   // resolve id / contact so we can detect groups reliably
   const id = (params as any).id as string;
   const contact = contacts.find(c => c.id === id);
-  const name = (params as any).name || contact?.name || 'Người dùng';
-  const rawAvatar = (params as any).avatar as string | undefined;
-  const avatar = rawAvatar ? (getAvatarUrl(rawAvatar) || undefined) : undefined;
   const targetUserId = (params as any).targetUserId as string | undefined;
-  
+
   const isGroup = useMemo(() => {
     return (params as any).isGroup === 'true' || (params as any).isGroup === true;
   }, [params]);
 
-  const membersCount = (params as any).membersCount ? parseInt((params as any).membersCount as string) : 0;
-  
   const [currentStatus, setCurrentStatus] = useState<string | undefined>((params as any).status);
   const isOnline = currentStatus === 'online';
 
@@ -56,12 +52,41 @@ export function useChatOptions() {
 
   const groupAvatars = useMemo(() => {
     if (groupDetails?.participants) {
-      return groupDetails.participants
-        .map((p: any) => getAvatarUrl(p.user.avatar))
-        .filter(Boolean) as string[];
+      return [...groupDetails.participants]
+        .sort((a: any, b: any) => a.id - b.id)
+        .map((p: any) => ({
+          url: p.user.avatar ? getAvatarUrl(p.user.avatar) : null,
+          name: p.user.fullName,
+          initials: getInitials(p.user.fullName)
+        }));
     }
-    return (params as any).avatars ? ((params as any).avatars as string).split(',') : [];
+    const raw = (params as any).avatars;
+    if (raw) {
+      const list = typeof raw === 'string' ? raw.split(',') : (Array.isArray(raw) ? raw : [raw]);
+      return list.map((url: string) => ({ url }));
+    }
+    return [];
   }, [groupDetails, params]);
+
+  const name = useMemo(() => {
+    if (isGroup && groupDetails?.name) return groupDetails.name;
+    if (!isGroup && groupDetails?.participants) {
+      const other = groupDetails.participants.find((p: any) => p.userId !== user?.id);
+      if (other?.user?.fullName) return other.user.fullName;
+    }
+    return (params as any).name || contact?.name || 'Người dùng';
+  }, [isGroup, groupDetails, params, contact, user]);
+
+  const avatar = useMemo(() => {
+    if (!isGroup && groupDetails?.participants) {
+      const other = groupDetails.participants.find((p: any) => p.userId !== user?.id);
+      if (other?.user?.avatar) return getAvatarUrl(other.user.avatar) || undefined;
+    }
+    const rawAvatar = (params as any).avatar as string | undefined;
+    return rawAvatar ? (getAvatarUrl(rawAvatar) || undefined) : undefined;
+  }, [isGroup, groupDetails, params, user]);
+
+  const membersCount = (params as any).membersCount ? parseInt((params as any).membersCount as string) : 0;
 
   const fetchConversationDetails = useCallback(async () => {
     try {
@@ -92,18 +117,18 @@ export function useChatOptions() {
     }
   }, [id, user]);
 
-  // preview images for media row
-  const [recentImages, setRecentImages] = useState<string[]>([]);
-  const loadRecentImages = useCallback(async () => {
+  // preview media for media row
+  const [recentMedia, setRecentMedia] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
+  const loadRecentMedia = useCallback(async () => {
     try {
-      const imgs: string[] = [];
+      const media: { uri: string; type: 'image' | 'video' }[] = [];
       let cursor: any = undefined;
-      // page through until we gather 4 images or run out of messages
-      while (imgs.length < 4) {
+      // page through until we gather 4 media items or run out of messages
+      while (media.length < 4) {
         const res = await chatApi.getMessages(Number(id), cursor, 20);
         if (!res.data || res.data.length === 0) break;
         for (const m of res.data) {
-          if (m.type === 'image') {
+          if (m.type === 'image' || m.type === 'video') {
             let url: string | undefined;
             try {
               const info = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
@@ -115,39 +140,39 @@ export function useChatOptions() {
               if (!url.startsWith('http')) {
                 url = getAvatarUrl(url) || url;
               }
-              imgs.push(url);
+              media.push({ uri: url, type: m.type as 'image' | 'video' });
             }
           }
-          if (imgs.length >= 4) break;
+          if (media.length >= 4) break;
         }
-        if (imgs.length >= 4) break;
+        if (media.length >= 4) break;
         // prepare for next page
         const last = res.data[res.data.length - 1];
         cursor = last ? last.id : undefined;
         if (!cursor) break;
       }
-      setRecentImages(imgs.slice(0, 4));
+      setRecentMedia(media.slice(0, 4));
     } catch (err) {
-      console.error('Load recent images error', err);
+      console.error('Load recent media error', err);
     }
   }, [id]);
 
   useEffect(() => {
-    loadRecentImages();
-  }, [loadRecentImages]);
+    loadRecentMedia();
+  }, [loadRecentMedia]);
 
-  // refresh on new image message
+  // refresh on new media message
   useEffect(() => {
     const handler = (data: any) => {
-      if (data.conversationId?.toString() === id.toString() && data.type === 'image') {
-        loadRecentImages();
+      if (data.conversationId?.toString() === id.toString() && (data.type === 'image' || data.type === 'video')) {
+        loadRecentMedia();
       }
     };
     socketService.on('new_message', handler);
     return () => {
       socketService.off('new_message', handler);
     };
-  }, [id, loadRecentImages]);
+  }, [id, loadRecentMedia]);
 
   useEffect(() => {
     fetchConversationDetails();
@@ -289,7 +314,7 @@ export function useChatOptions() {
     performLeaveGroup,
     isOwner,
     fetchConversationDetails,
-    recentImages,
+    recentMedia,
     handleMute,
   };
 }

@@ -20,7 +20,7 @@ const COLUMN_COUNT = 3;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_SIZE = SCREEN_WIDTH / COLUMN_COUNT - 2;
 
-type FileObject = { uri: string; name?: string; type?: string; size?: number };
+type FileObject = { uri: string; name?: string; type?: string; size?: number; duration?: number };
 
 type GallerySheetProps = {
   visible: boolean;
@@ -69,10 +69,10 @@ export default function GallerySheet({
     setLoading(true);
     try {
       const result = await MediaLibrary.getAssetsAsync({
-        mediaType: ['photo'],
+        mediaType: ['photo', 'video'],
         first: 50,
         after,
-        sortBy: ['creationTime'],
+        sortBy: ['modificationTime'],
       });
       setAssets(prev => [...prev, ...result.assets]);
       setAfter(result.endCursor || undefined);
@@ -115,8 +115,9 @@ export default function GallerySheet({
     const file: FileObject = {
       uri,
       name: asset.filename,
-      type: asset.mediaType === 'photo' ? 'image/jpeg' : undefined,
+      type: asset.mediaType === 'photo' ? 'image/jpeg' : (asset.mediaType === 'video' ? 'video/mp4' : undefined),
       size: (asset as any).fileSize,
+      duration: asset.duration,
     };
     if (existing) {
       removeAttachment(uri);
@@ -142,7 +143,8 @@ export default function GallerySheet({
     cameraCell: { width: ITEM_SIZE, height: ITEM_SIZE, justifyContent: 'center', alignItems: 'center' },
     image: { width: ITEM_SIZE, height: ITEM_SIZE, margin: 1, backgroundColor: '#eee' },
     itemContainer: { width: ITEM_SIZE, height: ITEM_SIZE, borderWidth: 1, borderColor: '#ccc', justifyContent: 'center', alignItems: 'center' },
-    badge: { position: 'absolute', top: 4, right: 4, backgroundColor: colors.tint, borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+    badge: { position: 'absolute', top: 6, right: 6, backgroundColor: colors.tint, borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#fff' },
+    emptyBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, width: 24, height: 24, borderWidth: 1.5, borderColor: '#fff' },
   }), [colors]);
 
   const openCamera = useCallback(async () => {
@@ -184,10 +186,19 @@ export default function GallerySheet({
           onError={e => console.warn('GallerySheet image error', e.nativeEvent)}
           style={styles.image}
         />
-        {selectedIndex !== -1 && (
-          <View style={styles.badge}>
-            <Text style={{ color: '#fff', fontSize: 12 }}>{selectedIndex + 1}</Text>
+        {asset.mediaType === 'video' && asset.duration > 0 && (
+          <View style={{ position: 'absolute', bottom: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>
+              {Math.floor(asset.duration / 60).toString().padStart(2, '0')}:{Math.floor(asset.duration % 60).toString().padStart(2, '0')}
+            </Text>
           </View>
+        )}
+        {selectedIndex !== -1 ? (
+          <View style={styles.badge}>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{selectedIndex + 1}</Text>
+          </View>
+        ) : (
+          <View style={styles.emptyBadge} />
         )}
       </TouchableOpacity>
     );

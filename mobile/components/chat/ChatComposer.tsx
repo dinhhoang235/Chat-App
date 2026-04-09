@@ -50,6 +50,7 @@ export default function ChatComposer({
   onCancelReply,
 }: ChatComposerProps) {
   const [imagePressed, setImagePressed] = useState(false);
+  const hasAttachments = Boolean(attachments && attachments.length > 0);
 
   return (
     <View
@@ -106,7 +107,7 @@ export default function ChatComposer({
           paddingTop: 1,
         }}
       >
-        {attachments && attachments.length > 0 ? (
+        {hasAttachments ? (
           <TouchableOpacity className="mr-3" onPress={onClearAttachments}>
             <MaterialIcons name="chevron-left" size={26} color={colors.icon} />
           </TouchableOpacity>
@@ -125,18 +126,18 @@ export default function ChatComposer({
           </TouchableOpacity>
         )}
 
-        {(!attachments || attachments.length === 0) ? (
-          <TouchableWithoutFeedback onPress={() => setComposerVisible(false)}>
-            <View
-              className="flex-1 px-2 py-2 mr-3"
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 10,
-                minHeight: 40,
-                maxHeight: 100,
-                justifyContent: 'center',
-              }}
-            >
+        <View
+          className="flex-1 px-2 py-2 mr-3"
+          style={{
+            backgroundColor: colors.surface,
+            borderRadius: 10,
+            minHeight: 40,
+            maxHeight: 100,
+            justifyContent: 'center',
+          }}
+        >
+          <TouchableWithoutFeedback onPress={() => setComposerVisible(false)} disabled={hasAttachments}>
+            <View>
               <TextInput
                 ref={inputRef}
                 value={messageText}
@@ -146,23 +147,24 @@ export default function ChatComposer({
                 }}
                 placeholder="Tin nhắn"
                 placeholderTextColor={colors.textSecondary}
+                editable={!hasAttachments}
+                showSoftInputOnFocus={!hasAttachments}
                 style={{
                   color: colors.text,
                   fontSize: 16,
                   paddingVertical: 8,
                   textAlignVertical: 'center',
+                  opacity: hasAttachments ? 0 : 1,
                 }}
                 multiline
               />
             </View>
           </TouchableWithoutFeedback>
-        ) : (
-          <View style={{ flex: 1 }} />
-        )}
+        </View>
 
         {/* Right action icons: show send when typing, otherwise more/mic/image */}
         <View className="flex-row items-center">
-          {(messageText.trim().length > 0 || (attachments && attachments.length > 0)) ? (
+          {(messageText.trim().length > 0 || hasAttachments) ? (
             <TouchableOpacity
               onPress={handleSend}
               disabled={creatingConversation}

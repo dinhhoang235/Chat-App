@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ChatComposer } from '@/components';
+import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 
@@ -35,6 +35,8 @@ export default function ChatThread() {
     setGalleryVisible,
     emojiVisible,
     setEmojiVisible,
+    micVisible,
+    setMicVisible,
     messageText,
     onTextChange,
     handleEmojiSelect,
@@ -73,6 +75,8 @@ export default function ChatThread() {
     setGalleryVisible,
     emojiVisible,
     setEmojiVisible,
+    micVisible,
+    setMicVisible,
     lastKeyboardHeight
   );
 
@@ -315,7 +319,7 @@ export default function ChatThread() {
                   colors={colors}
                   insets={insets}
                   onOpenSheet={openSheet}
-                  imageActive={galleryVisible ? 'gallery' : (emojiVisible ? 'emoji' : (composerVisible ? 'actions' : false))}
+                  imageActive={galleryVisible ? 'gallery' : (emojiVisible ? 'emoji' : (micVisible ? 'mic' : (composerVisible ? 'actions' : false)))}
                   attachments={attachments}
                   onRemoveAttachment={removeAttachment}
                   onClearAttachments={clearAttachments}
@@ -325,6 +329,7 @@ export default function ChatThread() {
                     if (galleryVisible) setGalleryVisible(false);
                     if (composerVisible) setComposerVisible(false);
                     if (emojiVisible) setEmojiVisible(false);
+                    if (micVisible) setMicVisible(false);
                   }}
                 />
               )}
@@ -334,6 +339,7 @@ export default function ChatThread() {
             visible={galleryVisible}
             onClose={() => {
               setGalleryVisible(false);
+              clearAttachments();
             }}
             attachments={attachments}
             addAttachment={(file: any) => addAttachments([file])}
@@ -365,6 +371,21 @@ export default function ChatThread() {
                 // TODO: implement location share
               } else if (key === 'gif') {
                 // TODO: open GIF picker
+              }
+            }}
+          />
+
+          <ComposerMicSheet
+            visible={micVisible}
+            onClose={() => {
+              setMicVisible(false);
+            }}
+            height={sheetHeight}
+            onAction={(key) => {
+              if (key === 'send_audio') {
+                // TODO: implement send recorded audio
+              } else if (key === 'send_text') {
+                // TODO: implement speech-to-text flow
               }
             }}
           />

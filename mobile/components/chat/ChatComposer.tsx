@@ -16,9 +16,9 @@ interface ChatComposerProps {
   insets: { bottom: number };
   onImagePress?: () => void;
   /** if true, show image icon as active (blue) */
-  imageActive?: 'gallery' | 'actions' | 'emoji' | boolean;
-  /** unified sheet opener: 'gallery' | 'actions' | 'emoji' */
-  onOpenSheet?: (type: 'gallery' | 'actions' | 'emoji') => void;
+  imageActive?: 'gallery' | 'actions' | 'emoji' | 'mic' | boolean;
+  /** unified sheet opener: 'gallery' | 'actions' | 'emoji' | 'mic' */
+  onOpenSheet?: (type: 'gallery' | 'actions' | 'emoji' | 'mic') => void;
   onMorePress?: () => void;
   attachments?: {uri: string}[];
   onRemoveAttachment?: (arg: number | string) => void;
@@ -202,10 +202,12 @@ export default function ChatComposer({
 
               <TouchableOpacity
                 className="mr-4"
-                onPress={() => console.log('Mic pressed')}
+                onPress={() => {
+                  if (onOpenSheet) onOpenSheet('mic');
+                }}
                 style={{ padding: 6 }}
               >
-                <MaterialIcons name="mic" size={26} color={colors.icon} />
+                <MaterialIcons name="mic" size={26} color={imageActive === 'mic' ? colors.tint : colors.icon} />
               </TouchableOpacity>
 
               <TouchableOpacity

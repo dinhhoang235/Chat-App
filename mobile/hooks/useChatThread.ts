@@ -378,6 +378,7 @@ export function useChatThread() {
   const [composerVisible, setComposerVisible] = useState(false);
   const [galleryVisible, setGalleryVisible] = useState(false);
   const [emojiVisible, setEmojiVisible] = useState(false);
+  const [micVisible, setMicVisible] = useState(false);
   const [messageText, setMessageText] = useState('');
 
   // attachments picked from image picker (max 10)
@@ -448,7 +449,7 @@ export function useChatThread() {
       sheetTimeoutRef.current = null;
     }
 
-    const isAnySheetVisible = composerVisible || galleryVisible || emojiVisible;
+    const isAnySheetVisible = composerVisible || galleryVisible || emojiVisible || micVisible;
     if (isAnySheetVisible) {
       if (keyboardHeight.value > 0) {
         // Nếu bàn phím đang mở (VD: từ bàn phím bấm sang More)
@@ -468,7 +469,7 @@ export function useChatThread() {
         sheetHeightSV.value = withTiming(0, { duration: 333 });
       }
     }
-  }, [composerVisible, galleryVisible, emojiVisible, lastKeyboardHeight, sheetHeightSV, keyboardHeight]);
+  }, [composerVisible, galleryVisible, emojiVisible, micVisible, lastKeyboardHeight, sheetHeightSV, keyboardHeight]);
 
   const animatedContentStyle = useAnimatedStyle(() => {
     return {
@@ -1186,6 +1187,8 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     setGalleryVisible,
     emojiVisible,
     setEmojiVisible,
+    micVisible,
+    setMicVisible,
     messageText,
     onTextChange,
     handleEmojiSelect,

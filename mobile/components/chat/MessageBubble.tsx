@@ -4,13 +4,13 @@ import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Animated, S
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { Image } from 'expo-image';
 import { useTheme } from '@/context/themeContext';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { getAvatarUrl } from '@/utils/avatar';
 import { getInitials } from '@/utils/initials';
 import FullscreenImageViewer from '../modals/FullscreenImageViewer';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import CircularProgress from './CircularProgress';
+import { CircularProgress } from './CircularProgress';
 
 const InlineVideoPlayer = ({ url }: { url: string }) => {
   const [videoDuration, setVideoDuration] = useState(0);
@@ -155,27 +155,6 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       return IMAGE_SIZE_CACHE.get(fullImageUri)!;
     }
     return null;
-  });
-
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (message.status === 'sending') {
-      const loop = Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        })
-      );
-      loop.start();
-      return () => loop.stop();
-    }
-  }, [message.status, rotateAnim]);
-
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
   });
 
   const [localThumb, setLocalThumb] = useState<string | null>(null);

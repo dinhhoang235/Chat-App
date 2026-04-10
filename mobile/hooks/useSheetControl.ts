@@ -1,10 +1,10 @@
 import React from 'react';
 import { Keyboard } from 'react-native';
 
-type SheetType = 'gallery' | 'actions' | 'emoji';
+type SheetType = 'gallery' | 'actions' | 'emoji' | 'mic';
 
 /**
- * Quản lý trạng thái mở/đóng của GallerySheet, ComposerActionsSheet và EmojiSheet.
+ * Quản lý trạng thái mở/đóng của GallerySheet, ComposerActionsSheet, EmojiSheet và ComposerMicSheet.
  *
  * - Chỉ một sheet được mở tại một thời điểm.
  * - Khi chuyển giữa keyboard → sheet (hoặc ngược lại), vùng chat không nhảy
@@ -19,6 +19,8 @@ export default function useSheetControl(
   setGalleryVisible: React.Dispatch<React.SetStateAction<boolean>>,
   emojiVisible: boolean,
   setEmojiVisible: React.Dispatch<React.SetStateAction<boolean>>,
+  micVisible: boolean,
+  setMicVisible: React.Dispatch<React.SetStateAction<boolean>>,
   lastKeyboardHeight: number
 ) {
   /**
@@ -35,14 +37,22 @@ export default function useSheetControl(
     if (type === 'gallery') {
       if (composerVisible) setComposerVisible(false);
       if (emojiVisible) setEmojiVisible(false);
+      if (micVisible) setMicVisible(false);
       setGalleryVisible(v => !v);
     } else if (type === 'emoji') {
       if (composerVisible) setComposerVisible(false);
       if (galleryVisible) setGalleryVisible(false);
+      if (micVisible) setMicVisible(false);
       setEmojiVisible(v => !v);
+    } else if (type === 'mic') {
+      if (composerVisible) setComposerVisible(false);
+      if (galleryVisible) setGalleryVisible(false);
+      if (emojiVisible) setEmojiVisible(false);
+      setMicVisible(v => !v);
     } else {
       if (galleryVisible) setGalleryVisible(false);
       if (emojiVisible) setEmojiVisible(false);
+      if (micVisible) setMicVisible(false);
       setComposerVisible(v => !v);
     }
   };
@@ -53,6 +63,7 @@ export default function useSheetControl(
     setComposerVisible(false);
     setGalleryVisible(false);
     setEmojiVisible(false);
+    setMicVisible(false);
   };
 
   return {

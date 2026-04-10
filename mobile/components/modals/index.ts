@@ -1,6 +1,7 @@
 export { default as AddToGroupModal } from './AddToGroupModal';
 export { default as BlockSettingsModal } from './BlockSettingsModal';
 export { default as ComposerActionsSheet } from './ComposerActionsSheet';
+export { default as ComposerMicSheet } from './ComposerMicSheet';
 export { default as ConfirmModal } from './ConfirmModal';
 export { default as EditDisplayNameModal } from './EditDisplayNameModal';
 export { default as FullscreenImageViewer } from './FullscreenImageViewer';

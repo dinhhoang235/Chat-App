@@ -37,7 +37,8 @@ Hệ thống Backend thời gian thực được tối ưu hóa cho hiệu năng
 ### 3) Chat 1-1 & Group
 
 *   Tạo hội thoại cá nhân, tạo nhóm, thêm/xóa thành viên, rời nhóm, giải tán nhóm.
-*   Gửi tin nhắn text/file/image/video, hỗ trợ reply tin nhắn.
+*   Gửi tin nhắn text/file/image/video/audio, hỗ trợ reply tin nhắn.
+*   Hỗ trợ gửi và lưu trữ voice message (audio) trực tiếp từ mobile.
 *   Đánh dấu đã đọc / chưa đọc.
 *   Ghim cuộc trò chuyện (`pin`) theo từng user.
 *   Tắt thông báo theo cuộc trò chuyện (`mute`) theo từng user.
@@ -58,6 +59,7 @@ Hệ thống Backend thời gian thực được tối ưu hóa cho hiệu năng
 *   Complete multipart và trả về `finalUrl`.
 *   Abort multipart để dọn dẹp khi lỗi giữa chừng.
 *   Validate quyền truy cập object theo `userId` (`objectName` phải thuộc user).
+*   Hỗ trợ lưu trữ đối tượng audio/voice message trong media conversation.
 
 ### 6) Health & Observability
 

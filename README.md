@@ -9,7 +9,7 @@
 
 - Đăng ký, đăng nhập và xác thực bằng JWT.
 - Chat realtime qua Socket.IO.
-- Gửi tin nhắn văn bản, ảnh, video và tệp.
+- Gửi tin nhắn văn bản, ảnh, video, audio/voice message và tệp.
 - Reply tin nhắn trong hội thoại.
 - Nhắn tin 1-1 và tạo nhóm chat.
 - Quản lý nhóm: thêm/xóa thành viên, rời nhóm, giải tán nhóm.
@@ -34,6 +34,7 @@
 - Socket.IO Client
 - Expo Notifications
 - Expo Camera
+- Expo Audio
 - Expo File System
 - Expo Media Library
 - Expo Video

@@ -14,7 +14,8 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
   - Hỗ trợ quét mã QR hồ sơ để kết nối nhanh.
   - Quản lý yêu cầu kết bạn.
 - **Chia sẻ đa phương tiện**:
-  - Gửi hình ảnh, video và tệp tài liệu.
+  - Gửi hình ảnh, video, bản ghi âm và tệp tài liệu.
+  - Hỗ trợ ghi âm và gửi voice message trực tiếp trong cuộc trò chuyện.
   - Trình phát video tích hợp với thumbnail preview.
   - Hỗ trợ gửi các tệp tin tài liệu lên đến 100MB qua cơ chế **Multipart Upload**.
   - Tự động nén ảnh, nén video có điều kiện và xử lý dữ liệu trước khi tải lên.
@@ -39,6 +40,7 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
   - Thiết kế Responsive với NativeWind (Tailwind CSS).
 
 ## 🆕 Cập nhật mới nhất
+- **Voice Message Support**: Ghi âm, xem trước và gửi tin nhắn giọng nói ngay trong khung chat.
 - **Video Message Support**: Tối ưu gửi và hiển thị video trong cuộc trò chuyện bằng `expo-video`.
 - **Smart Upload Pipeline**: Nén ảnh/video trước upload, retry khi lỗi mạng và chunk upload cho file lớn.
 - **Multipart Storage**: Upload nhiều phần với thanh tiến trình và tự động abort khi thất bại.
@@ -53,7 +55,7 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 - **Styling**: [NativeWind](https://www.nativewind.dev/) (Tailwind CSS cho React Native)
 - **Real-time**: [Socket.io Client](https://socket.io/)
 - **State Management**: React Context API & Hooks
-- **Media & Upload**: Expo Camera, Expo Image Picker, Expo Document Picker, Expo File System, **Expo Video**, Expo Image Manipulator, react-native-compressor
+- **Media & Upload**: Expo Camera, Expo Image Picker, Expo Document Picker, Expo File System, **Expo Audio**, **Expo Video**, Expo Image Manipulator, react-native-compressor
 - **Notifications**: Expo Notifications
 - **Animations**: React Native Reanimated & Gesture Handler
 

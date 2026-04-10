@@ -11,7 +11,6 @@ import { useSafeAreaInsets, initialWindowMetrics } from 'react-native-safe-area-
 import { userAPI } from '@/services/user';
 import { chatApi } from '@/services/chat';
 import { storageApi } from '@/services/storage';
-import { compressImage } from '@/services/imageUpload';
 import { socketService } from '@/services/socket';
 import { useAuth } from '@/context/authContext';
 import { getAvatarUrl } from '@/utils/avatar';
@@ -73,11 +72,11 @@ export function useChatThread() {
       const mapped = newMedia.map((m: any) => {
         let fileInfo = m.fileInfo;
         // In case fileInfo isn't pre-mapped correctly from the server
-        if (!fileInfo && (m.type === 'file' || m.type === 'image' || m.type === 'video')) {
+        if (!fileInfo && (m.type === 'file' || m.type === 'image' || m.type === 'video' || m.type === 'audio')) {
           try {
             fileInfo = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
           } catch {
-            if (m.type === 'image' || m.type === 'video') {
+            if (m.type === 'image' || m.type === 'video' || m.type === 'audio') {
                fileInfo = { url: m.content };
             }
           }
@@ -555,7 +554,7 @@ export function useChatThread() {
           contactAvatar: m.sender?.avatar ? getAvatarUrl(m.sender.avatar) || undefined : undefined,
           seenBy: m.seenBy || [],
         };
-        if (m.type === 'file' || m.type === 'image' || m.type === 'video') {
+        if (m.type === 'file' || m.type === 'image' || m.type === 'video' || m.type === 'audio') {
           // If message already has a fileInfo (like temp messages), keep it.
           // Otherwise try parsing from content string.
           if (m.fileInfo && m.fileInfo.size) {
@@ -565,7 +564,7 @@ export function useChatThread() {
               const info = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
               base.fileInfo = info;
             } catch {
-              if (m.type === 'image' || m.type === 'video') {
+              if (m.type === 'image' || m.type === 'video' || m.type === 'audio') {
                 base.fileInfo = { url: m.content };
               }
             }
@@ -663,12 +662,12 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
 
         // prepare parsed version of incoming message so we can compare
         let incomingFileName: string | undefined;
-        if (message.type === 'file' || message.type === 'image' || message.type === 'video') {
+        if (message.type === 'file' || message.type === 'image' || message.type === 'video' || message.type === 'audio') {
           try {
             const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
             incomingFileName = info?.name;
           } catch {
-            if (message.type === 'image' || message.type === 'video') {
+            if (message.type === 'image' || message.type === 'video' || message.type === 'audio') {
               incomingFileName = undefined;
             }
           }
@@ -680,7 +679,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         }
         
         if (tempIdx === -1) {
-          if (message.type === 'file' || message.type === 'image' || message.type === 'video') {
+          if (message.type === 'file' || message.type === 'image' || message.type === 'video' || message.type === 'audio') {
             tempIdx = prev.findIndex(
               m => m.status === 'sending' && m.type === message.type && m.fileName && incomingFileName && m.fileName === incomingFileName && m.senderId === message.senderId
             );
@@ -700,7 +699,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
           seenBy: message.seenBy || [],
           status: 'sent',
         };
-        if (message.type === 'file' || message.type === 'image' || message.type === 'video') {
+        if (message.type === 'file' || message.type === 'image' || message.type === 'video' || message.type === 'audio') {
           if (message.fileInfo && message.fileInfo.size) {
              mappedMessage.fileInfo = message.fileInfo;
           } else {
@@ -708,7 +707,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
               const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
               mappedMessage.fileInfo = info;
             } catch {
-              if (message.type === 'image' || message.type === 'video') mappedMessage.fileInfo = { url: message.content };
+              if (message.type === 'image' || message.type === 'video' || message.type === 'audio') mappedMessage.fileInfo = { url: message.content };
             }
           }
         }
@@ -765,6 +764,12 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
 
     if (!messageText.trim()) return;
     await handleSendText(messageText.trim());
+  };
+
+  const sendTextDirect = async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    await handleSendText(trimmed);
   };
 
   const handleSendText = async (text: string) => {
@@ -879,7 +884,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'sending',
       replyTo: replyToSnapshot,
-      type: file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : 'file'),
+      type: file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : (file.type.startsWith('audio/') ? 'audio' : 'file')),
       fileName: file.name,
       fileInfo: {
         url: uploadFileUri,
@@ -946,7 +951,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
             Number(targetUserIdState), 
             JSON.stringify(fileInfo),
             undefined,
-            isImage ? 'image' : (file.type.startsWith('video/') ? 'video' : 'file')
+            isImage ? 'image' : (file.type.startsWith('video/') ? 'video' : (file.type.startsWith('audio/') ? 'audio' : 'file'))
           );
           
           const conv = response.data;
@@ -965,7 +970,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
               try {
                 mappedMessage.fileInfo = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content;
               } catch {
-                if (lastMessage.type === 'image') mappedMessage.fileInfo = { url: lastMessage.content };
+                if (lastMessage.type === 'image' || lastMessage.type === 'video' || lastMessage.type === 'audio') mappedMessage.fileInfo = { url: lastMessage.content };
               }
               setMessages([mappedMessage]);
             }
@@ -1038,7 +1043,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       const response = await chatApi.sendMessage(
         Number(targetConversationId), 
         JSON.stringify(fileInfo), 
-        isImage ? 'image' : (file.type.startsWith('video/') ? 'video' : 'file'), 
+        isImage ? 'image' : (file.type.startsWith('video/') ? 'video' : (file.type.startsWith('audio/') ? 'audio' : 'file')), 
         undefined, 
         replyToSnapshot?.id, 
         tempId
@@ -1056,11 +1061,11 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
             time: new Date(sentMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             status: 'sent',
           };
-          if (sentMessage.type === 'image' || sentMessage.type === 'file' || sentMessage.type === 'video') {
+          if (sentMessage.type === 'image' || sentMessage.type === 'file' || sentMessage.type === 'video' || sentMessage.type === 'audio') {
             try {
               mapped.fileInfo = typeof sentMessage.content === 'string' ? JSON.parse(sentMessage.content) : sentMessage.content;
             } catch {
-              if (sentMessage.type === 'image' || sentMessage.type === 'video') mapped.fileInfo = { url: sentMessage.content };
+              if (sentMessage.type === 'image' || sentMessage.type === 'video' || sentMessage.type === 'audio') mapped.fileInfo = { url: sentMessage.content };
             }
           }
           newMessages[idx] = mapped;
@@ -1197,6 +1202,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     animatedContentStyle,
     fetchMessages,
     handleSend,
+    sendTextDirect,
     handleSendAttachment,
     pickDocument,
     statusText,

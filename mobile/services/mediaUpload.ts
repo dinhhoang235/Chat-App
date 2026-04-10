@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { Video } from 'react-native-compressor';
+import { Platform } from 'react-native';
 
 import { compressImage } from './imageUpload';
 
@@ -39,7 +39,12 @@ async function compressVideoIfNeeded(file: AttachmentFile) {
     return file.uri;
   }
 
+  if (Platform.OS === 'web') {
+    return file.uri;
+  }
+
   try {
+    const { Video } = await import('react-native-compressor');
     const compressedUri = await Video.compress(file.uri, {
       compressionMethod: 'auto',
       minimumFileSizeForCompress: VIDEO_COMPRESSION_MIN_SIZE_BYTES,

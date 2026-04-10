@@ -6,6 +6,7 @@ import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 
 export default function ChatThread() {
+  const [micTextMode, setMicTextMode] = React.useState(false);
   const {
     colors,
     params,
@@ -58,6 +59,8 @@ export default function ChatThread() {
     currentResultIndices,
     statusText,
     handleSend,
+    sendTextDirect,
+    handleSendAttachment,
     pickDocument,
     replyingTo,
     setReplyingTo,
@@ -197,7 +200,7 @@ export default function ChatThread() {
                 { icon: 'call', onPress: () => console.log('Call pressed') },
                 { icon: 'videocam', onPress: () => console.log('Video call pressed') },
                 {
-                  icon: 'more-vert',
+                  icon: 'bars',
                   onPress: () => router.push({
                     pathname: '/chat/[id]/options',
                     params: {
@@ -319,6 +322,7 @@ export default function ChatThread() {
                   colors={colors}
                   insets={insets}
                   onOpenSheet={openSheet}
+                  micTextMode={micTextMode}
                   imageActive={galleryVisible ? 'gallery' : (emojiVisible ? 'emoji' : (micVisible ? 'mic' : (composerVisible ? 'actions' : false)))}
                   attachments={attachments}
                   onRemoveAttachment={removeAttachment}
@@ -380,12 +384,31 @@ export default function ChatThread() {
             onClose={() => {
               setMicVisible(false);
             }}
+            textMode={micTextMode}
             height={sheetHeight}
+            onSendAudio={async (file) => {
+              await handleSendAttachment(file as any);
+            }}
+            onTranscriptChange={(text) => {
+              onTextChange(text);
+            }}
+            onSubmitTranscript={async (text) => {
+              await sendTextDirect(text);
+              setMicVisible(false);
+            }}
+            onRequestEditTranscript={() => {
+              inputRef.current?.focus?.();
+              // Close mic sheet after requesting focus so keyboard appears immediately.
+              setTimeout(() => {
+                setMicVisible(false);
+              }, 0);
+            }}
             onAction={(key) => {
               if (key === 'send_audio') {
-                // TODO: implement send recorded audio
+                // audio mode handled inside ComposerMicSheet
+                setMicTextMode(false);
               } else if (key === 'send_text') {
-                // TODO: implement speech-to-text flow
+                setMicTextMode(true);
               }
             }}
           />

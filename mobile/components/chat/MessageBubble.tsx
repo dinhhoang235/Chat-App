@@ -6,11 +6,13 @@ import { Image } from 'expo-image';
 import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { getAvatarUrl } from '@/utils/avatar';
 import { getInitials } from '@/utils/initials';
 import FullscreenImageViewer from '../modals/FullscreenImageViewer';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CircularProgress } from './CircularProgress';
+import AudioWaveform from './AudioWaveform';
 
 const InlineVideoPlayer = ({ url }: { url: string }) => {
   const [videoDuration, setVideoDuration] = useState(0);
@@ -68,7 +70,7 @@ type ChatMessage = {
   content?: string;
   time?: string;
   fromMe?: boolean;
-  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'video' | 'file' | 'image_group';
+  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'video' | 'audio' | 'file' | 'image_group';
   contactName?: string;
   contactAvatar?: string;
   contactAvatarColor?: string;
@@ -76,13 +78,155 @@ type ChatMessage = {
   seenBy?: { id: number; fullName?: string; avatar?: string }[];
   isLastInGroup?: boolean;
   status?: 'sending' | 'sent' | 'error';
-  fileInfo?: { url: string; name?: string; size?: number; mime?: string; thumbnailUrl?: string };
+  fileInfo?: { url: string; name?: string; size?: number; mime?: string; thumbnailUrl?: string; duration?: number };
   images?: any[]; // for image_group
   replyTo?: any;
   progress?: number;
 };
 
 const IMAGE_SIZE_CACHE = new Map<string, {width: number, height: number}>();
+
+const resolveMediaUri = (url: string) => {
+  if (url.startsWith('http') || url.startsWith('file://') || url.startsWith('content://')) {
+    return url;
+  }
+  return getAvatarUrl(url) || url;
+};
+
+const formatDuration = (seconds?: number) => {
+  if (typeof seconds !== 'number' || Number.isNaN(seconds)) return '--:--';
+  const rounded = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(rounded / 60).toString().padStart(2, '0');
+  const remaining = (rounded % 60).toString().padStart(2, '0');
+  return `${minutes}:${remaining}`;
+};
+
+const hashWaveSeed = (value: string) => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const createSeededAmplitudes = (seedValue: string, count = 72) => {
+  const seed = hashWaveSeed(seedValue);
+
+  const barNoise = (index: number) => {
+    // Deterministic per-bar pseudo-random value in [0, 1].
+    const n = hashWaveSeed(`${seed}-${index * 7919}`);
+    return n / 0xffffffff;
+  };
+
+  const profileA = 1.8 + (seed % 11) * 0.17;
+  const profileB = 3.6 + ((seed >>> 4) % 13) * 0.11;
+  const accentStride = 4 + ((seed >>> 9) % 6);
+
+  const raw = Array.from({ length: count }, (_, i) => {
+    const t = i / Math.max(1, count - 1);
+    const n1 = barNoise(i);
+    const n2 = barNoise(i + 97);
+
+    const wave = Math.abs(Math.sin(t * Math.PI * profileA + n1 * 1.2)) * 0.38;
+    const harmonic = Math.abs(Math.cos(t * Math.PI * profileB + n2 * 1.8)) * 0.28;
+    const randomBody = Math.pow(n1, 1.45) * 0.42;
+    const accent = i % accentStride === 0 ? 0.16 + n2 * 0.18 : 0;
+
+    return Math.max(0.05, Math.min(1, 0.1 + wave + harmonic + randomBody + accent));
+  });
+
+  // Light smoothing to avoid jitter while keeping message-to-message uniqueness.
+  return raw.map((_, i) => {
+    const prev = raw[Math.max(0, i - 1)];
+    const curr = raw[i];
+    const next = raw[Math.min(raw.length - 1, i + 1)];
+    return Math.max(0.05, Math.min(1, prev * 0.14 + curr * 0.72 + next * 0.14));
+  });
+};
+
+function AudioMessageBubble({
+  url,
+  duration,
+  seedKey,
+  textColor,
+  isSending,
+}: {
+  url: string;
+  duration?: number;
+  seedKey: string;
+  textColor: string;
+  isSending?: boolean;
+}) {
+  const player = useAudioPlayer(url, { downloadFirst: true });
+  const status = useAudioPlayerStatus(player);
+  const [waveWidth, setWaveWidth] = useState(0);
+  const waveform = useMemo(
+    () => createSeededAmplitudes(`${seedKey}|${url}|${Math.round(duration || 0)}`),
+    [seedKey, url, duration]
+  );
+  const totalDuration = duration || status.duration || 0;
+  const progress = totalDuration > 0 ? Math.min(1, status.currentTime / totalDuration) : 0;
+  const shouldShowCurrentTime = status.playing || (status.currentTime > 0 && !status.didJustFinish);
+  const displayTime = shouldShowCurrentTime ? status.currentTime : totalDuration;
+  const displayProgress = shouldShowCurrentTime ? progress : 0;
+
+  const handleTogglePlayback = async () => {
+    if (isSending) return;
+
+    if (status.playing) {
+      player.pause();
+      return;
+    }
+
+    const atEnd = totalDuration > 0 && status.currentTime >= totalDuration - 0.15;
+    if (status.didJustFinish || atEnd) {
+      await player.seekTo(0);
+    }
+
+    player.play();
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={() => {
+        void handleTogglePlayback();
+      }}
+      activeOpacity={0.8}
+    >
+      <View style={{ minWidth: 170, maxWidth: 230, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: isSending ? 'rgba(10,73,161,0.45)' : '#0756C2', alignItems: 'center', justifyContent: 'center' }}>
+          <MaterialIcons name={status.playing ? 'pause' : 'play-arrow'} size={23} color="#FFFFFF" />
+        </View>
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <View
+            onLayout={(event) => {
+              const next = Math.floor(event.nativeEvent.layout.width);
+              if (next > 0 && Math.abs(next - waveWidth) > 1) {
+                setWaveWidth(next);
+              }
+            }}
+            style={{ overflow: 'hidden' }}
+          >
+            <AudioWaveform
+              width={waveWidth || 118}
+              height={18}
+              amplitudes={waveform}
+              progress={displayProgress}
+              activeColor="#0756C2"
+              inactiveColor="rgba(7,86,194,0.5)"
+              barWidth={3}
+              barGap={2.5}
+            />
+          </View>
+          <Text style={{ color: '#3B6FAF', fontSize: 12, marginTop: 4, opacity: 0.95, fontWeight: '700' }}>
+            {formatDuration(displayTime)}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number }) {
   const { colors } = useTheme();
@@ -102,10 +246,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     const sourceImages = allMedia && allMedia.length > 0 ? allMedia : [];
     sourceImages.forEach(m => {
       if ((m.type === 'image' || m.type === 'video') && m.fileInfo?.url) {
-        let uri = m.fileInfo?.url || '';
-        if (uri && !uri.startsWith('http')) {
-          uri = getAvatarUrl(uri) || uri;
-        }
+        let uri = resolveMediaUri(m.fileInfo?.url || '');
         uris.push(uri);
         ids.push(m.id != null ? m.id.toString() : '');
       }
@@ -146,8 +287,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     if (message.type !== 'image' || !message.fileInfo) return null;
     let url = message.fileInfo.url;
     if (!url) return null;
-    if (url.startsWith('http')) return url;
-    return getAvatarUrl(url) || url;
+    return resolveMediaUri(url);
   }, [message.type, message.fileInfo]);
 
   const [imgSize, setImgSize] = useState<{width:number;height:number} | null>(() => {
@@ -204,6 +344,12 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     textColor = colors.bubbleMeText;
   }
 
+  if (message.type === 'audio') {
+    bubbleBg = isOutgoing ? '#6FAEFF' : '#DDEBFF';
+    borderColor = isOutgoing ? '#6FAEFF' : '#DDEBFF';
+    textColor = '#0F3E84';
+  }
+
   const animatedBorderStyle = {
     borderColor: highlightAnim.interpolate({
       inputRange: [0, 1],
@@ -257,11 +403,9 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
 
   if (message.type === 'video' && message.fileInfo && message.fileInfo.url) {
     let url = message.fileInfo.url;
-    if (!url.startsWith('http')) {
-      url = getAvatarUrl(url) || url;
-    }
+    url = resolveMediaUri(url);
     const maxWidth = screenWidth * 0.75;
-    const displayThumb = message.fileInfo.thumbnailUrl ? (message.fileInfo.thumbnailUrl.startsWith('http') ? message.fileInfo.thumbnailUrl : getAvatarUrl(message.fileInfo.thumbnailUrl)) : localThumb;
+    const displayThumb = message.fileInfo.thumbnailUrl ? resolveMediaUri(message.fileInfo.thumbnailUrl) : localThumb;
 
     contentElement = (
       <>
@@ -526,12 +670,33 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         />
       </View>
     );
+  } else if (message.type === 'audio' && message.fileInfo) {
+    const uri = resolveMediaUri(message.fileInfo.url);
+    contentElement = (
+      <AudioMessageBubble
+        url={uri}
+        duration={message.fileInfo.duration}
+        seedKey={message.id}
+        textColor={textColor}
+        isSending={message.status === 'sending'}
+      />
+    );
   } else if (message.type === 'file' && message.fileInfo) {
     let { url, name, size, mime } = message.fileInfo;
+    if (mime?.startsWith('audio/')) {
+      const uri = resolveMediaUri(url);
+      contentElement = (
+        <AudioMessageBubble
+          url={uri}
+          duration={message.fileInfo.duration}
+          seedKey={message.id}
+          textColor={textColor}
+          isSending={message.status === 'sending'}
+        />
+      );
+    } else {
     let uri = url;
-    if (!uri.startsWith('http')) {
-      uri = getAvatarUrl(uri) || uri;
-    }
+    uri = resolveMediaUri(uri);
 
     const filename = name || 'File';
     const ext = mime ? mime.split('/')[1] : filename.split('.').pop();
@@ -551,6 +716,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         </View>
       </TouchableOpacity>
     );
+    }
   } else {
     // default text rendering
     contentElement = renderHighlighted(message.text);
@@ -662,7 +828,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           {message.replyTo.sender?.fullName || 'Người dùng'}
         </Text>
         <Text style={{ fontSize: 13, color: isOutgoing ? 'rgba(255,255,255,0.85)' : colors.textSecondary }} numberOfLines={1} ellipsizeMode="tail">
-          {message.replyTo.type === 'text' ? message.replyTo.content?.replace(/\n/g, ' ') : (message.replyTo.type === 'image' || message.replyTo.type === 'image_group' ? '[Hình ảnh]' : (message.replyTo.type === 'video' ? '[Video]' : '[Tệp]'))}
+          {message.replyTo.type === 'text' ? message.replyTo.content?.replace(/\n/g, ' ') : (message.replyTo.type === 'image' || message.replyTo.type === 'image_group' ? '[Hình ảnh]' : (message.replyTo.type === 'video' ? '[Video]' : (message.replyTo.type === 'audio' ? '[Bản ghi âm]' : '[Tệp]')))}
         </Text>
       </View>
     </TouchableOpacity>

@@ -72,6 +72,8 @@ export const startConversation = (io: Server) => async (req: AuthRequest, res: R
       firstMessage = JSON.stringify(info);
       if (req.file.mimetype.startsWith('image/')) {
         messageType = 'image';
+      } else if (req.file.mimetype.startsWith('audio/')) {
+        messageType = 'audio';
       } else {
         messageType = 'file';
       }

@@ -27,6 +27,7 @@
         "WRITE_EXTERNAL_STORAGE",
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO",
+        "RECORD_AUDIO",
         "POST_NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED"
       ],
@@ -72,6 +73,22 @@
         "expo-media-library",
         {
           "photosPermission": "Cho phép DiskordMes truy cập thư viện ảnh của bạn để lưu mã QR."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Cho phép DiskordMes truy cập microphone để ghi âm."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Cho phép DiskordMes truy cập microphone để nhập bằng giọng nói.",
+          "speechRecognitionPermission": "Cho phép DiskordMes nhận diện giọng nói để chuyển thành văn bản.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
         }
       ]
     ],

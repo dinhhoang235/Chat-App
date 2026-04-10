@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, TextInput, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ActivityIndicator, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import AntDesign from '@expo/vector-icons/AntDesign';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { Image } from 'expo-image';
 import { getAvatarUrl } from '@/utils/avatar';
 
@@ -19,6 +21,7 @@ interface ChatComposerProps {
   imageActive?: 'gallery' | 'actions' | 'emoji' | 'mic' | boolean;
   /** unified sheet opener: 'gallery' | 'actions' | 'emoji' | 'mic' */
   onOpenSheet?: (type: 'gallery' | 'actions' | 'emoji' | 'mic') => void;
+  micTextMode?: boolean;
   onMorePress?: () => void;
   attachments?: {uri: string}[];
   onRemoveAttachment?: (arg: number | string) => void;
@@ -41,6 +44,7 @@ export default function ChatComposer({
   onImagePress,
   imageActive,
   onOpenSheet,
+  micTextMode = false,
   onMorePress,
   attachments,
   onRemoveAttachment,
@@ -68,7 +72,7 @@ export default function ChatComposer({
               Đang trả lời {replyingTo.contactName || replyingTo.sender?.fullName || 'Người dùng'}
             </Text>
             <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
-              {replyingTo.type === 'image' || replyingTo.type === 'image_group' ? '[Hình ảnh]' : (replyingTo.type === 'video' ? '[Video]' : (replyingTo.type === 'text' ? replyingTo.content : '[Tệp]'))}
+              {replyingTo.type === 'image' || replyingTo.type === 'image_group' ? '[Hình ảnh]' : (replyingTo.type === 'video' ? '[Video]' : (replyingTo.type === 'audio' ? '[Bản ghi âm]' : (replyingTo.type === 'text' ? replyingTo.content : '[Tệp]')))}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -109,7 +113,7 @@ export default function ChatComposer({
       >
         {hasAttachments ? (
           <TouchableOpacity className="mr-3" onPress={onClearAttachments}>
-            <MaterialIcons name="chevron-left" size={26} color={colors.icon} />
+            <FontAwesome5 name="chevron-left" size={24} color={colors.icon} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity 
@@ -173,7 +177,7 @@ export default function ChatComposer({
               {creatingConversation ? (
                 <ActivityIndicator size={26} color={colors.tint} />
               ) : (
-                <MaterialIcons name="send" size={26} color={colors.tint} />
+                <AntDesign name="send" size={24} color={colors.tint} />
               )}
             </TouchableOpacity>
           ) : (
@@ -207,7 +211,34 @@ export default function ChatComposer({
                 }}
                 style={{ padding: 6 }}
               >
-                <MaterialIcons name="mic" size={26} color={imageActive === 'mic' ? colors.tint : colors.icon} />
+                {micTextMode ? (
+                  <View style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
+                    <MaterialIcons
+                      name="mic"
+                      size={26}
+                      color={imageActive === 'mic' ? colors.tint : colors.icon}
+                    />
+                    <Text
+                      style={{
+                        position: 'absolute',
+                        right: -1,
+                        bottom: 0,
+                        color: imageActive === 'mic' ? colors.tint : colors.icon,
+                        fontSize: 8,
+                        fontWeight: '800',
+                        lineHeight: 9,
+                      }}
+                    >
+                      A
+                    </Text>
+                  </View>
+                ) : (
+                  <MaterialIcons
+                    name="mic"
+                    size={26}
+                    color={imageActive === 'mic' ? colors.tint : colors.icon}
+                  />
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity

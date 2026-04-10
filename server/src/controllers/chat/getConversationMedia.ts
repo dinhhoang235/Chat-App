@@ -40,6 +40,7 @@ export const getConversationMedia = async (req: AuthRequest, res: Response): Pro
         OR: [
           { type: 'image' },
           { type: 'video' },
+          { type: 'audio' },
           { type: 'file' },
           { 
             type: 'text',
@@ -69,11 +70,11 @@ export const getConversationMedia = async (req: AuthRequest, res: Response): Pro
     
     const mappedMessages = messages.map(m => {
       let fileInfo = null;
-      if (m.type === 'file' || m.type === 'image' || m.type === 'video') {
+      if (m.type === 'file' || m.type === 'image' || m.type === 'video' || m.type === 'audio') {
         try {
           fileInfo = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
         } catch {
-          if (m.type === 'image' || m.type === 'video') {
+          if (m.type === 'image' || m.type === 'video' || m.type === 'audio') {
             fileInfo = { url: m.content };
           }
         }

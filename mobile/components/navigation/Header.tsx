@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, TextStyle } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import AntDesign from '@expo/vector-icons/AntDesign';
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "@/context/themeContext";
 import React from "react";
@@ -124,7 +125,11 @@ const Header = ({
 
               {rightActions && rightActions.map((a, idx) => (
                 <TouchableOpacity key={idx} onPress={a.onPress} className="ml-2">
-                  <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 24} />
+                  {a.icon === 'bars' ? (
+                    <AntDesign name="bars" color={iconColor} size={a.size ?? 24} />
+                  ) : (
+                    <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 24} />
+                  )}
                 </TouchableOpacity>
               ))}
 
@@ -177,7 +182,11 @@ const Header = ({
 
                 {rightActions && rightActions.map((a, idx) => (
                   <TouchableOpacity key={idx} className="px-3" onPress={a.onPress}>
-                    <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 28} />
+                    {a.icon === 'bars' ? (
+                      <AntDesign name="bars" color={iconColor} size={a.size ?? 28} />
+                    ) : (
+                      <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 28} />
+                    )}
                   </TouchableOpacity>
                 ))}
 

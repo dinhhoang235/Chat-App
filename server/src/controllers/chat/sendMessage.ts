@@ -29,6 +29,7 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
       const { url: fileUrl, fileName } = await uploadFile(req.file);
       
       const isImage = req.file.mimetype.startsWith('image/');
+      const isAudio = req.file.mimetype.startsWith('audio/');
       
       const info = {
         url: fileUrl,
@@ -39,6 +40,8 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
       content = JSON.stringify(info);
       if (isImage) {
         type = 'image';
+      } else if (isAudio) {
+        type = 'audio';
       } else {
         type = 'file';
       }
@@ -158,6 +161,8 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
             } catch {
               bodyText = '📎 Tệp';
             }
+          } else if (message.type === 'audio') {
+            bodyText = '🎤 Ghi âm';
           }
 
           // For group conversations, use group name as title and prefix sender in body

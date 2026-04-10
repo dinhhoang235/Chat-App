@@ -20,6 +20,14 @@ export function useConversations() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [startChatVisible, setStartChatVisible] = useState(false);
 
+  const formatDuration = (seconds?: number) => {
+    if (typeof seconds !== 'number' || Number.isNaN(seconds)) return '';
+    const total = Math.max(0, Math.round(seconds));
+    const mins = Math.floor(total / 60).toString().padStart(2, '0');
+    const secs = (total % 60).toString().padStart(2, '0');
+    return ` ${mins}:${secs}`;
+  };
+
   const fetchConversations = useCallback(async () => {
     // don't attempt to hit the API if we don't have a logged-in user yet
     if (!user) {
@@ -54,8 +62,29 @@ export function useConversations() {
             // Ignore parse errors
           }
           lastMessageText = isFromMe ? `Bạn: [Video]${durationStr}` : `[Video]${durationStr}`;
+        } else if (lastMsg.type === 'audio') {
+          let durationStr = '';
+          try {
+            const content = typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
+            durationStr = formatDuration(content?.duration);
+          } catch {
+            // Ignore parse errors
+          }
+          lastMessageText = isFromMe ? `Bạn: [Tin nhắn thoại]${durationStr}` : `[Tin nhắn thoại]${durationStr}`;
         } else if (lastMsg.type === 'file') {
-          lastMessageText = isFromMe ? 'Bạn: [File]' : '[File]';
+          let content: any = null;
+          try {
+            content = typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
+          } catch {
+            content = null;
+          }
+
+          if (content?.mime?.startsWith('audio/')) {
+            const durationStr = formatDuration(content?.duration);
+            lastMessageText = isFromMe ? `Bạn: [Tin nhắn thoại]${durationStr}` : `[Tin nhắn thoại]${durationStr}`;
+          } else {
+            lastMessageText = isFromMe ? 'Bạn: [File]' : '[File]';
+          }
         } else {
           // Check if it's JSON content that should have been a media type
           let mediaIcon = '';
@@ -69,6 +98,8 @@ export function useConversations() {
                 const secs = Math.floor(d % 60);
                 mediaIcon += ` ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
               }
+            } else if (content.mime?.startsWith('audio/')) {
+              mediaIcon = `[Tin nhắn thoại]${formatDuration(content.duration)}`;
             } else if (content.mime?.startsWith('image/')) {
               mediaIcon = '[Hình ảnh]';
             }

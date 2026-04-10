@@ -95,8 +95,12 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 2. Cấu hình biến môi trường:
    Tạo tệp `.env` dựa trên `.env.example`:
    ```env
-   EXPO_PUBLIC_API_URL=http://your-server-ip:3000/api
+  EXPO_PUBLIC_API_URL=http://your-server-ip:3000
    EXPO_PUBLIC_SOCKET_URL=http://your-server-ip:3000
+  EXPO_PUBLIC_TURN_HOST=
+  EXPO_PUBLIC_TURN_USERNAME=chatuser
+  EXPO_PUBLIC_TURN_PASSWORD=chatpass
+  EXPO_PUBLIC_FIREBASE_API_KEY=
    ```
 
 3. Khởi chạy ứng dụng:

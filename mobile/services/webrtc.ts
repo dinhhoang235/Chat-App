@@ -8,9 +8,9 @@ import {
 
 export type CallType = 'voice' | 'video';
 
-const TURN_HOST = process.env.EXPO_PUBLIC_TURN_HOST || '';
-const TURN_USERNAME = process.env.EXPO_PUBLIC_TURN_USERNAME || 'chatuser';
-const TURN_PASSWORD = process.env.EXPO_PUBLIC_TURN_PASSWORD || 'chatpass';
+const TURN_HOST = process.env.EXPO_PUBLIC_TURN_HOST;
+const TURN_USERNAME = process.env.EXPO_PUBLIC_TURN_USERNAME;
+const TURN_PASSWORD = process.env.EXPO_PUBLIC_TURN_PASSWORD;
 
 const buildIceServers = () => {
   const servers: RTCIceServer[] = [
@@ -47,6 +47,8 @@ class WebRTCService {
   /** ICE candidates received before remote description was set */
   private pendingCandidates: any[] = [];
   private remoteDescSet = false;
+  public currentCallId: string | null = null;
+  public isInitializing = false;
 
   // Callbacks set by the call screen
   onRemoteStream: ((stream: MediaStream) => void) | null = null;
@@ -54,7 +56,13 @@ class WebRTCService {
   onConnectionStateChange: ((state: string) => void) | null = null;
 
   /** Acquire camera/mic. Must be called before createPeerConnection(). */
-  async acquireLocalStream(callType: CallType): Promise<MediaStream> {
+  async acquireLocalStream(callId: string, callType: CallType): Promise<MediaStream> {
+    if (this.currentCallId === callId && this.localStream) {
+      return this.localStream;
+    }
+    this.isInitializing = true;
+    this.currentCallId = callId;
+    
     const constraints: any = {
       audio: true,
       video:
@@ -62,15 +70,29 @@ class WebRTCService {
           ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
           : false,
     };
-    this.localStream = await mediaDevices.getUserMedia(constraints);
-    return this.localStream;
+    try {
+      this.localStream = await mediaDevices.getUserMedia(constraints);
+      return this.localStream;
+    } finally {
+      this.isInitializing = false;
+    }
   }
 
   /** Create RTCPeerConnection and wire up event handlers. */
-  createPeerConnection(): RTCPeerConnection {
+  createPeerConnection(callId: string): RTCPeerConnection {
+    if (this.pc && this.currentCallId === callId) {
+      console.log('[WebRTC] PC already exists for this call, skipping ctor');
+      return this.pc;
+    }
+    if (this.pc) {
+      this.pc.close();
+      this.pc = null;
+    }
+    this.currentCallId = callId;
     const config: any = { iceServers: buildIceServers() };
     this.pc = new RTCPeerConnection(config);
     this.pendingCandidates = [];
+    this.remoteStream = null;
     this.remoteDescSet = false;
 
     (this.pc as any).onicecandidate = (event: any) => {
@@ -114,25 +136,36 @@ class WebRTCService {
     return { type: (answer as any).type, sdp: (answer as any).sdp };
   }
 
-  async setRemoteDescription(sdp: { type: string; sdp: string }): Promise<void> {
-    if (!this.pc) throw new Error('No peer connection');
-    await this.pc.setRemoteDescription(new RTCSessionDescription(sdp as any));
-    this.remoteDescSet = true;
-    // Drain any ICE candidates that arrived before remote description was set
-    for (const c of this.pendingCandidates) {
-      await this.pc.addIceCandidate(new RTCIceCandidate(c));
-    }
-    this.pendingCandidates = [];
-  }
-
   async addIceCandidate(candidate: any): Promise<void> {
-    if (!this.pc) return;
-    if (!this.remoteDescSet) {
-      // Queue until setRemoteDescription completes
+    if (!this.pc || !this.remoteDescSet) {
+      // Queue until PC is created and remote description is set
+      console.log('[WebRTC] Queueing ICE candidate');
       this.pendingCandidates.push(candidate);
       return;
     }
-    await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+    try {
+      await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (e) {
+      console.error('[WebRTC] addIceCandidate error:', e);
+    }
+  }
+
+  async setRemoteDescription(sdp: { type: string; sdp: string }): Promise<void> {
+    if (!this.pc) throw new Error('No peer connection');
+    console.log('[WebRTC] setRemoteDescription:', sdp.type);
+    await this.pc.setRemoteDescription(new RTCSessionDescription(sdp as any));
+    this.remoteDescSet = true;
+    console.log('[WebRTC] setRemoteDescription OK');
+    // Drain any ICE candidates that arrived before remote description was set
+    console.log(`[WebRTC] Draining ${this.pendingCandidates.length} pending candidates`);
+    for (const c of this.pendingCandidates) {
+      try {
+        await this.pc.addIceCandidate(new RTCIceCandidate(c));
+      } catch (e) {
+        console.error('[WebRTC] addIceCandidate (pending) error:', e);
+      }
+    }
+    this.pendingCandidates = [];
   }
 
   setMuted(muted: boolean): void {
@@ -164,6 +197,8 @@ class WebRTCService {
     this.localStream?.getTracks().forEach((track: any) => track.stop());
     this.pc?.close();
     this.pc = null;
+    this.currentCallId = null;
+    this.isInitializing = false;
     this.localStream = null;
     this.remoteStream = null;
     this.pendingCandidates = [];

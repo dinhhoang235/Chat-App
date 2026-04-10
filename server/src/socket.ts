@@ -122,6 +122,7 @@ export const setupSocket = (io: Server) => {
 
     // Caller → Server → Callee: WebRTC offer SDP
     socket.on('webrtc_offer', ({ callId, targetUserId, offer }: any) => {
+      console.log(`[Signaling] Offer: ${socket.user?.userId} → ${targetUserId} (callId: ${callId})`);
       io.to(`user:${targetUserId}`).emit('webrtc_offer', {
         callId,
         from: socket.user?.userId,
@@ -130,8 +131,9 @@ export const setupSocket = (io: Server) => {
     });
 
     // Callee → Server → Caller: WebRTC answer SDP
-    socket.on('webrtc_answer', ({ callId, callerId, answer }: any) => {
-      io.to(`user:${callerId}`).emit('webrtc_answer', {
+    socket.on('webrtc_answer', ({ callId, targetUserId, answer }: any) => {
+      console.log(`[Signaling] Answer: ${socket.user?.userId} → ${targetUserId} (callId: ${callId})`);
+      io.to(`user:${targetUserId}`).emit('webrtc_answer', {
         callId,
         from: socket.user?.userId,
         answer,
@@ -144,6 +146,16 @@ export const setupSocket = (io: Server) => {
         callId,
         from: socket.user?.userId,
         candidate,
+      });
+    });
+
+    // Camera toggle signaling
+    socket.on('camera_toggle', ({ callId, targetUserId, enabled }: any) => {
+      console.log(`[Signaling] Camera toggle: ${socket.user?.userId} → ${targetUserId} (${enabled})`);
+      io.to(`user:${targetUserId}`).emit('camera_toggle', {
+        callId,
+        userId: socket.user?.userId,
+        enabled,
       });
     });
 

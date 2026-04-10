@@ -129,7 +129,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         callerAvatar: user.avatar || '',
       });
 
-      router.push('/call' as any);
+      if (params.callType === 'video') {
+        router.replace('/videoCall' as any);
+      } else {
+        router.replace('/call' as any);
+      }
     },
     [user, router],
   );
@@ -141,12 +145,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setIncomingCall(null);
     setCallStatus('connecting');
 
-    socketService.emit('call_accept', {
-      callId: call.callId,
-      callerId: call.remoteUserId,
-    });
-
-    router.push('/call' as any);
+    if (call.callType === 'video') {
+      router.replace('/videoCall' as any);
+    } else {
+      router.replace('/call' as any);
+    }
   }, [incomingCall, router]);
 
   const rejectCall = useCallback(() => {

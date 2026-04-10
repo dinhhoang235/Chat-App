@@ -4,16 +4,15 @@ import {
   Text,
   TouchableOpacity,
   Animated,
-  Dimensions,
   Image,
-  StyleSheet,
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCall } from '@/context/callContext';
+import { getAvatarUrl } from '@/utils/avatar';
+import { getInitials } from '@/utils/initials';
 
-const { width } = Dimensions.get('window');
-const AVATAR_SIZE = 90;
+const AVATAR_SIZE = 140;
 
 export function IncomingCallModal() {
   const { incomingCall, acceptCall, rejectCall } = useCall();
@@ -62,12 +61,8 @@ export function IncomingCallModal() {
   if (!incomingCall) return null;
 
   const isVideo = incomingCall.callType === 'video';
-  const initials = (incomingCall.remoteName || '?')
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .substring(0, 2)
-    .toUpperCase();
+  const avatarUrl = getAvatarUrl(incomingCall.remoteAvatar);
+  const initials = getInitials(incomingCall.remoteName);
 
   return (
     <Modal
@@ -76,197 +71,97 @@ export function IncomingCallModal() {
       animationType="fade"
       statusBarTranslucent
     >
-      <View style={styles.overlay}>
-        {/* Background blur-like layer */}
-        <View style={[styles.backdrop, { backgroundColor: 'rgba(10,15,30,0.92)' }]} />
+      <View className="flex-1 bg-[#1E40AF]">
+        <View className="absolute inset-0 bg-[#1E40AF]" />
 
-        <View style={styles.container}>
-          {/* Call type badge */}
-          <View style={styles.badgeRow}>
-            <Ionicons
-              name={isVideo ? 'videocam' : 'call'}
-              size={16}
-              color="rgba(255,255,255,0.7)"
+        {/* Top Header */}
+        <View className="mt-[60px] items-center">
+          <Text className="text-white text-[22px] font-semibold">DiskordMes</Text>
+        </View>
+
+        {/* Pulsing avatar */}
+        <View className="mt-[60px] h-[300px] items-center justify-center">
+          {[pulse3, pulse2, pulse1].map((p, i) => (
+            <Animated.View
+              key={i}
+              className="absolute bg-white"
+              style={[
+                {
+                  width: AVATAR_SIZE + 40 + i * 40,
+                  height: AVATAR_SIZE + 40 + i * 40,
+                  borderRadius: (AVATAR_SIZE + 40 + i * 40) / 2,
+                  transform: [{ scale: p }],
+                  opacity: p.interpolate({
+                    inputRange: [1, 1.6],
+                    outputRange: [0.25 - i * 0.05, 0],
+                  }),
+                },
+              ]}
             />
-            <Text style={styles.badgeText}>
-              {isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi thoại đến'}
-            </Text>
-          </View>
+          ))}
+          {avatarUrl ? (
+            <Image
+              source={{ uri: avatarUrl }}
+              className="w-[140px] h-[140px] rounded-[70px] border border-white/40"
+            />
+          ) : (
+            <View className="w-[140px] h-[140px] rounded-[70px] border border-white/40 bg-blue-500 items-center justify-center">
+              <Text className="text-white text-[48px] font-bold">{initials}</Text>
+            </View>
+          )}
+        </View>
 
-          {/* Pulsing avatar */}
-          <View style={styles.avatarWrapper}>
-            {[pulse3, pulse2, pulse1].map((p, i) => (
-              <Animated.View
-                key={i}
-                style={[
-                  styles.pulseRing,
-                  {
-                    width: AVATAR_SIZE + 24 + i * 20,
-                    height: AVATAR_SIZE + 24 + i * 20,
-                    borderRadius: (AVATAR_SIZE + 24 + i * 20) / 2,
-                    transform: [{ scale: p }],
-                    opacity: p.interpolate({
-                      inputRange: [1, 1.6],
-                      outputRange: [0.35 - i * 0.08, 0],
-                    }),
-                  },
-                ]}
-              />
-            ))}
-            {incomingCall.remoteAvatar ? (
-              <Image
-                source={{ uri: incomingCall.remoteAvatar }}
-                style={styles.avatar}
-              />
-            ) : (
-              <View style={[styles.avatar, styles.avatarInitials]}>
-                <Text style={styles.initialsText}>{initials}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Caller name */}
-          <Text style={styles.callerName} numberOfLines={1}>
+        {/* Caller Info */}
+        <View className="items-center -mt-5">
+          <Text className="text-white text-[32px] font-bold mb-2" numberOfLines={1}>
             {incomingCall.remoteName}
           </Text>
-          <Text style={styles.statusText}>
-            {isVideo ? '📹 Đang gọi video...' : '📞 Đang gọi...'}
+          <Text className="text-white/80 text-base">
+            DiskordMes: {isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi thoại đến'}
           </Text>
+        </View>
 
-          {/* Action buttons */}
-          <View style={styles.actions}>
-            {/* Reject */}
-            <View style={styles.actionItem}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.rejectBtn]}
-                onPress={rejectCall}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-              </TouchableOpacity>
-              <Text style={styles.actionLabel}>Từ chối</Text>
-            </View>
+        {/* Action buttons */}
+        <View className="flex-row justify-around w-full absolute bottom-[80px] px-5">
+          {/* Reject */}
+          <View className="items-center gap-3">
+            <TouchableOpacity
+              className="w-[80px] h-[80px] rounded-[40px] items-center justify-center bg-red-500"
+              style={{
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 6,
+                elevation: 10,
+              }}
+              onPress={rejectCall}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="call" size={32} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+            </TouchableOpacity>
+            <Text className="text-white text-base font-medium">Từ chối</Text>
+          </View>
 
-            {/* Accept */}
-            <View style={styles.actionItem}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.acceptBtn]}
-                onPress={acceptCall}
-                activeOpacity={0.8}
-              >
-                <Ionicons name={isVideo ? 'videocam' : 'call'} size={28} color="#fff" />
-              </TouchableOpacity>
-              <Text style={styles.actionLabel}>Chấp nhận</Text>
-            </View>
+          {/* Accept */}
+          <View className="items-center gap-3">
+            <TouchableOpacity
+              className="w-[80px] h-[80px] rounded-[40px] items-center justify-center bg-green-500"
+              style={{
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 6,
+                elevation: 10,
+              }}
+              onPress={acceptCall}
+              activeOpacity={0.8}
+            >
+              <Ionicons name={isVideo ? 'videocam' : 'call'} size={32} color="#fff" />
+            </TouchableOpacity>
+            <Text className="text-white text-base font-medium">Chấp nhận</Text>
           </View>
         </View>
       </View>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  container: {
-    width: width * 0.88,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 32,
-  },
-  badgeText: {
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: 14,
-    letterSpacing: 0.3,
-  },
-  avatarWrapper: {
-    width: AVATAR_SIZE + 80,
-    height: AVATAR_SIZE + 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-  },
-  pulseRing: {
-    position: 'absolute',
-    backgroundColor: '#4ade80',
-  },
-  avatar: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    borderWidth: 3,
-    borderColor: '#fff',
-  },
-  avatarInitials: {
-    backgroundColor: '#3b82f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initialsText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '700',
-  },
-  callerName: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '700',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  statusText: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 15,
-    marginBottom: 44,
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    width: '100%',
-    gap: 48,
-  },
-  actionItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionBtn: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  rejectBtn: {
-    backgroundColor: '#ef4444',
-    shadowColor: '#ef4444',
-  },
-  acceptBtn: {
-    backgroundColor: '#22c55e',
-    shadowColor: '#22c55e',
-  },
-  actionLabel: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-});

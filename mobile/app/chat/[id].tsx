@@ -72,7 +72,8 @@ export default function ChatThread() {
     scrollToMessageId,
     uploadProgress,
     startVoiceCall,
-    startVideoCall
+    startVideoCall,
+    allMedia
   } = useChatThread();
   
   // unified sheet control (gallery/composer) moved to hook
@@ -119,9 +120,10 @@ export default function ChatThread() {
         isHighlighted={item.id?.toString() === highlightedMessageId}
         onReplyPress={(replyId: string) => scrollToMessageId(replyId)}
         progress={uploadProgress[item.id]}
+        allMedia={allMedia}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId]);
+  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;

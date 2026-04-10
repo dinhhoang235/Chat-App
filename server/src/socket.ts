@@ -2,7 +2,8 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { TokenPayload } from './utils/jwt.js';
 import prisma from './db.js';
-import { setUserStatus } from './utils/redis.js';
+import { setUserStatus, setCallInfo, getCallInfo, deleteCallInfo, cacheMessage } from './utils/redis.js';
+import { sendPushNotifications, formatMessageNotification } from './utils/notification.js';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -88,7 +89,20 @@ export const setupSocket = (io: Server) => {
 
     // Caller → Server: invite target user to call
     socket.on('call_invite', ({ callId, conversationId, targetUserId, callType, callerName, callerAvatar }: any) => {
-      io.to(`user:${targetUserId}`).emit('incoming_call', {
+      console.log(`[Call] Invite: ${socket.user?.userId} → ${targetUserId} (callId: ${callId})`);
+      
+      // Store call info in Redis for tracking duration and state
+      setCallInfo(callId, {
+        conversationId,
+        callerId: socket.user?.userId,
+        targetUserId,
+        callType,
+        startTime: null, // Not started yet
+        invitationTime: Date.now(),
+      }).catch(err => console.error('[Call] Redis set error:', err));
+
+      const room = `user:${targetUserId}`;
+      io.to(room).emit('incoming_call', {
         callId,
         conversationId,
         callerId: socket.user?.userId,
@@ -96,11 +110,48 @@ export const setupSocket = (io: Server) => {
         callerAvatar,
         callType,
       });
-      console.log(`[Call] ${socket.user?.userId} → ${targetUserId} (${callType}) callId=${callId}`);
+      
+      // Send push notification to target user ONLY if they are not currently connected via socket
+      io.in(room).fetchSockets().then(sockets => {
+        console.log(`[Call] Emitted to ${room}, participants connected: ${sockets.length}`);
+        
+        if (sockets.length === 0) {
+          prisma.user.findUnique({
+            where: { id: Number(targetUserId) },
+            select: { pushToken: true }
+          }).then(targetUser => {
+            if (targetUser?.pushToken) {
+              sendPushNotifications([targetUser.pushToken], {
+                title: callerName || 'Cuộc gọi đến',
+                body: `Bạn có cuộc gọi ${callType === 'video' ? 'video' : 'thoại'} từ ${callerName || 'ai đó'}`,
+                data: {
+                  type: 'call',
+                  callId,
+                  conversationId,
+                  callType,
+                  callerName,
+                  callerAvatar
+                },
+                channelId: 'call',
+                sound: 'notification.mp3'
+              }).catch(err => console.error('[Call] Push error:', err));
+            }
+          }).catch(err => console.error('[Call] Db fetch error:', err));
+        } else {
+          console.log(`[Call] Skipping push notification for ${targetUserId} as they are online via socket`);
+        }
+      });
     });
 
     // Callee → Server: accepted call
-    socket.on('call_accept', ({ callId, callerId }: any) => {
+    socket.on('call_accept', async ({ callId, callerId }: any) => {
+      // Update call info with start time
+      const callInfo = await getCallInfo(callId);
+      if (callInfo) {
+        callInfo.startTime = Date.now();
+        await setCallInfo(callId, callInfo);
+      }
+
       io.to(`user:${callerId}`).emit('call_accepted', {
         callId,
         accepterId: socket.user?.userId,
@@ -108,7 +159,75 @@ export const setupSocket = (io: Server) => {
     });
 
     // Callee → Server: rejected call
-    socket.on('call_reject', ({ callId, callerId }: any) => {
+    socket.on('call_reject', async ({ callId, callerId }: any) => {
+      const callInfo = await getCallInfo(callId);
+      if (callInfo) {
+        const convId = Number(callInfo.conversationId);
+        // Create a message for the call log
+        const message = await prisma.message.create({
+          data: {
+            conversationId: convId,
+            senderId: Number(callInfo.callerId), // Who made the call
+            content: JSON.stringify({
+              callType: callInfo.callType,
+              status: 'rejected',
+              duration: 0
+            }),
+            type: 'call',
+          },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+            conversation: {
+              select: {
+                id: true,
+                isGroup: true,
+                name: true
+              }
+            }
+          },
+        });
+
+        // Update conversation metadata
+        try {
+          await prisma.conversation.update({
+            where: { id: convId },
+            data: { updatedAt: new Date() }
+          });
+
+          await prisma.conversationParticipant.updateMany({
+            where: { conversationId: convId, hiddenAt: { not: null } },
+            data: { hiddenAt: null }
+          });
+        } catch (err) {
+          console.error('[Call] Error updating conversation metadata (reject):', err);
+        }
+
+        // Broadcast the log message to both participants
+        io.to(`conversation:${convId}`).emit('new_message', message);
+        await cacheMessage(convId, message);
+
+        // Update conversation list for both
+        const participants = await prisma.conversationParticipant.findMany({
+          where: { conversationId: convId },
+          include: { user: { select: { id: true, pushToken: true } } }
+        });
+
+        participants.forEach(p => {
+          io.to(`user:${p.userId}`).emit('conversation_updated', {
+            conversationId: convId,
+            lastMessage: message
+          });
+        });
+        
+        await deleteCallInfo(callId);
+      }
+
       io.to(`user:${callerId}`).emit('call_rejected', {
         callId,
         rejecterId: socket.user?.userId,
@@ -116,7 +235,87 @@ export const setupSocket = (io: Server) => {
     });
 
     // Either side → Server: end active call
-    socket.on('call_end', ({ callId, targetUserId }: any) => {
+    socket.on('call_end', async ({ callId, targetUserId }: any) => {
+      const callInfo = await getCallInfo(callId);
+      if (callInfo) {
+        const convId = Number(callInfo.conversationId);
+        const isMissed = !callInfo.startTime;
+        const duration = isMissed ? 0 : Math.floor((Date.now() - callInfo.startTime) / 1000);
+        
+        // Create a message for the call log
+        const message = await prisma.message.create({
+          data: {
+            conversationId: convId,
+            senderId: Number(callInfo.callerId),
+            content: JSON.stringify({
+              callType: callInfo.callType,
+              status: isMissed ? 'missed' : 'completed',
+              duration: duration
+            }),
+            type: 'call',
+          },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+            conversation: {
+              select: {
+                id: true,
+                isGroup: true,
+                name: true
+              }
+            }
+          },
+        });
+
+        // Update conversation metadata
+        try {
+          await prisma.conversation.update({
+            where: { id: convId },
+            data: { updatedAt: new Date() }
+          });
+
+          await prisma.conversationParticipant.updateMany({
+            where: { conversationId: convId, hiddenAt: { not: null } },
+            data: { hiddenAt: null }
+          });
+        } catch (err) {
+          console.error('[Call] Error updating conversation metadata (end):', err);
+        }
+
+        // Broadcast the log message
+        io.to(`conversation:${convId}`).emit('new_message', message);
+        await cacheMessage(convId, message);
+
+        // Update conversation list for both
+        const participants = await prisma.conversationParticipant.findMany({
+          where: { conversationId: convId },
+          include: { user: { select: { id: true, pushToken: true } } }
+        });
+
+        const pushTokens = participants
+          .filter(p => p.userId !== Number(callInfo.callerId) && p.user.pushToken)
+          .map(p => p.user.pushToken as string);
+
+        if (pushTokens.length > 0 && isMissed) {
+          const notificationPayload = formatMessageNotification(message);
+          sendPushNotifications(pushTokens, notificationPayload).catch(err => console.error('[Call] Push error (end):', err));
+        }
+
+        participants.forEach(p => {
+          io.to(`user:${p.userId}`).emit('conversation_updated', {
+            conversationId: convId,
+            lastMessage: message
+          });
+        });
+
+        await deleteCallInfo(callId);
+      }
+
       io.to(`user:${targetUserId}`).emit('call_ended', { callId });
     });
 

@@ -3,7 +3,7 @@ import { Server } from 'socket.io';
 import prisma from '../../db.js';
 import { AuthRequest } from '../../middleware/auth.js';
 import { cacheMessage } from '../../utils/redis.js';
-import Expo from 'expo-server-sdk';
+import { sendPushNotifications } from '../../utils/notification.js';
 import { uploadFile } from '../../utils/minio.js';
 import { DIRECT_UPLOAD_MAX_SIZE_BYTES } from '../../constants/upload.js';
 
@@ -123,86 +123,47 @@ export const sendMessage = (io: Server) => async (req: AuthRequest, res: Respons
       });
     });
 
-    // send push notifications to participants with push tokens (excluding sender)
-    try {
-      // expo-server-sdk is now a normal dependency
-      const expo = new Expo();
-      const pushMessages: any[] = [];
+      const pushTokens = participants
+        .filter(p => p.userId !== userId && (p.user as any).pushToken)
+        .filter(p => !(p.mutedUntil && new Date(p.mutedUntil) > new Date()))
+        .map(p => (p.user as any).pushToken);
 
-      // log participant tokens for debugging
-      console.log('Participants for push:', participants.map(p => ({
-        userId: p.userId,
-        pushToken: (p.user as any)?.pushToken || null
-      })));
-
-      participants.forEach(p => {
-        // @ts-ignore pushToken may not exist on user type yet
-        const token = (p.user as any).pushToken;
-
-        // Skip if conversation is muted for this user
-        if (p.mutedUntil && new Date(p.mutedUntil) > new Date()) {
-          console.log(`skipping push for user ${p.userId} because conversation is muted until ${p.mutedUntil}`);
-          return;
-        }
-
-        if (!token || token === '') {
-          console.log(`no push token for user ${p.userId}`);
-        }
-        if (token && token !== '' && p.userId !== userId) {
-          let bodyText = '';
-          if (message.type === 'text') {
-            bodyText = message.content;
-          } else if (message.type === 'image') {
-            bodyText = '📷 Ảnh';
-          } else if (message.type === 'file') {
-            try {
-              const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
-              bodyText = `📎 ${info?.name || 'Tệp'}`;
-            } catch {
-              bodyText = '📎 Tệp';
-            }
-          } else if (message.type === 'audio') {
-            bodyText = '🎤 Ghi âm';
+      if (pushTokens.length > 0) {
+        let bodyText = '';
+        if (message.type === 'text') {
+          bodyText = message.content;
+        } else if (message.type === 'image') {
+          bodyText = '📷 Ảnh';
+        } else if (message.type === 'file') {
+          try {
+            const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
+            bodyText = `📎 ${info?.name || 'Tệp'}`;
+          } catch {
+            bodyText = '📎 Tệp';
           }
+        } else if (message.type === 'audio') {
+          bodyText = '🎤 Ghi âm';
+        }
 
-          // For group conversations, use group name as title and prefix sender in body
-          let titleText = message.sender?.fullName || 'Tin nhắn mới';
-          if (message.conversation?.isGroup) {
-            // prefix with 'Nhóm '
-            titleText = `Nhóm ${message.conversation.name || ''}`.trim();
-            const senderName = message.sender?.fullName || 'Ai đó';
-            bodyText = `${senderName}: ${bodyText}`;
+        let titleText = message.sender?.fullName || 'Tin nhắn mới';
+        if (message.conversation?.isGroup) {
+          titleText = `Nhóm ${message.conversation.name || ''}`.trim();
+          const senderName = message.sender?.fullName || 'Ai đó';
+          bodyText = `${senderName}: ${bodyText}`;
+        }
+
+        await sendPushNotifications(pushTokens, {
+          title: titleText,
+          body: bodyText,
+          channelId: 'chat',
+          sound: 'notification.mp3',
+          data: {
+            conversationId: convId,
+            isGroup: message.conversation?.isGroup || false,
+            name: message.conversation?.name || ''
           }
-
-          pushMessages.push({
-            to: token,
-            sound: 'notification.mp3',
-            channelId: 'chat', 
-            title: titleText,
-            body: bodyText,
-            data: {
-              conversationId: convId,
-              isGroup: message.conversation?.isGroup || false,
-              name: message.conversation?.name || ''
-            }
-          });
-        }
-      });
-
-      console.log('pushMessages built:', pushMessages);
-
-      const chunks = expo.chunkPushNotifications(pushMessages);
-      for (const chunk of chunks) {
-        try {
-          const receipt = await expo.sendPushNotificationsAsync(chunk);
-          console.log('expo push chunk results:', receipt);
-        } catch (err) {
-          console.error('Error sending expo push chunk:', err);
-        }
+        }).catch(err => console.error('Push error:', err));
       }
-    } catch (err) {
-      console.error('Failed to send push notifications:', err);
-    }
 
     return res.status(201).json(message);
   } catch (err) {

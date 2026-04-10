@@ -65,8 +65,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleIncomingCall = (data: any) => {
+      console.log('Incoming call received:', data.callId, 'from:', data.callerId);
       // Skip if already in a call
-      if (activeCallRef.current) return;
+      if (activeCallRef.current) {
+        console.log('Incoming call ignored: active call in progress');
+        return;
+      }
       const info: CallInfo = {
         callId: data.callId,
         conversationId: data.conversationId,

@@ -44,15 +44,6 @@ const ChatOptionsHeaderInfo = ({
             />
           )}
         </View>
-        {!isGroup && isOnline && (
-          <View
-            className="absolute right-1 bottom-3 w-6 h-6 rounded-full border-4"
-            style={{
-              backgroundColor: '#4ade80',
-              borderColor: colors.background,
-            }}
-          />
-        )}
       </View>
       <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{displayName ?? name}</Text>
     </View>

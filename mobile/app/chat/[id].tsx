@@ -121,9 +121,11 @@ export default function ChatThread() {
         onReplyPress={(replyId: string) => scrollToMessageId(replyId)}
         progress={uploadProgress[item.id]}
         allMedia={allMedia}
+        onVoiceCall={startVoiceCall}
+        onVideoCall={startVideoCall}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia]);
+  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
@@ -214,8 +216,8 @@ export default function ChatThread() {
               }
               onBackPress={() => router.back()}
               rightActions={[
-                { icon: 'call', onPress: startVoiceCall },
-                { icon: 'videocam', onPress: startVideoCall },
+                { icon: 'call-outline', onPress: startVoiceCall },
+                { icon: 'video', onPress: startVideoCall },
                 {
                   icon: 'bars',
                   onPress: () => router.push({

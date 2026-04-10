@@ -9,7 +9,9 @@ import { useIsFocused } from '@react-navigation/native';
 import { ContactItem } from '@/components/lists/ContactRow';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getFriendsList, getPendingFriendRequests } from '@/services/friendship';
+import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
+import { useCall } from '@/context/callContext';
 
 type Section = {
   title: string;
@@ -22,6 +24,7 @@ export default function Contacts() {
   const { tabBarHeight } = useTabBar();
   const router = useRouter();
   const isFocused = useIsFocused();
+  const { startCall } = useCall();
   
   const [contacts, setContacts] = React.useState<ContactItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -76,6 +79,42 @@ export default function Contacts() {
 
   const handleSearch = (text: string) => {
     setSearchText(text);
+  };
+  
+  const handleCall = async (contact: ContactItem) => {
+    try {
+      const response = await chatApi.startConversation(Number(contact.id));
+      const conv = response.data;
+      const convId = conv.id || conv.conversationId;
+      
+      startCall({
+        conversationId: convId,
+        callType: 'voice',
+        remoteUserId: Number(contact.id),
+        remoteName: contact.fullName,
+        remoteAvatar: contact.avatar,
+      });
+    } catch (err) {
+      console.error('Start voice call error:', err);
+    }
+  };
+  
+  const handleVideoCall = async (contact: ContactItem) => {
+    try {
+      const response = await chatApi.startConversation(Number(contact.id));
+      const conv = response.data;
+      const convId = conv.id || conv.conversationId;
+      
+      startCall({
+        conversationId: convId,
+        callType: 'video',
+        remoteUserId: Number(contact.id),
+        remoteName: contact.fullName,
+        remoteAvatar: contact.avatar,
+      });
+    } catch (err) {
+      console.error('Start video call error:', err);
+    }
   };
 
   // Filter contacts based on search
@@ -159,7 +198,14 @@ export default function Contacts() {
             </TouchableOpacity>
           );
         }}
-        renderItem={({ item }) => <ContactRow contact={item} onPress={() => router.push(`/profile/${item.id}`)} />}
+        renderItem={({ item }) => (
+          <ContactRow 
+            contact={item} 
+            onPress={() => router.push(`/profile/${item.id}`)} 
+            onCall={() => handleCall(item)}
+            onVideo={() => handleVideoCall(item)}
+          />
+        )}
         renderSectionHeader={({ section: { title } }) => (
           <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface }}>
             <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>{title}</Text>

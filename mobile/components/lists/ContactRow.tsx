@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/themeContext';
 import { getInitials } from '@/utils/initials';
@@ -71,10 +71,10 @@ export default function ContactRow({ contact, onPress, onCall, onVideo }: Props)
 
       <View className="items-center space-x-3" style={{ position: 'absolute', right: insets.right + 4, top: 0, bottom: 0, justifyContent: 'center', flexDirection: 'row', zIndex: 20 }}>
         <TouchableOpacity onPress={onCall} className="p-2 rounded-full" accessibilityLabel="Gọi" hitSlop={{ top: 14, left: 14, bottom: 14, right: 14 }}>
-          <MaterialIcons name="call" size={22} color={iconColor} />
+          <Ionicons name="call-outline" size={22} color={iconColor} />
         </TouchableOpacity>
         <TouchableOpacity onPress={onVideo} className="p-2 rounded-full" accessibilityLabel="Gọi video" hitSlop={{ top: 14, left: 14, bottom: 14, right: 14 }}>
-          <MaterialIcons name="videocam" size={22} color={iconColor} />
+          <Feather name="video" size={22} color={iconColor} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

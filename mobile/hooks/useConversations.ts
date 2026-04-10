@@ -71,6 +71,22 @@ export function useConversations() {
             // Ignore parse errors
           }
           lastMessageText = isFromMe ? `Bạn: [Tin nhắn thoại]${durationStr}` : `[Tin nhắn thoại]${durationStr}`;
+        } else if (lastMsg.type === 'call') {
+          try {
+            const info = typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
+            const isVideo = info.callType === 'video';
+            const typeLabel = isVideo ? 'video' : 'thoại';
+            
+            if (!isFromMe && (info.status === 'missed' || info.status === 'no_answer')) {
+              lastMessageText = '[Cuộc gọi lỡ]';
+            } else {
+              const direction = isFromMe ? 'đi' : 'đến';
+              const prefix = isFromMe ? 'Bạn: ' : '';
+              lastMessageText = `${prefix}[Cuộc gọi ${typeLabel} ${direction}]`;
+            }
+          } catch {
+            lastMessageText = isFromMe ? 'Bạn: [Cuộc gọi]' : '[Cuộc gọi]';
+          }
         } else if (lastMsg.type === 'file') {
           let content: any = null;
           try {

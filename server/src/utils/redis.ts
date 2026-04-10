@@ -112,3 +112,39 @@ export const clearCachedMessages = async (conversationId: number) => {
     console.error('Redis Clear Cached Messages Error:', err);
   }
 };
+
+/**
+ * Call related tracking
+ */
+const CALL_KEY_PREFIX = 'call:';
+
+export const setCallInfo = async (callId: string, info: any) => {
+  try {
+    const key = `${CALL_KEY_PREFIX}${callId}`;
+    await redisClient.set(key, JSON.stringify(info), {
+      EX: 3600 // Expire in 1 hour
+    });
+  } catch (err) {
+    console.error('Redis Set Call Info Error:', err);
+  }
+};
+
+export const getCallInfo = async (callId: string) => {
+  try {
+    const key = `${CALL_KEY_PREFIX}${callId}`;
+    const data = await redisClient.get(key);
+    return data ? JSON.parse(data) : null;
+  } catch (err) {
+    console.error('Redis Get Call Info Error:', err);
+    return null;
+  }
+};
+
+export const deleteCallInfo = async (callId: string) => {
+  try {
+    const key = `${CALL_KEY_PREFIX}${callId}`;
+    await redisClient.del(key);
+  } catch (err) {
+    console.error('Redis Delete Call Info Error:', err);
+  }
+};

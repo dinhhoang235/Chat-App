@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, TextStyle } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Ionicons, Feather } from "@expo/vector-icons";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { Link, useRouter } from "expo-router";
 import { useTheme } from "@/context/themeContext";
@@ -127,6 +127,10 @@ const Header = ({
                 <TouchableOpacity key={idx} onPress={a.onPress} className="ml-2">
                   {a.icon === 'bars' ? (
                     <AntDesign name="bars" color={iconColor} size={a.size ?? 24} />
+                  ) : a.icon === 'call-outline' || a.icon === 'call' ? (
+                    <Ionicons name={a.icon as any} color={iconColor} size={a.size ?? 24} />
+                  ) : a.icon === 'video' || a.icon === 'videocam' ? (
+                    <Feather name="video" color={iconColor} size={a.size ?? 24} />
                   ) : (
                     <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 24} />
                   )}
@@ -184,6 +188,10 @@ const Header = ({
                   <TouchableOpacity key={idx} className="px-3" onPress={a.onPress}>
                     {a.icon === 'bars' ? (
                       <AntDesign name="bars" color={iconColor} size={a.size ?? 28} />
+                    ) : a.icon === 'call-outline' || a.icon === 'call' ? (
+                      <Ionicons name={a.icon as any} color={iconColor} size={a.size ?? 28} />
+                    ) : a.icon === 'video' || a.icon === 'videocam' ? (
+                      <Feather name="video" color={iconColor} size={a.size ?? 28} />
                     ) : (
                       <MaterialIcons name={a.icon as any} color={iconColor} size={a.size ?? 28} />
                     )}

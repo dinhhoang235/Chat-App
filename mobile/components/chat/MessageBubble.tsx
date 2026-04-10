@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Animated, S
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { Image } from 'expo-image';
 import { useTheme } from '@/context/themeContext';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather, Ionicons } from '@expo/vector-icons';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { getAvatarUrl } from '@/utils/avatar';
@@ -70,7 +70,7 @@ type ChatMessage = {
   content?: string;
   time?: string;
   fromMe?: boolean;
-  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'video' | 'audio' | 'file' | 'image_group';
+  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'video' | 'audio' | 'file' | 'image_group' | 'call';
   contactName?: string;
   contactAvatar?: string;
   contactAvatarColor?: string;
@@ -235,7 +235,7 @@ function AudioMessageBubble({
   );
 }
 
-export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[] }) {
+export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -725,6 +725,87 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       </TouchableOpacity>
     );
     }
+  } else if (message.type === 'call') {
+    let callData: any = { callType: 'voice', status: 'completed', duration: 0 };
+    try {
+      callData = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
+    } catch (e) {
+      console.error('Error parsing call data', e);
+    }
+
+    const isMissed = callData.status === 'missed' || callData.status === 'rejected' || callData.status === 'no_answer';
+    const isVideo = callData.callType === 'video';
+
+    let label = '';
+    if (callData.status === 'missed' || callData.status === 'no_answer') {
+      label = message.fromMe ? 'Bạn đã hủy' : 'Cuộc gọi lỡ';
+    } else if (callData.status === 'rejected') {
+      label = 'Cuộc gọi bị từ chối';
+    } else {
+      label = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+      if (callData.duration > 0) {
+        label += ` (${formatDuration(callData.duration)})`;
+      }
+    }
+
+    const iconColor = isOutgoing ? '#FFFFFF' : (isMissed ? '#FF3B30' : colors.tint);
+    const iconBg = isOutgoing ? 'rgba(255,255,255,0.18)' : (isMissed ? 'rgba(255, 59, 48, 0.08)' : 'rgba(0, 122, 255, 0.08)');
+    const subTextColor = isOutgoing ? 'rgba(255,255,255,0.7)' : colors.textSecondary;
+
+    contentElement = (
+      <View style={{ paddingVertical: 2, minWidth: 180 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            backgroundColor: iconBg,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12
+          }}>
+            {isMissed ? (
+              isVideo ? (
+                <MaterialIcons name="missed-video-call" size={24} color={iconColor} />
+              ) : (
+                <Feather name="phone-missed" size={22} color={iconColor} />
+              )
+            ) : isVideo ? (
+              <Feather name="video" size={22} color={iconColor} />
+            ) : (
+              <Ionicons name="call-outline" size={22} color={iconColor} />
+            )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: textColor, fontWeight: '600', fontSize: 15 }}>{label}</Text>
+            <Text style={{ color: subTextColor, fontSize: 12, marginTop: 2 }}>
+               {isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại'}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity 
+          onPress={() => isVideo ? onVideoCall?.() : onVoiceCall?.()}
+          style={{ 
+            borderTopWidth: 1, 
+            borderTopColor: isOutgoing ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',
+            marginTop: 8,
+            paddingTop: 8,
+            alignItems: 'center'
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ 
+            color: isOutgoing ? '#FFFFFF' : '#007AFF', 
+            fontWeight: '700', 
+            fontSize: 12,
+            letterSpacing: 0.3
+          }}>
+            GỌI LẠI
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
   } else {
     // default text rendering
     contentElement = renderHighlighted(message.text);
@@ -869,7 +950,23 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         }}
         containerStyle={{ zIndex: 2 }}
       >
-        <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+        <TouchableOpacity 
+          onPress={() => {
+            if (message.type === 'call') {
+              try {
+                const callData = typeof message.content === 'string' ? JSON.parse(message.content || '{}') : message.content;
+                const isVideo = callData?.callType === 'video';
+                if (isVideo) onVideoCall?.();
+                else onVoiceCall?.();
+              } catch {
+                onPress?.();
+              }
+            } else {
+              onPress?.();
+            }
+          }} 
+          activeOpacity={0.95}
+        >
         <View className={`flex-row ${message.fromMe ? 'justify-end' : 'justify-start'} px-4 my-2`}> 
           {!message.fromMe && (
             <View style={{ width: 40, height: 40 }} />
@@ -878,9 +975,9 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         <View style={{ maxWidth: '72%', marginLeft: isOutgoing ? 'auto' : 12 }} className={`${isOutgoing ? 'items-end' : 'items-start'}`}> 
             {/* for image attachments we don’t show the standard bubble styling */}
         <Animated.View style={[{
-            backgroundColor: (message.type === 'image' || message.type === 'image_group' || message.type === 'video') ? 'transparent' : bubbleBg,
+            backgroundColor: (message.type === 'image' || message.type === 'image_group' || message.type === 'video') ? 'transparent' : (message.type === 'call' && (JSON.parse(message.content || '{}').status === 'missed' && !message.fromMe) ? 'rgba(255, 59, 48, 0.1)' : bubbleBg),
             borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video') ? 0 : 1,
-            padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video') ? 0 : 12,
+            padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video') ? 0 : (message.type === 'call' ? 14 : 12),
             borderRadius: 18,
             marginBottom: isLastInGroup ? 0 : -8
           }, (message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video') ? animatedBorderStyle : {}]}>

@@ -106,6 +106,12 @@ export default function NotificationHandler() {
       (response: NotificationResponse) => {
         const data: any = response.notification.request.content.data;
         console.log('notification tapped data', data);
+
+        if (data?.type === 'call') {
+          console.log('Call notification tapped, letting CallProvider handle signaling');
+          // For now, navigating to the chat is a good fallback
+        }
+
         const convId = data?.conversationId;
         if (convId) {
           const params: any = { id: convId };
@@ -153,6 +159,13 @@ export default function NotificationHandler() {
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#FF231F7C',
         sound: 'notification', 
+      });
+      Notifications.setNotificationChannelAsync('call', {
+        name: 'Incoming calls',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 500, 500, 500, 500, 500],
+        lightColor: '#3B82F6',
+        // In a real app we might want a longer ringtone
       });
     }
 

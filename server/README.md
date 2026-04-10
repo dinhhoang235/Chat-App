@@ -9,7 +9,9 @@ Hệ thống Backend thời gian thực được tối ưu hóa cho hiệu năng
     *   **MySQL:** Lưu trữ dữ liệu chính (Users, Messages, Conversations).
     *   **Redis:** Caching tin nhắn và trạng thái online/offline theo thời gian thực.
 *   **ORM:** Prisma (Type-safe database client).
-*   **Realtime:** Socket.io (Hỗ trợ chat thời gian thực).
+*   **Realtime & Calling:** 
+    *   **Socket.io:** Hỗ trợ chat thời gian thực và WebRTC Signaling.
+    *   **CoTurn:** STUN/TURN Server giúp kết nối P2P xuyên qua NAT/Firewall.
 *   **Storage (🔥 New 2025):** 
     *   **MinIO v2025:** Object Storage chuẩn S3 để lưu trữ ảnh, video và file đính kèm.
     *   **Presigned URLs:** Cơ chế upload trực tiếp từ Mobile lên Storage để tiết kiệm 50% băng thông Server.
@@ -61,10 +63,11 @@ Hệ thống Backend thời gian thực được tối ưu hóa cho hiệu năng
 *   Validate quyền truy cập object theo `userId` (`objectName` phải thuộc user).
 *   Hỗ trợ lưu trữ đối tượng audio/voice message trong media conversation.
 
-### 6) Health & Observability
-
-*   `GET /health` kiểm tra trạng thái API + kết nối database.
-*   Log rõ ràng cho các bước upload multipart và push notification.
+### 7) Cuộc gọi Voice & Video (WebRTC)
+*   **Signaling Server:** Xử lý luồng báo hiệu (Signaling) cho cuộc gọi qua Socket.io.
+*   **Sự kiện hỗ trợ:** `call_invite`, `call_accept`, `call_reject`, `call_end`.
+*   **WebRTC P2P:** Hỗ trợ trao đổi `webrtc_offer`, `webrtc_answer` và `webrtc_ice_candidate`.
+*   **Trạng thái Camera:** Đồng bộ trạng thái bật/tắt camera (`camera_toggle`) giữa các bên trong cuộc gọi video.
 
 ## 📦 Yêu Cầu Hệ Thống
 
@@ -186,6 +189,11 @@ MYSQL_USER=chatuser
 MYSQL_PASSWORD=admin123
 MYSQL_PORT=3306
 REDIS_PORT=6379
+
+# CoTurn (WebRTC Infrastructure)
+TURN_EXTERNAL_IP=your-public-ip-or-localhost
+TURN_USERNAME=chatuser
+TURN_PASSWORD=chatpass
 ```
 
 ## 🛠️ Quản Trị Hệ Thống

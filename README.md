@@ -21,6 +21,8 @@
 - Upload file lớn (đến 100MB phía mobile) bằng MinIO Multipart Upload.
 - Thông báo đẩy trên mobile bằng Expo Notifications + Expo Server SDK.
 - Trạng thái online/offline và typing indicator.
+- Cuộc gọi thoại (Voice call) và gọi video (Video call) thời gian thực qua WebRTC.
+- Hỗ trợ hạ tầng truyền tải cuộc gọi bằng CoTurn (STUN/TURN).
 
 ## Công Nghệ Đã Dùng
 
@@ -40,6 +42,7 @@
 - Expo Video
 - Expo Image Manipulator
 - react-native-compressor
+- react-native-webrtc (WebRTC P2P)
 - React Native Reanimated
 - Axios
 
@@ -57,12 +60,14 @@
 - bcryptjs
 - Multer
 - Expo Server SDK
+- CoTurn (STUN/TURN Server)
 
 ### Hạ Tầng và Tích Hợp
 
 - Docker / Docker Compose cho môi trường backend
 - Nginx reverse proxy cho storage signature pass-through
 - Google Services / FCM cho thông báo đẩy trên Android
+- WebRTC Signaling qua Socket.IO
 
 ## Cấu Trúc Thư Mục
 
@@ -134,6 +139,11 @@ MYSQL_USER=chatuser
 MYSQL_PASSWORD=admin123
 MYSQL_PORT=3306
 REDIS_PORT=6379
+
+# CoTurn (WebRTC Infrastructure)
+TURN_EXTERNAL_IP=your-public-ip-or-localhost
+TURN_USERNAME=chatuser
+TURN_PASSWORD=chatpass
 ```
 
 ## Chạy Mobile
@@ -151,6 +161,11 @@ Tạo file `mobile/.env` hoặc sửa theo IP máy của bạn:
 ```env
 EXPO_PUBLIC_API_URL=http://<your-ip>:3000
 EXPO_PUBLIC_SOCKET_URL=http://<your-ip>:3000
+
+# WebRTC (Nếu dùng CoTurn riêng)
+EXPO_PUBLIC_TURN_HOST=<your-ip>
+EXPO_PUBLIC_TURN_USERNAME=chatuser
+EXPO_PUBLIC_TURN_PASSWORD=chatpass
 ```
 
 Nếu chạy trên máy thật, hãy dùng IP LAN của máy đang chạy backend thay vì `localhost`.
@@ -163,6 +178,7 @@ Nếu chạy trên máy thật, hãy dùng IP LAN của máy đang chạy backen
 4. Prisma kết nối MySQL để lưu user, cuộc trò chuyện, tin nhắn và quan hệ bạn bè.
 5. Redis dùng để cache tin nhắn và lưu trạng thái online/offline.
 6. Backend gửi push notification qua Expo Server SDK; mobile nhận bằng Expo Notifications.
+7. Cuộc gọi WebRTC: Socket.IO làm signaling truyền SDP/ICE; CoTurn hỗ trợ kết nối qua mạng phức tạp.
 
 ## Ghi Chú
 

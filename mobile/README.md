@@ -19,6 +19,11 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
   - Trình phát video tích hợp với thumbnail preview.
   - Hỗ trợ gửi các tệp tin tài liệu lên đến 100MB qua cơ chế **Multipart Upload**.
   - Tự động nén ảnh, nén video có điều kiện và xử lý dữ liệu trước khi tải lên.
+- **Cuộc gọi Voice & Video**:
+  - Hỗ trợ gọi thoại (Voice Call) và gọi video (Video Call) thời gian thực.
+  - Sử dụng giao thức **WebRTC** để kết nối P2P trực tiếp giữa hai thiết bị.
+  - Giao diện cuộc gọi chuyên nghiệp: hiển thị thời gian, trình điều khiển mic/loa/camera.
+  - Hỗ trợ thu nhỏ màn hình gọi (PIP) hoặc chạy nền khi đang gọi.
 - **Hệ thống Avatar thông minh**:
   - Tự động hiển thị tên viết tắt (Initials) với màu sắc ngẫu nhiên khi không có ảnh đại diện.
   - Avatar nhóm (Group Avatar) hiển thị lưới các thành viên.
@@ -47,6 +52,7 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 - **Media Gallery Enhanced**: Trang media hỗ trợ phân loại ảnh/video/file/link theo ngày.
 - **Chat Controls**: Bổ sung ghim chat, tắt thông báo, đánh dấu chưa đọc và tìm kiếm tin nhắn trong chat.
 - **QR Contact Flow**: Chia sẻ profile bằng QR và quét để mở nhanh trang người dùng.
+- **WebRTC Call Support**: Triển khai gọi thoại và gọi video thời gian thực với độ trễ thấp, tích hợp signaling qua Socket.io và hỗ trợ TURN server cho kết nối mạng phức tạp.
 
 ## 🛠 Công nghệ sử dụng
 
@@ -56,6 +62,7 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 - **Real-time**: [Socket.io Client](https://socket.io/)
 - **State Management**: React Context API & Hooks
 - **Media & Upload**: Expo Camera, Expo Image Picker, Expo Document Picker, Expo File System, **Expo Audio**, **Expo Video**, Expo Image Manipulator, react-native-compressor
+- **Real-time Communication**: **react-native-webrtc** (kết nối P2P cho voice/video call)
 - **Notifications**: Expo Notifications
 - **Animations**: React Native Reanimated & Gesture Handler
 

@@ -70,7 +70,9 @@ export default function ChatThread() {
     setReplyingTo,
     highlightedMessageId,
     scrollToMessageId,
-    uploadProgress
+    uploadProgress,
+    startVoiceCall,
+    startVideoCall
   } = useChatThread();
   
   // unified sheet control (gallery/composer) moved to hook
@@ -210,8 +212,8 @@ export default function ChatThread() {
               }
               onBackPress={() => router.back()}
               rightActions={[
-                { icon: 'call', onPress: () => console.log('Call pressed') },
-                { icon: 'videocam', onPress: () => console.log('Video call pressed') },
+                { icon: 'call', onPress: startVoiceCall },
+                { icon: 'videocam', onPress: startVideoCall },
                 {
                   icon: 'bars',
                   onPress: () => router.push({

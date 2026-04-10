@@ -66,7 +66,15 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
   }
 
   try {
-    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId;
+
+    console.log('[Push] Registering with projectId:', projectId);
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
     return tokenData.data;
   } catch (e: any) {
     if (e.message?.includes('FirebaseApp is not initialized')) {

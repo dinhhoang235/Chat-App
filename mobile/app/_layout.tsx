@@ -5,12 +5,14 @@ import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { NotificationHandler } from '@/components/';
+import { IncomingCallModal } from '@/components/call';
 import { AuthProvider, useAuth } from "@/context/authContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "@/context/themeContext";
 import { SelectionProvider } from "@/context/selectionContext";
 import { SearchProvider } from "@/context/searchContext";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import { CallProvider } from "@/context/callContext";
 
 function ThemeRoot() {
   const { scheme, colors } = useTheme();
@@ -28,11 +30,14 @@ function ThemeRoot() {
           <KeyboardProvider>
             <SelectionProvider>
               <AuthProvider>
-                <SearchProvider>
-                  {/* invisible component handles permissions and socket notifications */}
-                  <NotificationHandler />
-                  <AppStack />
-                </SearchProvider>
+                <CallProvider>
+                  <SearchProvider>
+                    {/* invisible component handles permissions and socket notifications */}
+                    <NotificationHandler />
+                    <IncomingCallModal />
+                    <AppStack />
+                  </SearchProvider>
+                </CallProvider>
               </AuthProvider>
             </SelectionProvider>
           </KeyboardProvider>

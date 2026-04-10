@@ -84,6 +84,71 @@ export const setupSocket = (io: Server) => {
       });
     });
 
+    // ─── WebRTC Call Signaling ────────────────────────────────
+
+    // Caller → Server: invite target user to call
+    socket.on('call_invite', ({ callId, conversationId, targetUserId, callType, callerName, callerAvatar }: any) => {
+      io.to(`user:${targetUserId}`).emit('incoming_call', {
+        callId,
+        conversationId,
+        callerId: socket.user?.userId,
+        callerName,
+        callerAvatar,
+        callType,
+      });
+      console.log(`[Call] ${socket.user?.userId} → ${targetUserId} (${callType}) callId=${callId}`);
+    });
+
+    // Callee → Server: accepted call
+    socket.on('call_accept', ({ callId, callerId }: any) => {
+      io.to(`user:${callerId}`).emit('call_accepted', {
+        callId,
+        accepterId: socket.user?.userId,
+      });
+    });
+
+    // Callee → Server: rejected call
+    socket.on('call_reject', ({ callId, callerId }: any) => {
+      io.to(`user:${callerId}`).emit('call_rejected', {
+        callId,
+        rejecterId: socket.user?.userId,
+      });
+    });
+
+    // Either side → Server: end active call
+    socket.on('call_end', ({ callId, targetUserId }: any) => {
+      io.to(`user:${targetUserId}`).emit('call_ended', { callId });
+    });
+
+    // Caller → Server → Callee: WebRTC offer SDP
+    socket.on('webrtc_offer', ({ callId, targetUserId, offer }: any) => {
+      io.to(`user:${targetUserId}`).emit('webrtc_offer', {
+        callId,
+        from: socket.user?.userId,
+        offer,
+      });
+    });
+
+    // Callee → Server → Caller: WebRTC answer SDP
+    socket.on('webrtc_answer', ({ callId, callerId, answer }: any) => {
+      io.to(`user:${callerId}`).emit('webrtc_answer', {
+        callId,
+        from: socket.user?.userId,
+        answer,
+      });
+    });
+
+    // Either side → Server → Other: ICE candidate
+    socket.on('webrtc_ice_candidate', ({ callId, targetUserId, candidate }: any) => {
+      io.to(`user:${targetUserId}`).emit('webrtc_ice_candidate', {
+        callId,
+        from: socket.user?.userId,
+        candidate,
+      });
+    });
+
+    // ─────────────────────────────────────────────────────────
+
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.user?.userId}`);
       if (socket.user) {

@@ -7,17 +7,14 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.mobile",
-      "notification": {
-        "icon": "./assets/images/icon.png"
-      }
+      "bundleIdentifier": "com.anonymous.mobile"
     },
     "android": {
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.diskordmes.app",
       "googleServicesFile": "./google-services.json",
@@ -28,13 +25,10 @@
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO",
         "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
         "POST_NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED"
-      ],
-      "notification": {
-        "icon": "./assets/images/notification-icon.png",
-        "color": "#ffffff"
-      }
+      ]
     },
     "web": {
       "output": "static"
@@ -59,7 +53,9 @@
         {
           "icon": "./assets/images/notification-icon.png",
           "color": "#ffffff",
-          "sounds": ["./assets/sounds/notification.mp3"],
+          "sounds": [
+            "./assets/sounds/notification.mp3"
+          ],
           "defaultChannel": "chat"
         }
       ],
@@ -90,7 +86,19 @@
             "com.google.android.googlequicksearchbox"
           ]
         }
-      ]
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Cho phép DiskordMes truy cập camera để thực hiện cuộc gọi video.",
+          "microphonePermission": "Cho phép DiskordMes truy cập microphone để thực hiện cuộc gọi thoại."
+        }
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-video",
+      "expo-web-browser",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,

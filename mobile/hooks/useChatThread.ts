@@ -19,6 +19,7 @@ import { useTyping } from './useTyping';
 import * as DocumentPicker from 'expo-document-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { prepareAttachmentForUpload } from '@/services/mediaUpload';
+import { useCall } from '@/context/callContext';
 
 export function useChatThread() {
   const { colors } = useTheme();
@@ -50,6 +51,9 @@ export function useChatThread() {
 
   const [groupDetails, setGroupDetails] = useState<any>(null);
   const [allMedia, setAllMedia] = useState<any[]>([]);
+  const allMediaRef = useRef<any[]>([]);
+  useEffect(() => { allMediaRef.current = allMedia; }, [allMedia]);
+
   const [loadingMoreMedia, setLoadingMoreMedia] = useState(false);
   const [hasMoreMedia, setHasMoreMedia] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -62,8 +66,8 @@ export function useChatThread() {
       if (isLoadMore) setLoadingMoreMedia(true);
 
       const cursor =
-        isLoadMore && allMedia.length > 0
-          ? allMedia[allMedia.length - 1].id
+        isLoadMore && allMediaRef.current.length > 0
+          ? allMediaRef.current[allMediaRef.current.length - 1].id
           : undefined;
 
       const response = await chatApi.getConversationMedia(id, cursor, 30);
@@ -102,7 +106,7 @@ export function useChatThread() {
     } finally {
       if (isLoadMore) setLoadingMoreMedia(false);
     }
-  }, [id, user?.id, hasMoreMedia, loadingMoreMedia, allMedia]);
+  }, [id, user?.id, hasMoreMedia, loadingMoreMedia]);
 
   const fetchGroupDetails = useCallback(async () => {
     if (!id || params.isGroup !== 'true') return;
@@ -188,13 +192,31 @@ export function useChatThread() {
     checkExisting();
   }, [isNewConversation, targetUserIdState, conversationId]);
 
-  // Reset state when conversation changes
-  useEffect(() => {
-    setInitialFetchDone(false);
-    setHasMore(true);
-    setMessages([]);
-    if (conversationId) setLoading(true);
-  }, [conversationId]);
+
+
+  const { startCall } = useCall();
+
+  const startVoiceCall = useCallback(() => {
+    if (isGroup || !targetUserIdState || !conversationId) return;
+    startCall({
+      conversationId: conversationId,
+      callType: 'voice',
+      remoteUserId: Number(targetUserIdState),
+      remoteName: paramName || targetUser?.fullName || 'User',
+      remoteAvatar: targetUser?.avatar || (params.avatar as string) || undefined,
+    });
+  }, [isGroup, targetUserIdState, conversationId, paramName, targetUser, params.avatar, startCall]);
+
+  const startVideoCall = useCallback(() => {
+    if (isGroup || !targetUserIdState || !conversationId) return;
+    startCall({
+      conversationId: conversationId,
+      callType: 'video',
+      remoteUserId: Number(targetUserIdState),
+      remoteName: paramName || targetUser?.fullName || 'User',
+      remoteAvatar: targetUser?.avatar || (params.avatar as string) || undefined,
+    });
+  }, [isGroup, targetUserIdState, conversationId, paramName, targetUser, params.avatar, startCall]);
 
   // keep global notification state in sync so we don't show a local notification
   // for the conversation the user is actively viewing
@@ -601,6 +623,18 @@ export function useChatThread() {
     }
   }, [conversationId, user?.id, hasMore, loadingMore, targetUserIdState, messagesRef]);
 
+  // Reset state when conversation changes
+  useEffect(() => {
+    setInitialFetchDone(false);
+    setHasMore(true);
+    setMessages([]);
+    if (conversationId) {
+      setLoading(true);
+      fetchMessages(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+
   useEffect(() => {
     if (!isFocused || !conversationId) return;
     if (initialFetchDone) return;
@@ -616,7 +650,8 @@ export function useChatThread() {
     chatApi.markAsRead(conversationIdNum).catch(err => {
       console.error('Mark as read focus error:', err);
     });
-  }, [conversationId, isFocused, fetchMessages, fetchAllMedia, initialFetchDone]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, isFocused, initialFetchDone]);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -744,8 +779,8 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
 
     return () => {
       if (conversationIdNum) socketService.emit('leave_conversation', conversationIdNum);
-      socketService.off('new_message');
-      socketService.off('message_seen');
+      socketService.off('new_message', handleNewMessage);
+      socketService.off('message_seen', handleMessageSeen);
       socketService.off('conversation_updated', handleConversationUpdated);
     };
   }, [conversationId, user?.id, isFocused, fetchMessages, fetchGroupDetails, isGroup]);
@@ -1247,6 +1282,8 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     setReplyingTo,
     highlightedMessageId,
     scrollToMessageId,
-    uploadProgress
+    uploadProgress,
+    startVoiceCall,
+    startVideoCall
   };
 }

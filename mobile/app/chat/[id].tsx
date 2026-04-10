@@ -6,7 +6,11 @@ import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 
 export default function ChatThread() {
+  const DEFAULT_COMPOSER_HEIGHT = 74;
   const [micTextMode, setMicTextMode] = React.useState(false);
+  const [micOutsideCloseLocked, setMicOutsideCloseLocked] = React.useState(false);
+  const [micVoiceFlowActive, setMicVoiceFlowActive] = React.useState(false);
+  const [composerHeight, setComposerHeight] = React.useState(DEFAULT_COMPOSER_HEIGHT);
   const {
     colors,
     params,
@@ -117,6 +121,15 @@ export default function ChatThread() {
     );
   }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId]);
 
+  const maybeCloseAll = React.useCallback(() => {
+    if (micOutsideCloseLocked) return;
+    closeAll();
+  }, [micOutsideCloseLocked, closeAll]);
+
+  const micSheetHeight = micVoiceFlowActive
+    ? Math.round(sheetHeight + composerHeight)
+    : sheetHeight;
+
   return (
     <View className="flex-1" style={{ backgroundColor: colors.surface, paddingTop: insets.top }}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -134,7 +147,7 @@ export default function ChatThread() {
               renderMode="header"
             />
           ) : (
-            <View onTouchStart={closeAll}>
+            <View onTouchStart={maybeCloseAll}>
               <Header
                 showBack
               leftElement={
@@ -229,7 +242,7 @@ export default function ChatThread() {
               ) : (
                 <View
                   style={{ flex: 1, marginBottom: 2 }}
-                  onTouchStart={closeAll}
+                  onTouchStart={maybeCloseAll}
                 >
                   <FlatList
                     ref={flatListRef}
@@ -310,32 +323,41 @@ export default function ChatThread() {
               )}
 
               {/* Composer: hidden when search mode is active */}
-              {!searchMode && (
-                <ChatComposer
-                  messageText={messageText}
-                  onTextChange={onTextChange}
-                  inputRef={inputRef}
-                  handleSend={handleSend}
-                  creatingConversation={creatingConversation}
-                  composerVisible={composerVisible}
-                  setComposerVisible={setComposerVisible}
-                  colors={colors}
-                  insets={insets}
-                  onOpenSheet={openSheet}
-                  micTextMode={micTextMode}
-                  imageActive={galleryVisible ? 'gallery' : (emojiVisible ? 'emoji' : (micVisible ? 'mic' : (composerVisible ? 'actions' : false)))}
-                  attachments={attachments}
-                  onRemoveAttachment={removeAttachment}
-                  onClearAttachments={clearAttachments}
-                  replyingTo={replyingTo}
-                  onCancelReply={() => setReplyingTo(null)}
-                  onFocus={() => {
-                    if (galleryVisible) setGalleryVisible(false);
-                    if (composerVisible) setComposerVisible(false);
-                    if (emojiVisible) setEmojiVisible(false);
-                    if (micVisible) setMicVisible(false);
+              {!searchMode && !micVoiceFlowActive && (
+                <View
+                  onLayout={(event) => {
+                    const nextHeight = Math.round(event.nativeEvent.layout.height || 0);
+                    if (nextHeight > 0 && Math.abs(nextHeight - composerHeight) > 1) {
+                      setComposerHeight(nextHeight);
+                    }
                   }}
-                />
+                >
+                  <ChatComposer
+                    messageText={messageText}
+                    onTextChange={onTextChange}
+                    inputRef={inputRef}
+                    handleSend={handleSend}
+                    creatingConversation={creatingConversation}
+                    composerVisible={composerVisible}
+                    setComposerVisible={setComposerVisible}
+                    colors={colors}
+                    insets={insets}
+                    onOpenSheet={openSheet}
+                    micTextMode={micTextMode}
+                    imageActive={galleryVisible ? 'gallery' : (emojiVisible ? 'emoji' : (micVisible ? 'mic' : (composerVisible ? 'actions' : false)))}
+                    attachments={attachments}
+                    onRemoveAttachment={removeAttachment}
+                    onClearAttachments={clearAttachments}
+                    replyingTo={replyingTo}
+                    onCancelReply={() => setReplyingTo(null)}
+                    onFocus={() => {
+                      if (galleryVisible) setGalleryVisible(false);
+                      if (composerVisible) setComposerVisible(false);
+                      if (emojiVisible) setEmojiVisible(false);
+                      if (micVisible) setMicVisible(false);
+                    }}
+                  />
+                </View>
               )}
           </Animated.View>
 
@@ -384,8 +406,10 @@ export default function ChatThread() {
             onClose={() => {
               setMicVisible(false);
             }}
+            onLockOutsideCloseChange={setMicOutsideCloseLocked}
+            onVoiceFlowChange={setMicVoiceFlowActive}
             textMode={micTextMode}
-            height={sheetHeight}
+            height={micSheetHeight}
             onSendAudio={async (file) => {
               await handleSendAttachment(file as any);
             }}

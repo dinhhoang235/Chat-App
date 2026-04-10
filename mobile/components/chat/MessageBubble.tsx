@@ -78,7 +78,7 @@ type ChatMessage = {
   seenBy?: { id: number; fullName?: string; avatar?: string }[];
   isLastInGroup?: boolean;
   status?: 'sending' | 'sent' | 'error';
-  fileInfo?: { url: string; name?: string; size?: number; mime?: string; thumbnailUrl?: string; duration?: number };
+  fileInfo?: { url: string; name?: string; size?: number; mime?: string; thumbnailUrl?: string; duration?: number; waveform?: number[] };
   images?: any[]; // for image_group
   replyTo?: any;
   progress?: number;
@@ -149,22 +149,29 @@ function AudioMessageBubble({
   url,
   duration,
   seedKey,
+  amplitudes,
   textColor,
   isSending,
 }: {
   url: string;
   duration?: number;
   seedKey: string;
+  amplitudes?: number[];
   textColor: string;
   isSending?: boolean;
 }) {
   const player = useAudioPlayer(url, { downloadFirst: true });
   const status = useAudioPlayerStatus(player);
   const [waveWidth, setWaveWidth] = useState(0);
-  const waveform = useMemo(
-    () => createSeededAmplitudes(`${seedKey}|${url}|${Math.round(duration || 0)}`),
-    [seedKey, url, duration]
-  );
+  const waveform = useMemo(() => {
+    if (Array.isArray(amplitudes) && amplitudes.length > 0) {
+      return amplitudes
+        .filter((value) => Number.isFinite(value))
+        .map((value) => Math.max(0, Math.min(1, value)));
+    }
+
+    return createSeededAmplitudes(`${seedKey}|${url}|${Math.round(duration || 0)}`);
+  }, [seedKey, url, duration, amplitudes]);
   const totalDuration = duration || status.duration || 0;
   const progress = totalDuration > 0 ? Math.min(1, status.currentTime / totalDuration) : 0;
   const shouldShowCurrentTime = status.playing || (status.currentTime > 0 && !status.didJustFinish);
@@ -677,6 +684,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         url={uri}
         duration={message.fileInfo.duration}
         seedKey={message.id}
+        amplitudes={message.fileInfo.waveform}
         textColor={textColor}
         isSending={message.status === 'sending'}
       />
@@ -690,6 +698,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
           url={uri}
           duration={message.fileInfo.duration}
           seedKey={message.id}
+          amplitudes={message.fileInfo.waveform}
           textColor={textColor}
           isSending={message.status === 'sending'}
         />

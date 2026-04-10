@@ -854,11 +854,13 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
   };
 
   const handleSendAttachment = async (
-    file: { uri: string; name: string; type: string; size?: number; duration?: number },
+    file: { uri: string; name: string; type: string; size?: number; duration?: number; waveform?: number[] },
     caption?: string
   ) => {
     if (!file) return;
     const MAX_ATTACHMENT_SIZE_BYTES = 100 * 1024 * 1024;
+    const DEFAULT_MULTIPART_THRESHOLD_BYTES = 5 * 1024 * 1024;
+    const AUDIO_MULTIPART_THRESHOLD_BYTES = 2 * 1024 * 1024;
 
     // Tăng giới hạn lên 100MB nhờ Chunked Upload
     if (file.size && file.size > MAX_ATTACHMENT_SIZE_BYTES) {
@@ -867,6 +869,14 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
     }
 
     const tempId = `temp-${Date.now()}`;
+    const clearUploadProgress = () => {
+      setUploadProgress(prev => {
+        if (!(tempId in prev)) return prev;
+        const next = { ...prev };
+        delete next[tempId];
+        return next;
+      });
+    };
     const replyToSnapshot = replyingTo;
     setReplyingTo(null);
 
@@ -889,7 +899,8 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       fileInfo: {
         url: uploadFileUri,
         size: uploadSize,
-        mime: file.type
+        mime: file.type,
+        waveform: file.waveform,
       }
     };
 
@@ -906,7 +917,10 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
           // Upload (Chunked if large)
           let finalUrl = '';
           let thumbnailUrl = '';
-          const isLargeFile = uploadSize && uploadSize > 5 * 1024 * 1024;
+          const multipartThreshold = file.type.startsWith('audio/')
+            ? AUDIO_MULTIPART_THRESHOLD_BYTES
+            : DEFAULT_MULTIPART_THRESHOLD_BYTES;
+          const isLargeFile = Boolean(uploadSize && uploadSize > multipartThreshold);
           const isVideo = file.type.startsWith('video/');
 
           // 1. Tạo thumbnail nếu là video
@@ -944,6 +958,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
             size: uploadSize,
             mime: file.type,
             duration: file.duration,
+            waveform: file.waveform,
             thumbnailUrl: thumbnailUrl || undefined
           };
 
@@ -975,10 +990,12 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
               setMessages([mappedMessage]);
             }
           }
+          clearUploadProgress();
           return;
         } catch (err) {
           console.error('Error creating conversation on attachment send:', err);
           setMessages([]);
+          clearUploadProgress();
           return;
         } finally {
           setCreatingConversation(false);
@@ -992,7 +1009,10 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
       let finalFileUrl = '';
       let thumbnailUrl = '';
       try {
-        const isLargeFile = uploadSize && uploadSize > 5 * 1024 * 1024;
+        const multipartThreshold = file.type.startsWith('audio/')
+          ? AUDIO_MULTIPART_THRESHOLD_BYTES
+          : DEFAULT_MULTIPART_THRESHOLD_BYTES;
+        const isLargeFile = Boolean(uploadSize && uploadSize > multipartThreshold);
         const isVideo = file.type.startsWith('video/');
 
         // 1. Tạo thumbnail nếu là video
@@ -1037,6 +1057,7 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         size: uploadSize,
         mime: file.type,
         duration: file.duration,
+        waveform: file.waveform,
         thumbnailUrl: thumbnailUrl || undefined
       };
 
@@ -1073,10 +1094,12 @@ const isDuplicate = prev.find(m => m.id?.toString() === message.id?.toString());
         }
         return prev;
       });
+      clearUploadProgress();
     } catch (err) {
       console.error('Attachment send error:', err);
       alert('Không thể gửi tệp, vui lòng thử lại');
       setMessages(prev => prev.filter(m => m.id !== tempId));
+      clearUploadProgress();
     }
   };
 

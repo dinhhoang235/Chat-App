@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions, Image } from 'react-native';
+import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions, Image, Platform, StatusBar } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import { GroupAvatar } from '@/components/avatars';
@@ -36,20 +36,22 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
   const { scheme, colors } = useTheme();
   const overlayColor = scheme === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.55)';
   const rowBg = colors.surface;
+  const statusBarOffset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0;
+  const anchorY = menuPos ? menuPos.y + statusBarOffset : 0;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={{ flex: 1, backgroundColor: overlayColor }} onPress={onClose}>
         {menuPos && message ? (
           <View
             style={{
               position: 'absolute',
               left: menuPos.x,
-              top: menuPos.y,
+              top: anchorY,
               width: menuPos.w,
-              borderRadius: 10,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
+              borderRadius: 8,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
               flexDirection: 'row',
               alignItems: 'center',
               backgroundColor: rowBg,
@@ -101,8 +103,8 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
             const menuW = Math.min(220, screenW - 48);
             const left = Math.max(8, Math.min(menuPos.x, screenW - menuW - 8));
             const spacing = 8;
-            const belowTop = menuPos.y + menuPos.h + spacing;
-            const aboveTop = menuPos.y - menuHeight - spacing;
+            const belowTop = anchorY + menuPos.h + spacing;
+            const aboveTop = anchorY - menuHeight - spacing;
 
             // Ưu tiên trên khi bottom của menu vượt quá màn hình
             const menuBottomIfBelow = belowTop + menuHeight;

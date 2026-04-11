@@ -101,19 +101,6 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
         className="px-4 py-3 flex-row items-center"
         style={selectionMode && (selected ? { backgroundColor: colors.surface, borderRadius: 8 } : { borderRadius: 8 })}
       >
-        <MenuModal
-          visible={menuVisible}
-          menuPos={menuPos}
-          onClose={() => setMenuVisible(false)}
-          onAction={(action) => handleAction(action)}
-          items={menuItems}
-          message={{
-            ...message,
-            groupAvatars: message.avatars,
-            isGroup: isGroupConversation,
-            membersCount: message.membersCount
-          } as any}
-        />
         {/* Left: checkbox + avatar in selection mode, otherwise avatar */}
         {selectionMode ? (
           <View style={{ width: 92, flexDirection: 'row', alignItems: 'center' }}>

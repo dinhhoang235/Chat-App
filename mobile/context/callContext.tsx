@@ -92,7 +92,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ringtonePlayer) return;
 
-    if (callStatus === 'incoming' || callStatus === 'calling') {
+    // Only play ringtone for incoming calls (receiver/callee)
+    if (callStatus === 'incoming') {
       ringtonePlayer.play();
     } else {
       ringtonePlayer.pause();

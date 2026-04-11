@@ -169,36 +169,43 @@ export default function NotificationHandler() {
 
   // cold start should only be handled once ever
   useEffect(() => {
-    if (coldHandled.current) return;
-    (async () => {
-      const lastResponse = await Notifications.getLastNotificationResponseAsync();
-      if (lastResponse) {
-        const data: any = lastResponse.notification.request.content.data;
-        console.log('cold start notification data', data);
-        const convId = data?.conversationId;
-        if (data?.type === 'call') {
-          if (!activeCall) {
-            setIncomingCall({
-              callId: data.callId,
-              conversationId: data.conversationId,
-              callType: data.callType || 'voice',
-              isOutgoing: false,
-              remoteUserId: data.callerId ? Number(data.callerId) : 0,
-              remoteName: data.callerName || 'Unknown',
-              remoteAvatar: data.callerAvatar,
-            });
-            setCallStatus('incoming');
+    if (user && !coldHandled.current) {
+      (async () => {
+        const lastResponse = await Notifications.getLastNotificationResponseAsync();
+        if (lastResponse) {
+          const data: any = lastResponse.notification.request.content.data;
+          console.log('cold start notification data', data);
+          const convId = data?.conversationId;
+          if (data?.type === 'call') {
+            const now = Date.now();
+            const sentAt = data.sentAt || 0;
+            const isStale = sentAt > 0 && now - sentAt > 45000; // 45 seconds
+
+            if (!activeCall && !isStale) {
+              setIncomingCall({
+                callId: data.callId,
+                conversationId: data.conversationId,
+                callType: data.callType || 'voice',
+                isOutgoing: false,
+                remoteUserId: data.callerId ? Number(data.callerId) : 0,
+                remoteName: data.callerName || 'Unknown',
+                remoteAvatar: data.callerAvatar,
+              });
+              setCallStatus('incoming');
+            } else {
+              console.log('[NotificationHandler] Ignoring stale/expired cold start call notification');
+            }
+          } else if (convId) {
+            const params: any = { id: convId };
+            if (data.isGroup) params.isGroup = 'true';
+            if (data.name) params.name = data.name;
+            router.push({ pathname: '/chat/[id]', params });
           }
-        } else if (convId) {
-          const params: any = { id: convId };
-          if (data.isGroup) params.isGroup = 'true';
-          if (data.name) params.name = data.name;
-          router.push({ pathname: '/chat/[id]', params });
         }
-      }
-      coldHandled.current = true;
-    })();
-  }, [router, activeCall, setCallStatus, setIncomingCall]);
+        coldHandled.current = true;
+      })();
+    }
+  }, [router, activeCall, setCallStatus, setIncomingCall, user]);
 
   // Setup: preload sound asset + create Android channel
   useEffect(() => {

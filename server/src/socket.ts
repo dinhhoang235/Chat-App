@@ -133,7 +133,8 @@ export const setupSocket = (io: Server) => {
                 callType,
                 callerName,
                 callerAvatar,
-                callerId: socket.user?.userId
+                callerId: socket.user?.userId,
+                sentAt: Date.now() // Add timestamp to detect stale calls on client
               },
               channelId: 'call',
               categoryId: 'call',

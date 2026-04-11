@@ -113,39 +113,6 @@ npm run dev
 
 Backend mặc định chạy ở `http://localhost:3000`.
 
-### Biến Môi Trường Backend
-
-Tạo file `server/.env` dựa trên `server/.env.example`.
-
-Các biến quan trọng:
-
-```env
-PORT=3000
-JWT_SECRET=your_secret
-
-DATABASE_URL="mysql://chatuser:admin123@localhost:3306/chat_app"
-
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_USE_SSL=false
-MINIO_ROOT_USER=admin
-MINIO_ROOT_PASSWORD=admin123
-MINIO_BUCKET=chatapp
-MINIO_REGION=us-east-1
-
-MYSQL_ROOT_PASSWORD=admin123
-MYSQL_DATABASE=chat_app
-MYSQL_USER=chatuser
-MYSQL_PASSWORD=admin123
-MYSQL_PORT=3306
-REDIS_PORT=6379
-
-# CoTurn (WebRTC Infrastructure)
-TURN_EXTERNAL_IP=your-public-ip-or-localhost
-TURN_USERNAME=chatuser
-TURN_PASSWORD=chatpass
-```
-
 ## Chạy Mobile
 
 ```bash
@@ -153,22 +120,6 @@ cd mobile
 npm install
 npx expo start
 ```
-
-### Biến Môi Trường Mobile
-
-Tạo file `mobile/.env` hoặc sửa theo IP máy của bạn:
-
-```env
-EXPO_PUBLIC_API_URL=http://<your-ip>:3000
-EXPO_PUBLIC_SOCKET_URL=http://<your-ip>:3000
-
-# WebRTC (Nếu dùng CoTurn riêng)
-EXPO_PUBLIC_TURN_HOST=<your-ip>
-EXPO_PUBLIC_TURN_USERNAME=chatuser
-EXPO_PUBLIC_TURN_PASSWORD=chatpass
-```
-
-Nếu chạy trên máy thật, hãy dùng IP LAN của máy đang chạy backend thay vì `localhost`.
 
 ## Luồng Hoạt Động
 

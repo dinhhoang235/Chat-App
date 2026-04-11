@@ -1,4 +1,4 @@
-import Expo, { ExpoPushMessage } from 'expo-server-sdk';
+import Expo from 'expo-server-sdk';
 
 const expo = new Expo();
 
@@ -8,10 +8,11 @@ export interface PushNotificationData {
   data?: any;
   sound?: string;
   channelId?: string;
+  categoryId?: string;
 }
 
 export const sendPushNotifications = async (tokens: string[], notification: PushNotificationData) => {
-  const messages: ExpoPushMessage[] = [];
+  const messages: any[] = []; // Using any to avoid strict type issues with categoryId if it's outdated in the SDK
   
   for (const token of tokens) {
     if (!token || !Expo.isExpoPushToken(token)) continue;
@@ -23,6 +24,7 @@ export const sendPushNotifications = async (tokens: string[], notification: Push
       body: notification.body,
       data: notification.data,
       channelId: notification.channelId || 'chat',
+      categoryId: notification.categoryId,
       priority: 'high',
     });
   }
@@ -44,6 +46,7 @@ export const sendPushNotifications = async (tokens: string[], notification: Push
 
 export const formatMessageNotification = (message: any) => {
   let bodyText = '';
+  let titleText = message.sender?.fullName || 'Tin nhắn mới';
   const type = message.type;
   const content = message.content;
 
@@ -63,19 +66,38 @@ export const formatMessageNotification = (message: any) => {
   } else if (type === 'call') {
     try {
       const info = typeof content === 'string' ? JSON.parse(content) : content;
+      const callTypeName = info.callType === 'video' ? 'video' : 'thoại';
+      
       if (info.status === 'missed' || info.status === 'no_answer') {
-        bodyText = `📞 Cuộc gọi lỡ (${info.callType === 'video' ? 'video' : 'thoại'})`;
+        titleText = 'Cuộc gọi lỡ';
+        bodyText = `Bạn có cuộc gọi lỡ ${callTypeName} từ ${message.sender?.fullName || 'ai đó'}`;
       } else if (info.status === 'rejected') {
-        bodyText = `📞 Cuộc gọi bị từ chối`;
+        titleText = 'Cuộc gọi bị từ chối';
+        bodyText = `${message.sender?.fullName || 'Người dùng'} đã từ chối cuộc gọi ${callTypeName}`;
       } else {
-        bodyText = `📞 Cuộc gọi đã kết thúc (${Math.floor(info.duration / 60)}:${(info.duration % 60).toString().padStart(2, '0')})`;
+        const minutes = Math.floor(info.duration / 60);
+        const seconds = (info.duration % 60).toString().padStart(2, '0');
+        titleText = 'Cuộc gọi đã kết thúc';
+        bodyText = `Cuộc gọi ${callTypeName} kéo dài ${minutes}:${seconds}`;
       }
     } catch {
-      bodyText = '📞 Cuộc gọi';
+      titleText = 'Thông tin cuộc gọi';
+      bodyText = 'Cập nhật cuộc gọi';
     }
+    
+    // Skip the group prefix logic for calls as they are usually private or have their own format
+    return {
+      title: titleText,
+      body: bodyText,
+      data: {
+        conversationId: message.conversationId,
+        isGroup: message.conversation?.isGroup || false,
+        name: message.conversation?.name || '',
+        type: message.type
+      }
+    };
   }
 
-  let titleText = message.sender?.fullName || 'Tin nhắn mới';
   if (message.conversation?.isGroup) {
     titleText = `Nhóm ${message.conversation.name || ''}`.trim();
     const senderName = message.sender?.fullName || 'Ai đó';

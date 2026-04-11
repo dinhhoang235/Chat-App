@@ -50,11 +50,15 @@ export default function VideoCallScreen() {
       webrtcService.cleanup();
       setTimeout(() => {
         if (router.canGoBack()) {
-          router.back();
+          try {
+            router.back();
+          } catch {
+            router.replace('/(tabs)');
+          }
         } else {
           router.replace('/(tabs)');
         }
-      }, 400);
+      }, 500);
     }
   }, [callStatus, router]);
 
@@ -63,7 +67,11 @@ export default function VideoCallScreen() {
     endCall();
     webrtcService.cleanup();
     if (router.canGoBack()) {
-      router.back();
+      try {
+        router.back();
+      } catch {
+        router.replace('/(tabs)');
+      }
     } else {
       router.replace('/(tabs)');
     }

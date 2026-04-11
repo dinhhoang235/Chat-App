@@ -88,7 +88,7 @@ export const setupSocket = (io: Server) => {
     // ─── WebRTC Call Signaling ────────────────────────────────
 
     // Caller → Server: invite target user to call
-    socket.on('call_invite', ({ callId, conversationId, targetUserId, callType, callerName, callerAvatar }: any) => {
+    socket.on('call_invite', async ({ callId, conversationId, targetUserId, callType, callerName, callerAvatar }: any) => {
       console.log(`[Call] Invite: ${socket.user?.userId} → ${targetUserId} (callId: ${callId})`);
       
       // Store call info in Redis for tracking duration and state
@@ -101,8 +101,12 @@ export const setupSocket = (io: Server) => {
         invitationTime: Date.now(),
       }).catch(err => console.error('[Call] Redis set error:', err));
 
-      const room = `user:${targetUserId}`;
-      io.to(room).emit('incoming_call', {
+      // Check if target user is online in socket
+      const targetRoom = `user:${targetUserId}`;
+      const targetSockets = await io.in(targetRoom).fetchSockets();
+      const isOnline = targetSockets.length > 0;
+
+      io.to(targetRoom).emit('incoming_call', {
         callId,
         conversationId,
         callerId: socket.user?.userId,
@@ -111,36 +115,33 @@ export const setupSocket = (io: Server) => {
         callType,
       });
       
-      // Send push notification to target user ONLY if they are not currently connected via socket
-      io.in(room).fetchSockets().then(sockets => {
-        console.log(`[Call] Emitted to ${room}, participants connected: ${sockets.length}`);
-        
-        if (sockets.length === 0) {
-          prisma.user.findUnique({
-            where: { id: Number(targetUserId) },
-            select: { pushToken: true }
-          }).then(targetUser => {
-            if (targetUser?.pushToken) {
-              sendPushNotifications([targetUser.pushToken], {
-                title: callerName || 'Cuộc gọi đến',
-                body: `Bạn có cuộc gọi ${callType === 'video' ? 'video' : 'thoại'} từ ${callerName || 'ai đó'}`,
-                data: {
-                  type: 'call',
-                  callId,
-                  conversationId,
-                  callType,
-                  callerName,
-                  callerAvatar
-                },
-                channelId: 'call',
-                sound: 'notification.mp3'
-              }).catch(err => console.error('[Call] Push error:', err));
-            }
-          }).catch(err => console.error('[Call] Db fetch error:', err));
-        } else {
-          console.log(`[Call] Skipping push notification for ${targetUserId} as they are online via socket`);
-        }
-      });
+      // Only send push notification if user is NOT online
+      // If they are online, the app will handle showing the UI/local notification via socket
+      if (!isOnline) {
+        prisma.user.findUnique({
+          where: { id: Number(targetUserId) },
+          select: { pushToken: true }
+        }).then(targetUser => {
+          if (targetUser?.pushToken) {
+            sendPushNotifications([targetUser.pushToken], {
+              title: `Cuộc gọi ${callType === 'video' ? 'video' : 'thoại'} đến`,
+              body: `${callerName || 'Ai đó'} đang gọi cho bạn...`,
+              data: {
+                type: 'call',
+                callId,
+                conversationId,
+                callType,
+                callerName,
+                callerAvatar,
+                callerId: socket.user?.userId
+              },
+              channelId: 'call',
+              categoryId: 'call',
+              sound: 'notification.mp3'
+            }).catch(err => console.error('[Call] Push error:', err));
+          }
+        }).catch(err => console.error('[Call] Db fetch error:', err));
+      }
     });
 
     // Callee → Server: accepted call

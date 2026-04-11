@@ -73,12 +73,17 @@ export default function CallScreen() {
     if (callStatus === 'ended') {
       webrtcService.cleanup();
       setTimeout(() => {
+        // Safe navigation logic
         if (router.canGoBack()) {
-          router.back();
+          try {
+            router.back();
+          } catch {
+            router.replace('/(tabs)');
+          }
         } else {
           router.replace('/(tabs)');
         }
-      }, 400);
+      }, 500);
     }
   }, [callStatus, router]);
 
@@ -87,7 +92,11 @@ export default function CallScreen() {
     endCall();
     webrtcService.cleanup();
     if (router.canGoBack()) {
-      router.back();
+      try {
+        router.back();
+      } catch {
+        router.replace('/(tabs)');
+      }
     } else {
       router.replace('/(tabs)');
     }

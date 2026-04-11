@@ -6,9 +6,11 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { AppState, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { socketService } from '@/services/socket';
 import { useAuth } from './authContext';
+import * as Notifications from 'expo-notifications';
 
 export type CallType = 'voice' | 'video';
 
@@ -45,6 +47,7 @@ interface CallContextType {
   rejectCall: () => void;
   endCall: () => void;
   setCallStatus: React.Dispatch<React.SetStateAction<CallStatus>>;
+  setIncomingCall: (info: CallInfo | null) => void;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -58,10 +61,27 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [incomingCall, setIncomingCall] = useState<CallInfo | null>(null);
   const [activeCall, setActiveCall] = useState<CallInfo | null>(null);
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
+  const [currentAppState, setCurrentAppState] = useState(AppState.currentState);
+  const [callDuration, setCallDuration] = useState(0);
 
   // Ref to avoid stale closure in socket handlers
   const activeCallRef = useRef<CallInfo | null>(null);
   activeCallRef.current = activeCall;
+
+  // Timer for active call
+  useEffect(() => {
+    let interval: any;
+    if (callStatus === 'active') {
+      const startTime = Date.now();
+      setCallDuration(0);
+      interval = setInterval(() => {
+        setCallDuration(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    } else {
+      setCallDuration(0);
+    }
+    return () => clearInterval(interval);
+  }, [callStatus]);
 
   useEffect(() => {
     const handleIncomingCall = (data: any) => {
@@ -99,10 +119,29 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     socketService.on('call_rejected', handleCallRejected);
     socketService.on('call_ended', handleCallEnded);
 
+    // Foreground notification behavior - show banners even when app is active for calls
+    Notifications.setNotificationHandler({
+      handleNotification: async (notification: any) => {
+        // If it's a call-related notification, we might want to show it even in foreground
+        // Note: 'active-call-persistent' is our local sticky notif
+        return {
+          shouldShowBanner: true,
+          shouldShowList: true,
+          shouldPlaySound: false, // We handle sound via our own logic/incoming call screen
+          shouldSetBadge: false,
+        };
+      },
+    });
+
+    const sub = AppState.addEventListener('change', nextState => {
+      setCurrentAppState(nextState);
+    });
+
     return () => {
       socketService.off('incoming_call', handleIncomingCall);
       socketService.off('call_rejected', handleCallRejected);
       socketService.off('call_ended', handleCallEnded);
+      sub.remove();
     };
   }, []);
 
@@ -149,6 +188,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setIncomingCall(null);
     setCallStatus('connecting');
 
+    // Notify server that we accepted
+    socketService.emit('call_accept', {
+      callId: call.callId,
+      callerId: call.remoteUserId,
+    });
+
     if (call.callType === 'video') {
       router.replace('/videoCall' as any);
     } else {
@@ -178,6 +223,63 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setCallStatus('ended');
   }, [activeCall, incomingCall]);
 
+  // Handle persistent notification for active/incoming calls
+  useEffect(() => {
+    const NOTIF_ID = 'active-call-persistent';
+
+    if (callStatus === 'idle' || callStatus === 'ended') {
+      Notifications.dismissNotificationAsync(NOTIF_ID).catch(() => {});
+      return;
+    }
+
+    const currentCall = activeCall || incomingCall;
+    if (!currentCall) return;
+
+    const formatTime = (secs: number) => {
+      const mins = Math.floor(secs / 60);
+      const s = secs % 60;
+      return `${mins}:${s.toString().padStart(2, '0')}`;
+    };
+
+    let title = 'Cuộc gọi';
+    let body = `${currentCall.remoteName} đang gọi...`;
+
+    if (callStatus === 'active') {
+      title = `Đang trong cuộc gọi với ${currentCall.remoteName} (${formatTime(callDuration)})`;
+      body = ''; 
+    } else if (callStatus === 'calling' || callStatus === 'incoming') {
+      title = `Cuộc gọi ${currentCall.callType === 'video' ? 'video' : 'thoại'} đến`;
+      body = `${currentCall.remoteName} đang gọi cho bạn...`;
+    }
+
+    Notifications.scheduleNotificationAsync({
+      identifier: NOTIF_ID,
+      content: {
+        title,
+        body,
+        data: {
+          type: 'call',
+          callId: currentCall.callId,
+          conversationId: currentCall.conversationId,
+          callType: currentCall.callType,
+          callerName: currentCall.remoteName,
+          callerAvatar: currentCall.remoteAvatar,
+          callerId: currentCall.remoteUserId,
+        },
+        sticky: true,
+        autoDismiss: false,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        ...(Platform.OS === 'android' && {
+          android: {
+            channelId: 'call',
+            sticky: true,
+          },
+        }),
+      },
+      trigger: null,
+    }).catch((err: any) => console.error('Failed to schedule local call notification:', err));
+  }, [callStatus, activeCall, incomingCall, currentAppState, callDuration]);
+
   return (
     <CallContext.Provider
       value={{
@@ -189,6 +291,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         rejectCall,
         endCall,
         setCallStatus,
+        setIncomingCall,
       }}
     >
       {children}

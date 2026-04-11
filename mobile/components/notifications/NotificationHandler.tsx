@@ -8,12 +8,31 @@ import { socketService } from '@/services/socket';
 import { activeConversationId } from '@/services/notificationState';
 import { useAuth } from '@/context/authContext';
 import { userAPI } from '@/services/user';
+import { useCall } from '@/context/callContext';
 import { useRouter } from 'expo-router';
+
+// Register notification categories at the top level for reliability
+Notifications.setNotificationCategoryAsync('call', [
+  {
+    identifier: 'accept',
+    buttonTitle: 'Chấp nhận',
+    options: { opensAppToForeground: true },
+  },
+  {
+    identifier: 'reject',
+    buttonTitle: 'Từ chối',
+    options: { isDestructive: true, opensAppToForeground: false },
+  },
+], {
+  allowInCarPlay: true,
+  allowAnnouncement: true,
+}).catch((err: any) => console.error('Category registration error:', err));
 
 // minimal response type used locally to avoid export issues
 interface NotificationResponse {
   notification: {
     request: {
+      identifier: string;
       content: {
         data?: any;
       };
@@ -34,12 +53,11 @@ interface IncomingMessage {
   conversation?: { isGroup?: boolean; name?: string };
 }
 
-// foreground notification behavior
+// foreground notification behavior - hide system banners when app is active
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
+    shouldShowBanner: false,
+    shouldPlaySound: false,
     shouldSetBadge: false,
   }),
 });
@@ -97,6 +115,7 @@ export default function NotificationHandler() {
   const { user } = useAuth();
   const appState = useRef(AppState.currentState);
   const router = useRouter();
+  const { setIncomingCall, setCallStatus, activeCall } = useCall();
 
   // when a notification is tapped we want to navigate to the related chat
   const coldHandled = useRef(false);
@@ -108,8 +127,31 @@ export default function NotificationHandler() {
         console.log('notification tapped data', data);
 
         if (data?.type === 'call') {
-          console.log('Call notification tapped, letting CallProvider handle signaling');
-          // For now, navigating to the chat is a good fallback
+          console.log('Call notification action:', response.actionIdentifier);
+          
+          const callInfo = {
+            callId: data.callId,
+            conversationId: data.conversationId,
+            callType: data.callType || 'voice',
+            isOutgoing: false,
+            remoteUserId: data.callerId ? Number(data.callerId) : 0,
+            remoteName: data.callerName || 'Unknown',
+            remoteAvatar: data.callerAvatar,
+          };
+
+          if (response.actionIdentifier === 'accept') {
+            setIncomingCall(callInfo);
+            setCallStatus('incoming');
+          } else if (response.actionIdentifier === 'reject') {
+             // Handle reject locally if needed
+          } else {
+            // Standard tap (not a button)
+            if (!activeCall) {
+              setIncomingCall(callInfo);
+              setCallStatus('incoming');
+            }
+          }
+          return;
         }
 
         const convId = data?.conversationId;
@@ -123,7 +165,7 @@ export default function NotificationHandler() {
     );
 
     return () => subscription.remove();
-  }, [router]);
+  }, [router, activeCall, setCallStatus, setIncomingCall]);
 
   // cold start should only be handled once ever
   useEffect(() => {
@@ -134,7 +176,20 @@ export default function NotificationHandler() {
         const data: any = lastResponse.notification.request.content.data;
         console.log('cold start notification data', data);
         const convId = data?.conversationId;
-        if (convId) {
+        if (data?.type === 'call') {
+          if (!activeCall) {
+            setIncomingCall({
+              callId: data.callId,
+              conversationId: data.conversationId,
+              callType: data.callType || 'voice',
+              isOutgoing: false,
+              remoteUserId: data.callerId ? Number(data.callerId) : 0,
+              remoteName: data.callerName || 'Unknown',
+              remoteAvatar: data.callerAvatar,
+            });
+            setCallStatus('incoming');
+          }
+        } else if (convId) {
           const params: any = { id: convId };
           if (data.isGroup) params.isGroup = 'true';
           if (data.name) params.name = data.name;
@@ -143,7 +198,7 @@ export default function NotificationHandler() {
       }
       coldHandled.current = true;
     })();
-  }, [router]);
+  }, [router, activeCall, setCallStatus, setIncomingCall]);
 
   // Setup: preload sound asset + create Android channel
   useEffect(() => {
@@ -165,7 +220,6 @@ export default function NotificationHandler() {
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 500, 500, 500, 500, 500],
         lightColor: '#3B82F6',
-        // In a real app we might want a longer ringtone
       });
     }
 

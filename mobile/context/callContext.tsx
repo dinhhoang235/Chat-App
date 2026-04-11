@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { socketService } from '@/services/socket';
 import { useAuth } from './authContext';
 import * as Notifications from 'expo-notifications';
+import { useAudioPlayer } from 'expo-audio';
 
 export type CallType = 'voice' | 'video';
 
@@ -64,6 +65,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [currentAppState, setCurrentAppState] = useState(AppState.currentState);
   const [callDuration, setCallDuration] = useState(0);
 
+  // Audio player for ringtone
+  const ringtonePlayer = useAudioPlayer(require('@/assets/sounds/ringtone.mp3'));
+  ringtonePlayer.loop = true;
+
   // Ref to avoid stale closure in socket handlers
   const activeCallRef = useRef<CallInfo | null>(null);
   activeCallRef.current = activeCall;
@@ -82,6 +87,18 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
     return () => clearInterval(interval);
   }, [callStatus]);
+
+  // Handle ringtone playback
+  useEffect(() => {
+    if (!ringtonePlayer) return;
+
+    if (callStatus === 'incoming' || callStatus === 'calling') {
+      ringtonePlayer.play();
+    } else {
+      ringtonePlayer.pause();
+      ringtonePlayer.seekTo(0);
+    }
+  }, [callStatus, ringtonePlayer]);
 
   useEffect(() => {
     const handleIncomingCall = (data: any) => {
@@ -122,12 +139,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     // Foreground notification behavior - show banners even when app is active for calls
     Notifications.setNotificationHandler({
       handleNotification: async (notification: any) => {
-        // If it's a call-related notification, we might want to show it even in foreground
-        // Note: 'active-call-persistent' is our local sticky notif
+        // Mute notification sound if it's a call related notification to avoid clashing with ringtone
+        const isCall = notification.request.content.data?.type === 'call' || 
+                      notification.request.content.categoryIdentifier === 'call';
+        
         return {
           shouldShowBanner: true,
           shouldShowList: true,
-          shouldPlaySound: false, // We handle sound via our own logic/incoming call screen
+          shouldPlaySound: !isCall, // Only play sound if NOT a call
           shouldSetBadge: false,
         };
       },
@@ -268,11 +287,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         },
         sticky: true,
         autoDismiss: false,
+        sound: null, // Fully disable sound for local call notifications
         priority: Notifications.AndroidNotificationPriority.MAX,
         ...(Platform.OS === 'android' && {
           android: {
             channelId: 'call',
             sticky: true,
+            sound: null, // Null is more explicit for disabling sound
           },
         }),
       },

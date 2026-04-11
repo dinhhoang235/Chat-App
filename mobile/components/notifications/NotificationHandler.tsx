@@ -217,9 +217,10 @@ export default function NotificationHandler() {
       });
       Notifications.setNotificationChannelAsync('call', {
         name: 'Incoming calls',
-        importance: Notifications.AndroidImportance.MAX,
+        importance: Notifications.AndroidImportance.HIGH, // High instead of MAX to potentially avoid intrusive sound
         vibrationPattern: [0, 500, 500, 500, 500, 500],
         lightColor: '#3B82F6',
+        sound: null, // Explicitly disable sound for the call channel
       });
     }
 

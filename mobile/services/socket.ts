@@ -58,12 +58,20 @@ class SocketService {
     return this.socket;
   }
 
-  emit(event: string, data: any) {
+  emit(event: string, data: any, callback?: (response: any) => void) {
     if (this.socket?.connected) {
-      this.socket.emit(event, data);
+      if (callback) {
+        this.socket.emit(event, data, callback);
+      } else {
+        this.socket.emit(event, data);
+      }
     } else {
       this.emitQueue.push({ event, data });
       if (!this.socket) this.connect();
+      if (callback) {
+        // If socket isn't connected yet, queue an immediate callback failure
+        setTimeout(() => callback({ error: 'Socket not connected' }), 0);
+      }
     }
   }
 

@@ -235,7 +235,7 @@ function AudioMessageBubble({
   );
 }
 
-export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void }) {
+export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -733,11 +733,22 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       console.error('Error parsing call data', e);
     }
 
-    const isMissed = callData.status === 'missed' || callData.status === 'rejected' || callData.status === 'no_answer';
     const isVideo = callData.callType === 'video';
+    const isGroupCall = Boolean(
+      callData.isGroupCall ||
+      (Array.isArray(callData.groupTargets) && callData.groupTargets.length > 1) ||
+      (Array.isArray(callData.targetUserIds) && callData.targetUserIds.length > 1)
+    );
+    const isStarted = callData.status === 'started';
+    const isMissed = callData.status === 'missed' || callData.status === 'rejected' || callData.status === 'no_answer';
+    const isEndedGroupCall = isGroupCall && (isMissed || callData.status === 'completed');
 
     let label = '';
-    if (callData.status === 'missed' || callData.status === 'no_answer') {
+    if (isStarted && isGroupCall) {
+      label = 'Cuộc gọi nhóm';
+    } else if (isEndedGroupCall) {
+      label = 'Cuộc gọi nhóm đã kết thúc';
+    } else if (callData.status === 'missed' || callData.status === 'no_answer') {
       label = message.fromMe ? 'Bạn đã hủy' : 'Cuộc gọi lỡ';
     } else if (callData.status === 'rejected') {
       label = 'Cuộc gọi bị từ chối';
@@ -751,6 +762,19 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     const iconColor = isOutgoing ? '#FFFFFF' : (isMissed ? '#FF3B30' : colors.tint);
     const iconBg = isOutgoing ? 'rgba(255,255,255,0.18)' : (isMissed ? 'rgba(255, 59, 48, 0.08)' : 'rgba(0, 122, 255, 0.08)');
     const subTextColor = isOutgoing ? 'rgba(255,255,255,0.7)' : colors.textSecondary;
+
+    if (isEndedGroupCall) {
+      return (
+        <View className="w-full items-center my-2">
+          <View style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.surfaceVariant, maxWidth: '84%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="video" size={16} color={colors.tint} style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: '600', textAlign: 'center' }}>
+              {label}
+            </Text>
+          </View>
+        </View>
+      );
+    }
 
     contentElement = (
       <View style={{ paddingVertical: 2, minWidth: 180 }}>
@@ -785,7 +809,17 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
         </View>
 
         <TouchableOpacity 
-          onPress={() => isVideo ? onVideoCall?.() : onVoiceCall?.()}
+          onPress={() => {
+            if (isGroupCall) {
+              onCallAction?.(message, callData);
+            } else {
+              if (isVideo) {
+                onVideoCall?.();
+              } else {
+                onVoiceCall?.();
+              }
+            }
+          }}
           style={{ 
             borderTopWidth: 1, 
             borderTopColor: isOutgoing ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)',
@@ -801,7 +835,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
             fontSize: 12,
             letterSpacing: 0.3
           }}>
-            GỌI LẠI
+            {isGroupCall ? 'THAM GIA' : 'GỌI LẠI'}
           </Text>
         </TouchableOpacity>
       </View>

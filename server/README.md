@@ -194,6 +194,11 @@ REDIS_PORT=6379
 TURN_EXTERNAL_IP=your-public-ip-or-localhost
 TURN_USERNAME=chatuser
 TURN_PASSWORD=chatpass
+
+# LiveKit (Self-hosted via Docker)
+LIVEKIT_URL=http://localhost:7880
+LIVEKIT_API_KEY=livekit
+LIVEKIT_API_SECRET=livekit_secret
 ```
 
 ## 🛠️ Quản Trị Hệ Thống

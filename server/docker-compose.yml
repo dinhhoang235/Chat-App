@@ -99,6 +99,33 @@ services:
       timeout: 5s
       retries: 5
 
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: chat-livekit
+    ports:
+      - "7880:7880"
+      - "3479:3479"
+      - "3479:3479/udp"
+      - "5348:5348"
+      - "5348:5348/udp"
+    restart: unless-stopped
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+      LIVEKIT_TURN_ENABLED: "${LIVEKIT_TURN_ENABLED}"
+      LIVEKIT_TURN_UDP_PORT: "${LIVEKIT_TURN_UDP_PORT}"
+      LIVEKIT_TURN_TLS_PORT: "${LIVEKIT_TURN_TLS_PORT}"
+      LIVEKIT_TURN_RELAY_RANGE_START: "${LIVEKIT_TURN_RELAY_RANGE_START}"
+      LIVEKIT_TURN_RELAY_RANGE_END: "${LIVEKIT_TURN_RELAY_RANGE_END}"
+      LIVEKIT_TURN_DOMAIN: "${LIVEKIT_TURN_DOMAIN}"
+      LIVEKIT_TURN_EXTERNAL_TLS: "${LIVEKIT_TURN_EXTERNAL_TLS}"
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7880/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   coturn:
     image: coturn/coturn:latest
     container_name: chat-coturn

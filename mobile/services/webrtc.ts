@@ -4,7 +4,7 @@ import {
   RTCIceCandidate,
   MediaStream,
   mediaDevices,
-} from 'react-native-webrtc';
+} from '@livekit/react-native-webrtc';
 
 export type CallType = 'voice' | 'video';
 

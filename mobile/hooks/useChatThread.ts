@@ -16,9 +16,14 @@ import { useChatThreadSendText } from './useChatThread/useChatThreadSendText';
 import { useChatThreadState } from './useChatThread/useChatThreadState';
 import { useChatThreadSearch } from './useChatThread/useChatThreadSearch';
 import { useChatThreadRuntime } from './useChatThread/useChatThreadRuntime';
+import { useChatThreadGroupCall } from './useChatThread/useChatThreadGroupCall';
 import { buildProcessedMessages } from '@/utils/chatThread';
 
-export function useChatThread() {
+type UseChatThreadOptions = {
+  openGroupVideoCallModal?: () => void;
+};
+
+export function useChatThread(options?: UseChatThreadOptions) {
   const { colors } = useTheme();
   const { user } = useAuth();
   const params = useLocalSearchParams();
@@ -130,7 +135,7 @@ export function useChatThread() {
     });
 
   const { startCall } = useCall();
-  const { startVoiceCall, startVideoCall } = useChatThreadCalls({
+  const { startVoiceCall, startVideoCall, startVideoCallToTarget, startGroupVideoCall } = useChatThreadCalls({
     isGroupParam: params.isGroup as string | undefined,
     targetUserIdState,
     conversationId,
@@ -138,6 +143,10 @@ export function useChatThread() {
     targetUser,
     paramAvatar: params.avatar as string | undefined,
     startCall,
+  });
+  const { handleGroupVideoHeaderPress } = useChatThreadGroupCall({
+    conversationId: id,
+    openGroupVideoCallModal: options?.openGroupVideoCallModal ?? (() => {}),
   });
 
   const processedMessages = useMemo(
@@ -300,5 +309,8 @@ export function useChatThread() {
     uploadProgress,
     startVoiceCall,
     startVideoCall,
+    startVideoCallToTarget,
+    startGroupVideoCall,
+    handleGroupVideoHeaderPress,
   };
 }

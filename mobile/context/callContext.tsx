@@ -9,29 +9,18 @@ import React, {
 import { AppState, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { socketService } from '@/services/socket';
+import { groupCallService } from '@/services/groupCall';
 import { useAuth } from './authContext';
 import * as Notifications from 'expo-notifications';
 import { useAudioPlayer } from 'expo-audio';
+import { 
+  CallStatus, 
+  CallType, 
+  CallTarget, 
+  CallInfo 
+} from '@/types/call';
 
-export type CallType = 'voice' | 'video';
-
-export type CallStatus =
-  | 'idle'
-  | 'incoming'
-  | 'calling'    // outgoing, waiting for accept
-  | 'connecting' // accepted, WebRTC negotiating
-  | 'active'
-  | 'ended';
-
-export interface CallInfo {
-  callId: string;
-  conversationId: number | string;
-  callType: CallType;
-  isOutgoing: boolean;
-  remoteUserId: number;
-  remoteName: string;
-  remoteAvatar?: string;
-}
+export type { CallType, CallStatus, CallTarget, CallInfo };
 
 interface CallContextType {
   incomingCall: CallInfo | null;
@@ -40,12 +29,15 @@ interface CallContextType {
   startCall: (params: {
     conversationId: number | string;
     callType: CallType;
-    remoteUserId: number;
-    remoteName: string;
+    remoteUserId?: number;
+    remoteName?: string;
     remoteAvatar?: string;
-  }) => void;
+    targetUsers?: CallTarget[];
+  }) => Promise<void>;
   acceptCall: () => void;
+  joinCall: (incoming: CallInfo) => void;
   rejectCall: () => void;
+  joinExistingGroupCall: (conversationId: number | string) => Promise<boolean>;
   endCall: () => void;
   setCallStatus: React.Dispatch<React.SetStateAction<CallStatus>>;
   setIncomingCall: (info: CallInfo | null) => void;
@@ -72,6 +64,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // Ref to avoid stale closure in socket handlers
   const activeCallRef = useRef<CallInfo | null>(null);
   activeCallRef.current = activeCall;
+  const incomingCallRef = useRef<CallInfo | null>(null);
+  incomingCallRef.current = incomingCall;
 
   // Timer for active call
   useEffect(() => {
@@ -101,6 +95,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   }, [callStatus, ringtonePlayer]);
 
+  const queryActiveCall = useCallback(
+    async (conversationId: number | string) =>
+      new Promise<any>((resolve) => {
+        socketService.emit('query_active_call', { conversationId }, (response: any) => {
+          resolve(response);
+        });
+      }),
+    [],
+  );
+
   useEffect(() => {
     const handleIncomingCall = (data: any) => {
       console.log('Incoming call received:', data.callId, 'from:', data.callerId);
@@ -109,6 +113,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         console.log('Incoming call ignored: active call in progress');
         return;
       }
+      const incomingGroupTargets: CallTarget[] | undefined = Array.isArray(data.groupTargets)
+        ? data.groupTargets
+        : Array.isArray(data.groupTargets?.groupTargets)
+        ? data.groupTargets.groupTargets
+        : undefined;
+
       const info: CallInfo = {
         callId: data.callId,
         conversationId: data.conversationId,
@@ -117,25 +127,92 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         remoteUserId: data.callerId,
         remoteName: data.callerName || 'Unknown',
         remoteAvatar: data.callerAvatar,
+        groupTargets: incomingGroupTargets,
       };
       setIncomingCall(info);
       setCallStatus('incoming');
     };
 
-    const handleCallRejected = () => {
-      setActiveCall(null);
-      setCallStatus('ended');
+    const handleCallRejected = (data: any) => {
+      if (data?.final) {
+        setActiveCall(null);
+        setCallStatus('ended');
+      } else {
+        console.log('[Call] One invite rejected, still waiting for others', data);
+      }
     };
 
-    const handleCallEnded = () => {
+    const handleCallEnded = (data: any) => {
+      if (activeCallRef.current && data?.callId && data.callId !== activeCallRef.current.callId) {
+        return;
+      }
       setActiveCall(null);
       setIncomingCall(null);
       setCallStatus('ended');
     };
 
+    const handleParticipantJoined = (data: any) => {
+      console.log('[Call] Participant joined:', data);
+      if (activeCallRef.current && data.callId === activeCallRef.current.callId) {
+        setActiveCall(prev => {
+          if (!prev) return null;
+          // You might want to fetch user details here if not in groupTargets
+          // For now, we just ensure they are in targetUserIds
+          const invitedIds = new Set(prev.targetUserIds || []);
+          invitedIds.add(Number(data.userId));
+          
+          const groupTargets = [...(prev.groupTargets || [])];
+          const existingIdx = groupTargets.findIndex(t => Number(t.userId) === Number(data.userId));
+          if (existingIdx > -1) {
+             groupTargets[existingIdx] = {
+               ...groupTargets[existingIdx],
+               fullName: data.fullName || groupTargets[existingIdx].fullName,
+               avatar: data.avatar || groupTargets[existingIdx].avatar,
+             };
+          } else {
+             groupTargets.push({
+               userId: Number(data.userId),
+               fullName: data.fullName,
+               avatar: data.avatar,
+             });
+          }
+
+          return {
+            ...prev,
+            targetUserIds: Array.from(invitedIds),
+            groupTargets,
+          };
+        });
+      }
+    };
+
+    const handleParticipantLeft = (data: any) => {
+      console.log('[Call] Participant left:', data);
+      if (activeCallRef.current && data.callId === activeCallRef.current.callId) {
+        if (data.userId === Number(user?.id)) {
+           // Self left
+           setActiveCall(null);
+           setCallStatus('ended');
+        } else {
+           // Someone else left
+           setActiveCall(prev => {
+             if (!prev) return null;
+             const invitedIds = new Set(prev.targetUserIds || []);
+             invitedIds.delete(Number(data.userId));
+             return {
+               ...prev,
+               targetUserIds: Array.from(invitedIds)
+             };
+           });
+        }
+      }
+    };
+
     socketService.on('incoming_call', handleIncomingCall);
     socketService.on('call_rejected', handleCallRejected);
     socketService.on('call_ended', handleCallEnded);
+    socketService.on('participant_joined', handleParticipantJoined);
+    socketService.on('participant_left', handleParticipantLeft);
 
     // Foreground notification behavior - show banners even when app is active for calls
     Notifications.setNotificationHandler({
@@ -161,44 +238,98 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       socketService.off('incoming_call', handleIncomingCall);
       socketService.off('call_rejected', handleCallRejected);
       socketService.off('call_ended', handleCallEnded);
+      socketService.off('participant_joined', handleParticipantJoined);
+      socketService.off('participant_left', handleParticipantLeft);
       sub.remove();
     };
-  }, []);
+  }, [user?.id]);
 
   const startCall = useCallback(
-    (params: {
+    async (params: {
       conversationId: number | string;
       callType: CallType;
-      remoteUserId: number;
-      remoteName: string;
+      remoteUserId?: number;
+      remoteName?: string;
       remoteAvatar?: string;
+      targetUsers?: CallTarget[];
     }) => {
       if (!user) return;
-      const callId = generateCallId();
+
+      const initialGroupTargets = params.targetUsers?.map((target) => ({
+        userId: Number(target.userId),
+        fullName: target.fullName,
+        avatar: target.avatar,
+      }));
+
+      let callId = generateCallId();
+      let groupTargets = initialGroupTargets;
+      let useExistingCall = false;
+      let existingCallInfo: any = null;
+
+      if (params.callType === 'video' && Array.isArray(initialGroupTargets) && initialGroupTargets.length > 1) {
+        const response = await queryActiveCall(params.conversationId);
+        if (response?.callId && response?.callInfo) {
+          const activeCallInfo = response.callInfo;
+          const isGroupVideoCall = activeCallInfo.callType === 'video' && (activeCallInfo.invitedUserIds?.length ?? 0) > 1;
+          if (isGroupVideoCall) {
+            useExistingCall = true;
+            callId = response.callId;
+            existingCallInfo = activeCallInfo;
+            groupTargets = activeCallInfo.groupTargets ?? initialGroupTargets;
+            console.log('[Call] Joining existing active group call:', callId);
+          }
+        }
+      }
+
+      const firstTarget = initialGroupTargets?.[0];
+      const remoteUserId = params.remoteUserId ?? firstTarget?.userId;
+      const remoteName = params.remoteName || firstTarget?.fullName || 'User';
+      const remoteAvatar = params.remoteAvatar || firstTarget?.avatar || undefined;
+
       const call: CallInfo = {
         callId,
         isOutgoing: true,
-        ...params,
+        conversationId: params.conversationId,
+        callType: params.callType,
+        remoteUserId,
+        remoteName,
+        remoteAvatar,
+        targetUserIds: groupTargets?.map((target) => Number(target.userId)),
+        groupTargets,
       };
       setActiveCall(call);
-      setCallStatus('calling');
+      setCallStatus(useExistingCall ? 'connecting' : 'calling');
 
-      socketService.emit('call_invite', {
-        callId,
-        conversationId: params.conversationId,
-        targetUserId: params.remoteUserId,
-        callType: params.callType,
-        callerName: user.fullName,
-        callerAvatar: user.avatar || '',
-      });
+      let inviteTargets = initialGroupTargets?.length ? initialGroupTargets : [{ userId: Number(remoteUserId), fullName: remoteName, avatar: remoteAvatar }];
+      if (useExistingCall && existingCallInfo?.invitedUserIds?.length) {
+        const existingIds = new Set(existingCallInfo.invitedUserIds.map((id: number) => Number(id)));
+        inviteTargets = inviteTargets.filter((target) => !existingIds.has(Number(target.userId)));
+      }
 
-      if (params.callType === 'video') {
+      if (inviteTargets.length > 0) {
+        inviteTargets.forEach((target) => {
+          socketService.emit('call_invite', {
+            callId,
+            conversationId: params.conversationId,
+            targetUserId: target.userId,
+            callType: params.callType,
+            callerName: user.fullName,
+            callerAvatar: user.avatar || '',
+            groupTargets: inviteTargets,
+          });
+        });
+      }
+
+      const isGroupCall = Boolean(groupTargets?.length && groupTargets.length > 1);
+      if (isGroupCall) {
+        router.replace('/groupCall' as any);
+      } else if (params.callType === 'video') {
         router.replace('/videoCall' as any);
       } else {
         router.replace('/call' as any);
       }
     },
-    [user, router],
+    [user, router, queryActiveCall],
   );
 
   const acceptCall = useCallback(() => {
@@ -212,14 +343,81 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     socketService.emit('call_accept', {
       callId: call.callId,
       callerId: call.remoteUserId,
+      accepterName: user?.fullName,
+      accepterAvatar: user?.avatar,
     });
 
-    if (call.callType === 'video') {
+    const isGroupCall = Boolean(call.groupTargets?.length && call.groupTargets.length > 1);
+    if (isGroupCall) {
+      router.replace('/groupCall' as any);
+    } else if (call.callType === 'video') {
       router.replace('/videoCall' as any);
     } else {
       router.replace('/call' as any);
     }
-  }, [incomingCall, router]);
+  }, [incomingCall, router, user?.fullName, user?.avatar]);
+
+  const joinCall = useCallback((incoming: CallInfo) => {
+    if (!incoming) return;
+    const call: CallInfo = { ...incoming };
+    setActiveCall(call);
+    setIncomingCall(null);
+    setCallStatus('connecting');
+
+    socketService.emit('call_accept', {
+      callId: call.callId,
+      callerId: call.remoteUserId,
+      accepterName: user?.fullName,
+      accepterAvatar: user?.avatar,
+    });
+
+    const isGroupCall = Boolean(call.groupTargets?.length && call.groupTargets.length > 1);
+    if (isGroupCall) {
+      router.replace('/groupCall' as any);
+    } else if (call.callType === 'video') {
+      router.replace('/videoCall' as any);
+    } else {
+      router.replace('/call' as any);
+    }
+  }, [router, user?.fullName, user?.avatar]);
+
+  const joinExistingGroupCall = useCallback(
+    async (conversationId: number | string) => {
+      if (!conversationId) return false;
+
+      const response = await new Promise<any>((resolve) => {
+        socketService.emit('query_active_call', { conversationId }, (res: any) => {
+          resolve(res);
+        });
+      });
+
+      if (!response?.callId || !response?.callInfo) {
+        return false;
+      }
+
+      const callInfo = response.callInfo;
+      const isGroupVideoCall = callInfo.callType === 'video' && (callInfo.invitedUserIds?.length ?? 0) > 1;
+      if (!isGroupVideoCall) {
+        return false;
+      }
+
+      const incomingCallInfo: CallInfo = {
+        callId: response.callId,
+        conversationId,
+        callType: 'video',
+        isOutgoing: false,
+        remoteUserId: callInfo.callerId,
+        remoteName: callInfo.callerName || 'Cuộc gọi nhóm',
+        remoteAvatar: callInfo.callerAvatar,
+        groupTargets: callInfo.groupTargets,
+        targetUserIds: callInfo.invitedUserIds,
+      };
+
+      joinCall(incomingCallInfo);
+      return true;
+    },
+    [joinCall],
+  );
 
   const rejectCall = useCallback(() => {
     if (!incomingCall) return;
@@ -242,6 +440,20 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setIncomingCall(null);
     setCallStatus('ended');
   }, [activeCall, incomingCall]);
+
+  useEffect(() => {
+    return () => {
+      const call = activeCallRef.current || incomingCallRef.current;
+      if (call) {
+        socketService.emit('call_end', {
+          callId: call.callId,
+          targetUserId: call.remoteUserId,
+        });
+      }
+      groupCallService.leave();
+      socketService.disconnect();
+    };
+  }, []);
 
   // Handle persistent notification for active/incoming calls
   useEffect(() => {
@@ -310,6 +522,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         callStatus,
         startCall,
         acceptCall,
+        joinCall,
+        joinExistingGroupCall,
         rejectCall,
         endCall,
         setCallStatus,

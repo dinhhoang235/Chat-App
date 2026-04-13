@@ -12,7 +12,15 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.mobile"
+      "bundleIdentifier": "com.anonymous.mobile",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio",
+          "voip",
+          "fetch",
+          "remote-notification"
+        ]
+      }
     },
     "android": {
       "predictiveBackGestureEnabled": false,

@@ -137,6 +137,7 @@ export default function NotificationHandler() {
             remoteUserId: data.callerId ? Number(data.callerId) : 0,
             remoteName: data.callerName || 'Unknown',
             remoteAvatar: data.callerAvatar,
+            groupTargets: data.groupTargets,
           };
 
           if (response.actionIdentifier === 'accept') {
@@ -190,6 +191,7 @@ export default function NotificationHandler() {
                 remoteUserId: data.callerId ? Number(data.callerId) : 0,
                 remoteName: data.callerName || 'Unknown',
                 remoteAvatar: data.callerAvatar,
+                groupTargets: data.groupTargets,
               });
               setCallStatus('incoming');
             } else {

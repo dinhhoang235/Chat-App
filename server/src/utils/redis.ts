@@ -148,3 +148,35 @@ export const deleteCallInfo = async (callId: string) => {
     console.error('Redis Delete Call Info Error:', err);
   }
 };
+
+const CONVERSATION_CALL_KEY_PREFIX = 'conversation_call:';
+
+export const setConversationCallId = async (conversationId: number | string, callId: string) => {
+  try {
+    const key = `${CONVERSATION_CALL_KEY_PREFIX}${conversationId}`;
+    await redisClient.set(key, callId, {
+      EX: 3600,
+    });
+  } catch (err) {
+    console.error('Redis Set Conversation Call Id Error:', err);
+  }
+};
+
+export const getConversationCallId = async (conversationId: number | string) => {
+  try {
+    const key = `${CONVERSATION_CALL_KEY_PREFIX}${conversationId}`;
+    return await redisClient.get(key);
+  } catch (err) {
+    console.error('Redis Get Conversation Call Id Error:', err);
+    return null;
+  }
+};
+
+export const deleteConversationCallId = async (conversationId: number | string) => {
+  try {
+    const key = `${CONVERSATION_CALL_KEY_PREFIX}${conversationId}`;
+    await redisClient.del(key);
+  } catch (err) {
+    console.error('Redis Delete Conversation Call Id Error:', err);
+  }
+};

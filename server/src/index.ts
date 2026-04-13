@@ -6,6 +6,7 @@ import { Server } from 'socket.io';
 import prisma from './db.js';
 import userRoutes from './routes/users.js';
 import storageRoutes from './routes/storage.js';
+import livekitRoutes from './routes/livekit.js';
 import { chatRoutes } from './routes/chats.js';
 import { setupSocket } from './socket.js';
 import { connectRedis } from './utils/redis.js';
@@ -57,6 +58,7 @@ app.get('/health', async (_req, res) => {
 // Routes (multer applied per route)
 app.use('/api/users', userRoutes);
 app.use('/api/storage', storageRoutes);
+app.use('/api/livekit', livekitRoutes);
 app.use('/api/chats', chatRoutes(io));
 
 // Start server

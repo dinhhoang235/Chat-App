@@ -76,13 +76,26 @@ export function useConversations() {
             const info = typeof lastMsg.content === 'string' ? JSON.parse(lastMsg.content) : lastMsg.content;
             const isVideo = info.callType === 'video';
             const typeLabel = isVideo ? 'video' : 'thoại';
-            
-            if (!isFromMe && (info.status === 'missed' || info.status === 'no_answer')) {
-              lastMessageText = '[Cuộc gọi lỡ]';
+            const endedStatuses = ['missed', 'rejected', 'no_answer', 'completed'];
+            const isGroupCall = conv.isGroup || Array.isArray(info.groupTargets) && info.groupTargets.length > 1;
+
+            if (isGroupCall) {
+              if (info.status === 'started') {
+                lastMessageText = 'Cuộc gọi nhóm đang diễn ra';
+              } else if (endedStatuses.includes(info.status)) {
+                lastMessageText = 'Cuộc gọi nhóm đã kết thúc';
+              } else {
+                const prefix = isFromMe ? 'Bạn: ' : '';
+                lastMessageText = `${prefix}[Cuộc gọi ${typeLabel}]`;
+              }
             } else {
-              const direction = isFromMe ? 'đi' : 'đến';
-              const prefix = isFromMe ? 'Bạn: ' : '';
-              lastMessageText = `${prefix}[Cuộc gọi ${typeLabel} ${direction}]`;
+              if (!isFromMe && (info.status === 'missed' || info.status === 'no_answer')) {
+                lastMessageText = '[Cuộc gọi lỡ]';
+              } else {
+                const direction = isFromMe ? 'đi' : 'đến';
+                const prefix = isFromMe ? 'Bạn: ' : '';
+                lastMessageText = `${prefix}[Cuộc gọi ${typeLabel} ${direction}]`;
+              }
             }
           } catch {
             lastMessageText = isFromMe ? 'Bạn: [Cuộc gọi]' : '[Cuộc gọi]';

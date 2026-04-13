@@ -61,8 +61,15 @@ export function IncomingCallModal() {
   if (!incomingCall) return null;
 
   const isVideo = incomingCall.callType === 'video';
+  const groupCount = incomingCall.groupTargets?.length ?? incomingCall.targetUserIds?.length ?? 0;
+  const isGroupVideo = isVideo && groupCount > 1;
   const avatarUrl = getAvatarUrl(incomingCall.remoteAvatar);
   const initials = getInitials(incomingCall.remoteName);
+  const callLabel = isVideo
+    ? isGroupVideo
+      ? 'Cuộc gọi video nhóm'
+      : 'Cuộc gọi video đến'
+    : 'Cuộc gọi thoại đến';
 
   return (
     <Modal
@@ -116,8 +123,8 @@ export function IncomingCallModal() {
           <Text className="text-white text-[32px] font-bold mb-2" numberOfLines={1}>
             {incomingCall.remoteName}
           </Text>
-          <Text className="text-white/80 text-base">
-            DiskordMes: {isVideo ? 'Cuộc gọi video đến' : 'Cuộc gọi thoại đến'}
+            <Text className="text-white/80 text-base">
+            DiskordMes: {callLabel}
           </Text>
         </View>
 
@@ -153,7 +160,7 @@ export function IncomingCallModal() {
                 shadowRadius: 6,
                 elevation: 10,
               }}
-              onPress={acceptCall}
+              onPress={() => acceptCall()}
               activeOpacity={0.8}
             >
               <Ionicons name={isVideo ? 'videocam' : 'call'} size={32} color="#fff" />

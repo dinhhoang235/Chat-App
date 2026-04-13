@@ -8,7 +8,7 @@ import {
   Alert,
   Image
 } from 'react-native';
-import { RTCView } from 'react-native-webrtc';
+import { RTCView } from '@livekit/react-native-webrtc';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
@@ -28,7 +28,6 @@ export default function VideoCallScreen() {
   const [remoteStreamURL, setRemoteStreamURL] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isRemoteCameraOn, setIsRemoteCameraOn] = useState(true);
   const [duration, setDuration] = useState(0);
 
   // Keep stable refs so socket callbacks never see stale values
@@ -101,9 +100,6 @@ export default function VideoCallScreen() {
 
     const onCameraToggle = ({ userId, enabled }: { userId: number, enabled: boolean }) => {
       console.log('[Socket] Received camera_toggle', enabled, 'from', userId);
-      if (userId === activeCallRef.current?.remoteUserId) {
-        setIsRemoteCameraOn(enabled);
-      }
     };
 
     socketService.on('webrtc_answer', onAnswer);
@@ -121,16 +117,18 @@ export default function VideoCallScreen() {
     if (!activeCall) return;
     let mounted = true;
 
-    const onAccepted = async ({ callId }: any) => {
-      console.log('[Socket] Received call_accepted for', callId);
+    const onAccepted = async ({ callId, accepterId }: any) => {
+      console.log('[Socket] Received call_accepted for', callId, 'from', accepterId);
       if (!mounted) return;
       if (callId !== activeCallRef.current?.callId) return;
+      const targetUserId = accepterId ?? activeCallRef.current?.remoteUserId;
+      if (!targetUserId) return;
       try {
         const offer = await webrtcService.createOffer();
         console.log('[WebRTC] Created offer, emitting...');
         socketService.emit('webrtc_offer', {
           callId,
-          targetUserId: activeCallRef.current?.remoteUserId,
+          targetUserId,
           offer,
         });
         setCallStatus('connecting');
@@ -274,11 +272,6 @@ export default function VideoCallScreen() {
 
   if (!activeCall) return null;
 
-  // Background is remote if we have it, otherwise local (full screen camera when calling)
-  const bgStreamURL = remoteStreamURL || localStreamURL;
-  // Local stream is only PIP if we are seeing remote
-  const pipStreamURL = remoteStreamURL ? localStreamURL : null;
-
   // ─────────────────────── RENDER ───────────────────────────────
   return (
     <View className="flex-1 bg-black">
@@ -288,20 +281,16 @@ export default function VideoCallScreen() {
       <View className={`absolute inset-0 ${(!remoteStreamURL && !isCameraOn) ? 'bg-[#1E40AF]' : 'bg-black'}`} />
 
       {/* ── Background Video Layer ── */}
-      {bgStreamURL && (
-        (bgStreamURL === localStreamURL && isCameraOn) || 
-        (bgStreamURL === remoteStreamURL && isRemoteCameraOn)
-      ) && (
+      {remoteStreamURL || localStreamURL ? (
         <RTCView
-          key={`bg-${bgStreamURL}`}
-          streamURL={bgStreamURL}
+          key={`bg-${remoteStreamURL || localStreamURL}`}
+          streamURL={remoteStreamURL || localStreamURL!}
           style={StyleSheet.absoluteFill}
           objectFit="cover"
           zOrder={0}
           mirror={!remoteStreamURL}
         />
-      )}
-
+      ) : null}
 
       {/* ── Top Header ── */}
       <View className="absolute top-0 left-0 right-0 px-4 flex-row items-center justify-between" style={{ paddingTop: insets.top + 6 }}>
@@ -347,30 +336,6 @@ export default function VideoCallScreen() {
           >
             {statusLabel()}
           </Text>
-        </View>
-      )}
-
-      {/* ── Floating Local Video Tile ── */}
-      {pipStreamURL && (
-        <View 
-          key="pip-container"
-          className="absolute right-4 w-[110px] h-[160px] rounded-2xl overflow-hidden border-2 border-white/30 bg-[#1E40AF] z-10 shadow-lg" 
-          style={{ top: insets.top + 80 }}
-        >
-          {isCameraOn ? (
-            <RTCView
-              key={`pip-${pipStreamURL}`}
-              streamURL={pipStreamURL}
-              style={StyleSheet.absoluteFill}
-              objectFit="cover"
-              zOrder={1}
-              mirror
-            />
-          ) : (
-            <View className="absolute inset-0 items-center justify-center">
-              <Ionicons name="videocam-off" size={28} color="#fff" />
-            </View>
-          )}
         </View>
       )}
 

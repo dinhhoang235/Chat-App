@@ -1,15 +1,19 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer } from '@/components';
+import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
+import { useGroupCallAction } from '@/hooks/useGroupCallAction';
+import { useCall } from '@/context/callContext';
+import { socketService } from '@/services/socket';
 
 export default function ChatThread() {
   const DEFAULT_COMPOSER_HEIGHT = 74;
   const [micTextMode, setMicTextMode] = React.useState(false);
   const [micOutsideCloseLocked, setMicOutsideCloseLocked] = React.useState(false);
   const [micVoiceFlowActive, setMicVoiceFlowActive] = React.useState(false);
+  const [groupVideoCallVisible, setGroupVideoCallVisible] = React.useState(false);
   const [composerHeight, setComposerHeight] = React.useState(DEFAULT_COMPOSER_HEIGHT);
   const {
     colors,
@@ -73,9 +77,64 @@ export default function ChatThread() {
     uploadProgress,
     startVoiceCall,
     startVideoCall,
+    startGroupVideoCall,
+    handleGroupVideoHeaderPress,
     allMedia
-  } = useChatThread();
-  
+  } = useChatThread({
+    openGroupVideoCallModal: React.useCallback(() => {
+      setGroupVideoCallVisible(true);
+    }, []),
+  });
+  const { activeCall, callStatus } = useCall();
+  const [remoteActiveGroupCall, setRemoteActiveGroupCall] = React.useState(false);
+
+  const activeCallConversationId = activeCall?.conversationId;
+  const activeCallGroupSize =
+    (activeCall?.groupTargets?.length ?? 0) ||
+    (activeCall?.targetUserIds?.length ?? 0);
+  const isActiveGroupCall = Boolean(
+    (activeCallConversationId != null &&
+      String(activeCallConversationId) === String(id) &&
+      activeCall?.callType === 'video' &&
+      activeCallGroupSize > 1 &&
+      callStatus !== 'ended') || remoteActiveGroupCall
+  );
+
+  const handleCallAction = useGroupCallAction(() => setGroupVideoCallVisible(true));
+
+  React.useEffect(() => {
+    let mounted = true;
+    const checkGroupCall = async () => {
+      if (!isGroup || !id) {
+        if (mounted) setRemoteActiveGroupCall(false);
+        return;
+      }
+
+      try {
+        const response = await new Promise<any>((resolve) => {
+          socketService.emit('query_active_call', { conversationId: id }, (res: any) => {
+            resolve(res);
+          });
+        });
+        const info = response?.callInfo;
+        const isRemoteActive = Boolean(
+          info?.callType === 'video' &&
+          (info?.invitedUserIds?.length ?? 0) > 1 &&
+          response?.callId
+        );
+        if (mounted) setRemoteActiveGroupCall(isRemoteActive);
+      } catch {
+        if (mounted) setRemoteActiveGroupCall(false);
+      }
+    };
+
+    checkGroupCall();
+
+    return () => {
+      mounted = false;
+    };
+  }, [id, isGroup]);
+
   // unified sheet control (gallery/composer) moved to hook
   const { openSheet, closeAll, sheetHeight } = useSheetControl(
     inputRef,
@@ -123,9 +182,10 @@ export default function ChatThread() {
         allMedia={allMedia}
         onVoiceCall={startVoiceCall}
         onVideoCall={startVideoCall}
+        onCallAction={handleCallAction}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall]);
+  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
@@ -215,7 +275,26 @@ export default function ChatThread() {
                 </TouchableOpacity>
               }
               onBackPress={() => router.back()}
-              rightActions={[
+              rightActions={isGroup ? [
+                { icon: 'video', onPress: handleGroupVideoHeaderPress, active: isActiveGroupCall },
+                { icon: 'search', onPress: () => setSearchMode(true) },
+                {
+                  icon: 'bars',
+                  onPress: () => router.push({
+                    pathname: '/chat/[id]/options',
+                    params: {
+                      id,
+                      name: paramName || targetUser?.fullName,
+                      avatar: targetUser?.avatar || params.avatar,
+                      targetUserId: targetUserId,
+                      status: targetUserStatus?.status,
+                      isGroup: isGroup ? 'true' : 'false',
+                      membersCount: membersCount,
+                      avatars: Array.isArray(groupAvatars) ? groupAvatars.join(',') : groupAvatars
+                    }
+                  } as any)
+                },
+              ] : [
                 { icon: 'call-outline', onPress: startVoiceCall },
                 { icon: 'video', onPress: startVideoCall },
                 {
@@ -237,6 +316,17 @@ export default function ChatThread() {
               ]}
             />
             </View>
+          )}
+
+          {isGroup && id && (
+            <GroupVideoCallModal
+              visible={groupVideoCallVisible}
+              conversationId={id}
+              onClose={() => setGroupVideoCallVisible(false)}
+              onStart={(selectedMembers) => {
+                startGroupVideoCall(selectedMembers);
+              }}
+            />
           )}
 
           {/* Wrapper for messages and composer that pushes up with keyboard */}

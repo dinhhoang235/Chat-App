@@ -21,12 +21,51 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
   - Tự động nén ảnh, nén video có điều kiện và xử lý dữ liệu trước khi tải lên.
 - **Cuộc gọi Voice & Video**:
   - Hỗ trợ gọi thoại (Voice Call) và gọi video (Video Call) thời gian thực.
-  - Sử dụng giao thức **WebRTC** để kết nối P2P trực tiếp giữa hai thiết bị.
+  - Sử dụng giao thức **WebRTC** để kết nối P2P trực tiếp giữa hai thiết bị trong cuộc gọi 1-1.
   - Giao diện cuộc gọi chuyên nghiệp: hiển thị thời gian, trình điều khiển mic/loa/camera.
   - Hỗ trợ thu nhỏ màn hình gọi (PIP) hoặc chạy nền khi đang gọi.
+  - Hỗ trợ cuộc gọi nhóm voice/video đa người, dùng LiveKit để quản lý room, publish/subscribe nhiều luồng audio/video, hiển thị danh sách người tham gia và đồng bộ trạng thái mic/camera.
 - **Hệ thống Avatar thông minh**:
   - Tự động hiển thị tên viết tắt (Initials) với màu sắc ngẫu nhiên khi không có ảnh đại diện.
   - Avatar nhóm (Group Avatar) hiển thị lưới các thành viên.
+
+## 📞 Cuộc gọi nhóm vs Cuộc gọi 1-1
+
+| Tiêu chí                      | Cuộc gọi 1-1                        | Cuộc gọi nhóm                                     |
+| ----------------------------- | ----------------------------------- | ------------------------------------------------- |
+| Signaling                     | Socket.io trực tiếp giữa hai client | Socket.io + LiveKit room quản lý đa người         |
+| Media transport               | P2P WebRTC giữa hai thiết bị        | LiveKit publish/subscribe nhiều luồng audio/video |
+| Room model                    | Không cần room riêng                | Room LiveKit theo `callId`                        |
+| Token LiveKit                 | Không cần                           | Cần token từ `/api/livekit/token`                 |
+| Số lượng người tham gia       | 2 người                             | Nhiều người                                       |
+| Rời cuộc gọi                  | Rời thì kết thúc                    | Rời vẫn tiếp tục nếu còn >= 2 người               |
+| Đồng bộ trạng thái mic/camera | Qua signaling                       | Qua LiveKit + socket events                       |
+| Hỗ trợ TURN                   | Có                                  | Có                                                |
+
+- **Cuộc gọi 1-1** sử dụng `webrtcService` và Socket.io để xử lý signaling, tạo kết nối trực tiếp P2P giữa hai client bằng `webrtc_offer`, `webrtc_answer` và `webrtc_ice_candidate`.
+- **Cuộc gọi nhóm** dùng `groupCallService` với LiveKit room, lấy token qua endpoint `/api/livekit/token`, publish/subscribe nhiều luồng audio/video và đồng bộ trạng thái tham gia.
+- Trong cuộc gọi nhóm, người dùng có thể thoát mà không làm gián đoạn những thành viên còn lại; cuộc gọi chỉ kết thúc hoàn toàn khi chỉ còn một người hoặc khi host dừng.
+- 1-1 call chủ yếu dựa vào kết nối peer-to-peer trực tiếp; nhóm call dựa vào LiveKit room để mở rộng, đồng bộ participant events và quản lý media track tốt hơn khi có nhiều bên.
+- Cả hai mô hình đều hỗ trợ TURN cho mạng phức tạp.
+
+## 🔄 Flow hoạt động
+
+### Cuộc gọi 1-1
+
+1. Người dùng A gửi `call_invite` qua Socket.io đến server với `targetUserId`, `callId`, `callType`.
+2. Server lưu metadata cuộc gọi, gửi sự kiện `incoming_call` đến user B, và thông báo push nếu B offline.
+3. B chấp nhận bằng `call_accept`; server gửi lại sự kiện `call_accepted` cho A.
+4. A tạo `webrtc_offer` và gửi cho B qua server; B trả về `webrtc_answer`.
+5. Cả hai bên trao đổi `webrtc_ice_candidate` để hoàn thành kết nối P2P và bắt đầu phát audio/video.
+
+### Cuộc gọi nhóm
+
+1. Người dùng khởi tạo hoặc tham gia cuộc gọi nhóm bằng `call_invite` cùng `groupTargets` và `callId`.
+2. Server cập nhật `groupTargets`, giữ thông tin `activeUserIds`, và phát `incoming_call` đến tất cả thành viên được mời.
+3. Khi đồng ý, client gọi `/api/livekit/token` để lấy token LiveKit và kết nối tới room `callId`.
+4. Client sử dụng LiveKit để publish audio/video tracks, đồng thời lắng nghe sự kiện `participant_joined`/`participant_left` và track subscription.
+5. Khi một người rời, server xử lý `call_end`; nếu còn nhiều hơn 1 người thì cuộc gọi vẫn tiếp tục, chỉ khi còn 1 người hoặc hết thành viên thì server kết thúc phiên và ghi log cuộc gọi.
+
 - **Thư viện Media trực quan**:
   - Xem lại toàn bộ ảnh/video/file/link trong cuộc trò chuyện.
   - Phân loại nội dung theo tab (Ảnh, File, Link).
@@ -45,8 +84,10 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
   - Thiết kế Responsive với NativeWind (Tailwind CSS).
 
 ## 🆕 Cập nhật mới nhất
+
 - **Voice Message Support**: Ghi âm, xem trước và gửi tin nhắn giọng nói ngay trong khung chat.
 - **Video Message Support**: Tối ưu gửi và hiển thị video trong cuộc trò chuyện bằng `expo-video`.
+- **Group Call Support**: Triển khai cuộc gọi nhóm voice/video với LiveKit, hiển thị danh sách người tham gia, cho phép tắt mic/camera, và đồng bộ trạng thái giữa các client.
 - **Smart Upload Pipeline**: Nén ảnh/video trước upload, retry khi lỗi mạng và chunk upload cho file lớn.
 - **Multipart Storage**: Upload nhiều phần với thanh tiến trình và tự động abort khi thất bại.
 - **Media Gallery Enhanced**: Trang media hỗ trợ phân loại ảnh/video/file/link theo ngày.
@@ -63,6 +104,7 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 - **State Management**: React Context API & Hooks
 - **Media & Upload**: Expo Camera, Expo Image Picker, Expo Document Picker, Expo File System, **Expo Audio**, **Expo Video**, Expo Image Manipulator, react-native-compressor
 - **Real-time Communication**: **react-native-webrtc** (kết nối P2P cho voice/video call)
+- **Group Call Engine**: **LiveKit** (`@livekit/react-native-webrtc`) cho room đa người, publish/subcribe track, và tạo phòng nhóm ổn định.
 - **Notifications**: Expo Notifications
 - **Animations**: React Native Reanimated & Gesture Handler
 
@@ -92,24 +134,6 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 - npm hoặc yarn
 - Expo Go (cho thử nghiệm nhanh) hoặc Development Build
 
-### ⚙️ Cài đặt
-
-1. Cài đặt các phụ thuộc:
-   ```bash
-   npm install
-   ```
-
-2. Cấu hình biến môi trường:
-   Tạo tệp `.env` dựa trên `.env.example`:
-   ```env
-  EXPO_PUBLIC_API_URL=http://your-server-ip:3000
-   EXPO_PUBLIC_SOCKET_URL=http://your-server-ip:3000
-  EXPO_PUBLIC_TURN_HOST=
-  EXPO_PUBLIC_TURN_USERNAME=chatuser
-  EXPO_PUBLIC_TURN_PASSWORD=chatpass
-  EXPO_PUBLIC_FIREBASE_API_KEY=
-   ```
-
 3. Khởi chạy ứng dụng:
    ```bash
    npx expo start
@@ -127,4 +151,3 @@ Quét mã QR bằng ứng dụng **Expo Go** (trên Android) hoặc ứng dụng
 ---
 
 Được phát triển bởi đội ngũ DiskordMes. Nếu bạn có bất kỳ thắc mắc nào, vui lòng liên hệ qua Discord hoặc GitHub.
-

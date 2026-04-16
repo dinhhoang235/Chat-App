@@ -3,10 +3,12 @@ import {
   View,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StyleSheet,
   StatusBar,
   Alert,
-  Image
+  Image,
+  Animated
 } from 'react-native';
 import { RTCView } from '@livekit/react-native-webrtc';
 import { useRouter } from 'expo-router';
@@ -29,6 +31,19 @@ export default function VideoCallScreen() {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [duration, setDuration] = useState(0);
+
+  // Tap-to-toggle controls visibility
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const controlsOpacity = useRef(new Animated.Value(1)).current;
+
+  const toggleControls = useCallback(() => {
+    const nextVisible = !controlsVisible;
+    Animated.timing(controlsOpacity, {
+      toValue: nextVisible ? 1 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => setControlsVisible(nextVisible));
+  }, [controlsVisible, controlsOpacity]);
 
   // Keep stable refs so socket callbacks never see stale values
   const activeCallRef = useRef(activeCall);
@@ -274,110 +289,111 @@ export default function VideoCallScreen() {
 
   // ─────────────────────── RENDER ───────────────────────────────
   return (
-    <View className="flex-1 bg-black">
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+    <TouchableWithoutFeedback onPress={toggleControls}>
+      <View className="flex-1 bg-black">
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* ── Background Layer: Blue for local-off, Black for others ── */}
-      <View className={`absolute inset-0 ${(!remoteStreamURL && !isCameraOn) ? 'bg-[#1E40AF]' : 'bg-black'}`} />
+        {/* ── Background Layer: Blue for local-off, Black for others ── */}
+        <View className={`absolute inset-0 ${(!remoteStreamURL && !isCameraOn) ? 'bg-[#1E40AF]' : 'bg-black'}`} />
 
-      {/* ── Background Video Layer ── */}
-      {remoteStreamURL || localStreamURL ? (
-        <RTCView
-          key={`bg-${remoteStreamURL || localStreamURL}`}
-          streamURL={remoteStreamURL || localStreamURL!}
-          style={StyleSheet.absoluteFill}
-          objectFit="cover"
-          zOrder={0}
-          mirror={!remoteStreamURL}
-        />
-      ) : null}
+        {/* ── Background Video Layer ── */}
+        {remoteStreamURL || localStreamURL ? (
+          <RTCView
+            key={`bg-${remoteStreamURL || localStreamURL}`}
+            streamURL={remoteStreamURL || localStreamURL!}
+            style={StyleSheet.absoluteFill}
+            objectFit="cover"
+            zOrder={0}
+            mirror={!remoteStreamURL}
+          />
+        ) : null}
 
-      {/* ── Top Header ── */}
-      <View className="absolute top-0 left-0 right-0 px-4 flex-row items-center justify-between" style={{ paddingTop: insets.top + 6 }}>
-        <TouchableOpacity className="w-[42px] h-[42px] items-center justify-center rounded-full bg-black/25" onPress={handleHangup}>
-          <Ionicons name="chevron-back" size={28} color="#fff" />
-        </TouchableOpacity>
-        
-        <View className="items-center">
-          <Text className="text-white text-lg font-bold tracking-wide" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-            DiskordMes
-          </Text>
-          {callStatus === 'active' && (
-            <Text className="text-[#4ade80] text-[15px] font-bold" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-              {fmt(duration)}
+        {/* ── Top Header – fades in/out on tap ── */}
+        <Animated.View
+          className="absolute top-0 left-0 right-0 px-4 flex-row items-center justify-between"
+          style={[{ opacity: controlsOpacity, paddingTop: insets.top + 6 }]}
+          pointerEvents={controlsVisible ? 'box-none' : 'none'}
+        >
+          <TouchableOpacity className="w-[42px] h-[42px] items-center justify-center rounded-full bg-black/25" onPress={handleHangup}>
+            <Ionicons name="chevron-back" size={28} color="#fff" />
+          </TouchableOpacity>
+
+          <View className="items-center">
+            <Text className="text-white text-lg font-bold tracking-wide" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
+              DiskordMes
             </Text>
-          )}
-        </View>
+            {callStatus === 'active' && (
+              <Text className="text-[#4ade80] text-[15px] font-bold" style={{ textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
+                {fmt(duration)}
+              </Text>
+            )}
+          </View>
 
-        <TouchableOpacity className="w-[42px] h-[42px] items-center justify-center rounded-full bg-black/25" onPress={flipCamera} disabled={!isCameraOn}>
-          <FontAwesome6 name="arrows-rotate" size={20} color={isCameraOn ? "#fff" : "rgba(255,255,255,0.5)"} />
-        </TouchableOpacity>
+          <TouchableOpacity className="w-[42px] h-[42px] items-center justify-center rounded-full bg-black/25" onPress={flipCamera} disabled={!isCameraOn}>
+            <FontAwesome6 name="arrows-rotate" size={20} color={isCameraOn ? "#fff" : "rgba(255,255,255,0.5)"} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* ── Avatar & Name (Central info, hidden when active) ── */}
+        {callStatus !== 'active' && (
+          <View className="absolute top-1/4 left-0 right-0 items-center" pointerEvents="none">
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} className="w-[100px] h-[100px] rounded-[50px] border-2 border-white mb-4" />
+            ) : (
+              <View className="w-[100px] h-[100px] rounded-[50px] border-2 border-white bg-blue-600 items-center justify-center mb-4">
+                <Ionicons name="person" size={50} color="#fff" />
+              </View>
+            )}
+            <Text
+              className="text-white text-[28px] font-bold text-center mb-2"
+              style={{ textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }}
+            >
+              {remoteName}
+            </Text>
+            <Text
+              className="text-center text-white/90 text-xl font-bold tracking-[0.5px]"
+              style={{ textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}
+            >
+              {statusLabel()}
+            </Text>
+          </View>
+        )}
+
+        {/* ── Bottom Controls – fades in/out on tap ── */}
+        <Animated.View
+          className="absolute bottom-0 left-0 right-0 px-5"
+          style={[{ opacity: controlsOpacity, paddingBottom: insets.bottom + 40 }]}
+          pointerEvents={controlsVisible ? 'box-none' : 'none'}
+        >
+          <View className="flex-row justify-between w-full max-w-[340px] self-center items-center">
+            <ControlBtn
+              icon={isCameraOn ? 'videocam' : 'videocam-off'}
+              label="Camera"
+              active={isCameraOn}
+              onPress={toggleCamera}
+            />
+            <ControlBtn
+              icon={isMuted ? 'mic-off' : 'mic'}
+              label="Mic"
+              active={!isMuted}
+              onPress={toggleMute}
+            />
+            <ControlBtn
+              icon="call"
+              label="Kết thúc"
+              variant="end"
+              iconRotate="135deg"
+              onPress={handleHangup}
+            />
+            <ControlBtn
+              icon="ellipsis-horizontal"
+              label="Thêm"
+              onPress={() => {}}
+            />
+          </View>
+        </Animated.View>
       </View>
-
-      {/* ── Avatar & Name (Central info, hidden when active) ── */}
-      {callStatus !== 'active' && (
-        <View className="absolute top-1/4 left-0 right-0 items-center" pointerEvents="none">
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} className="w-[100px] h-[100px] rounded-[50px] border-2 border-white mb-4" />
-          ) : (
-            <View className="w-[100px] h-[100px] rounded-[50px] border-2 border-white bg-blue-600 items-center justify-center mb-4">
-              <Ionicons name="person" size={50} color="#fff" />
-            </View>
-          )}
-          <Text 
-            className="text-white text-[28px] font-bold text-center mb-2"
-            style={{ textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }}
-          >
-            {remoteName}
-          </Text>
-          <Text 
-            className="text-center text-white/90 text-xl font-bold tracking-[0.5px]"
-            style={{ textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}
-          >
-            {statusLabel()}
-          </Text>
-        </View>
-      )}
-
-      {/* ── Bottom Controls ── */}
-      <View className="absolute bottom-0 left-0 right-0 px-5" style={{ paddingBottom: insets.bottom + 40 }}>
-        <View className="flex-row justify-between w-full max-w-[340px] self-center items-center">
-          {/* Toggle Video */}
-          <ControlBtn
-            icon={isCameraOn ? 'videocam' : 'videocam-off'}
-            label="Camera"
-            active={isCameraOn}
-            onPress={toggleCamera}
-          />
-
-          {/* Mute mic */}
-          <ControlBtn
-            icon={isMuted ? 'mic-off' : 'mic'}
-            label="Mic"
-            active={!isMuted}
-            onPress={toggleMute}
-          />
-
-          {/* End call */}
-          <ControlBtn
-            icon="call"
-            label="Kết thúc"
-            variant="end"
-            iconRotate="135deg"
-            onPress={handleHangup}
-          />
-
-          {/* Add */}
-          <ControlBtn
-            icon="ellipsis-horizontal"
-            label="Thêm"
-            onPress={() => {
-              // Add feature not implemented yet
-            }}
-          />
-        </View>
-      </View>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
 

@@ -17,6 +17,7 @@ export default function GroupCallScreen() {
   const [remoteVideoTracks, setRemoteVideoTracks] = useState<Record<number, any>>({});
   const [connectedIds, setConnectedIds] = useState<number[]>([]);
   const [cameraStatuses, setCameraStatuses] = useState<Record<number, boolean>>({});
+  const [micStatuses, setMicStatuses] = useState<Record<number, boolean>>({});
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [duration, setDuration] = useState(0);
@@ -83,17 +84,34 @@ export default function GroupCallScreen() {
         });
         return next;
       });
+
+      setMicStatuses(prev => {
+        const next = { ...prev };
+        streams.forEach((stream, sid) => {
+          const identity = groupCallService.participantIdentities.get(sid);
+          if (identity && identity.startsWith('user-')) {
+            const uId = Number(identity.replace('user-', ''));
+            const audioTrack = stream.getAudioTracks()[0];
+            next[uId] = !!audioTrack && audioTrack.enabled !== false && audioTrack.readyState === 'live';
+          }
+        });
+        return next;
+      });
       
       if (streams.size > 0 && mounted) {
         setCallStatus('active');
       }
     };
 
-    groupCallService.onRemoteTrackMuted = (muted, identity) => {
+    groupCallService.onRemoteTrackMuted = (muted, identity, kind) => {
       if (!mounted || !identity) return;
       if (identity.startsWith('user-')) {
         const uId = Number(identity.replace('user-', ''));
-        setCameraStatuses(prev => ({ ...prev, [uId]: !muted }));
+        if (kind === 'video') {
+          setCameraStatuses(prev => ({ ...prev, [uId]: !muted }));
+        } else if (kind === 'audio') {
+          setMicStatuses(prev => ({ ...prev, [uId]: !muted }));
+        }
       }
     };
 
@@ -263,6 +281,7 @@ export default function GroupCallScreen() {
       remoteVideoTracks={remoteVideoTracks}
       isCameraOn={isCameraOn}
       cameraStatuses={cameraStatuses}
+      micStatuses={micStatuses}
       callStatus={callStatus}
       formattedDuration={fmt(duration)}
       remoteName={activeCall.remoteName || 'Cuộc gọi nhóm'}

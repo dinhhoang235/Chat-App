@@ -44,7 +44,7 @@ class GroupCallService {
 
   onParticipantsChanged: ((participantStreams: Map<string, MediaStream>, participantTracks: Map<string, Track>) => void) | null = null;
   onLocalStreamChanged: ((stream: MediaStream) => void) | null = null;
-  onRemoteTrackMuted: ((muted: boolean, userId?: string) => void) | null = null;
+  onRemoteTrackMuted: ((muted: boolean, userId?: string, kind?: Track.Kind) => void) | null = null;
   onConnectionStateChange: ((state: string) => void) | null = null;
 
   async init(callId: string, callType: CallType, userId: number) {
@@ -321,12 +321,12 @@ class GroupCallService {
 
   private handleRemoteTrackMuted = (publication: TrackPublication, participant: Participant) => {
     if (participant.sid === this.localParticipantSid) return;
-    this.onRemoteTrackMuted?.(true, participant.identity);
+    this.onRemoteTrackMuted?.(true, participant.identity, publication.kind);
   };
 
   private handleRemoteTrackUnmuted = (publication: TrackPublication, participant: Participant) => {
     if (participant.sid === this.localParticipantSid) return;
-    this.onRemoteTrackMuted?.(false, participant.identity);
+    this.onRemoteTrackMuted?.(false, participant.identity, publication.kind);
   };
 
   async getLocalStream(): Promise<MediaStream | null> {

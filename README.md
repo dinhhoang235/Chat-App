@@ -275,6 +275,20 @@ npx expo start
 - Backend chỉ xử lý logic tạo presigned URL, xác thực user và xác thực multipart parts.
 - Kết quả: băng thông server giảm, xử lý nhẹ, và upload ổn định hơn khi mạng yếu.
 
+### 7. Nén ảnh và video trước khi upload
+
+- Trước khi upload, `useChatThreadAttachments` gọi `prepareAttachmentForUpload()` từ `mobile/services/mediaUpload.ts`.
+- Với ảnh, `prepareAttachmentForUpload()` gọi `compressImage()` trong `mobile/services/imageUpload.ts`, dùng `expo-image-manipulator` để resize và compress ảnh thành JPEG.
+  - Ảnh lúc này được resize về width `1440` và compress quality `0.95`.
+- Với video, nếu file lớn hơn `VIDEO_COMPRESSION_MIN_SIZE_BYTES = 8MB`, mobile import động `react-native-compressor` và gọi `Video.compress()`.
+  - Cấu hình compression: `compressionMethod: 'auto'`, `minimumFileSizeForCompress: 8MB`, `progressDivider: 10`.
+- Nếu nén thất bại, app sẽ fallback dùng file gốc.
+- Sau khi nén xong, app kiểm tra lại kích thước bằng `FileSystem.getInfoAsync()` và dùng URI nén làm source upload.
+- Với video, thumbnail được generate riêng bằng `expo-video-thumbnails` rồi upload như một asset độc lập.
+- Quy trình nén luôn xảy ra trước khi quyết định upload single PUT hay multipart upload.
+
+Xem thêm chi tiết chunk upload tại: `CHUNK_UPLOAD_README.md`
+
 ## Tài nguyên tham khảo
 
 - [Mobile README](mobile/README.md)

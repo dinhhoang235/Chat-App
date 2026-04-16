@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, Alert, Share } from 'react-native';
 import { useTheme } from '@/context/themeContext';
 import { Header } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { contacts } from '@/constants/mockData';
+import { chatApi } from '@/services/chat';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -15,9 +15,10 @@ export default function GroupLink() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const id = (params as any).id as string;
-  const contact = contacts.find(c => c.id === id);
-  const name = contact?.name ?? 'Nhóm';
-  const link = contact && (contact as any).groupLink ? (contact as any).groupLink : `https://zalo.me/g/${id}`;
+  const [conversation, setConversation] = useState<any>(null);
+
+  const name = conversation?.name ?? (params as any).name ?? 'Nhóm';
+  const link = (params as any).groupLink ?? `https://zalo.me/g/${id}`;
   const qrUri = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(link)}`;
 
   const copyLink = async () => {
@@ -54,6 +55,22 @@ export default function GroupLink() {
       Alert.alert('Lưu QR', 'Không thể lưu mã QR.');
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+    const loadConversation = async () => {
+      try {
+        const response = await chatApi.getConversationDetails(id);
+        if (mounted) setConversation(response.data);
+      } catch (error) {
+        console.error('Load conversation details error:', error);
+      }
+    };
+    loadConversation();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>

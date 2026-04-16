@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, Switch, Modal, TextInput, Pressable, Alert } from 'react-native';
 import { useTheme } from '@/context/themeContext';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Header } from '@/components';
-import { contacts } from '@/constants/mockData';
+import { chatApi } from '@/services/chat';
 import { useAuth } from '@/context/authContext';
 
 export default function MemberPendingSettings() {
@@ -14,13 +14,32 @@ export default function MemberPendingSettings() {
   const id = (params as any).id as string;
   const { user } = useAuth();
 
-  const contact = contacts.find(c => c.id === id);
-  const isOwner = !!contact?.ownerPhone && user?.phone === contact?.ownerPhone;
+  const [conversation, setConversation] = useState<any>(null);
+  const isOwner = useMemo(() => {
+    if (!conversation || !user) return false;
+    return conversation.participants?.some((p: any) => p.userId === user.id && p.role === 'owner');
+  }, [conversation, user]);
 
-  const [enabled, setEnabled] = useState<boolean>(!!contact?.requireApproval);
+  const [enabled, setEnabled] = useState<boolean>(false);
   const [question, setQuestion] = useState<string>('');
   const [questionModalVisible, setQuestionModalVisible] = useState<boolean>(false);
   const [draft, setDraft] = useState<string>('');
+
+  useEffect(() => {
+    let mounted = true;
+    const loadConversation = async () => {
+      try {
+        const response = await chatApi.getConversationDetails(id);
+        if (mounted) setConversation(response.data);
+      } catch (error) {
+        console.error('Load conversation details error:', error);
+      }
+    };
+    loadConversation();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>

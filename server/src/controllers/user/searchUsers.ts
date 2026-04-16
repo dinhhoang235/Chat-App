@@ -1,21 +1,24 @@
-import { Request, Response } from 'express';
-import prisma from '../../db.js';
+import { Request, Response } from "express";
+import prisma from "../../db.js";
 
 // Tìm kiếm user - bạn bè có thể tìm theo tên và số điện thoại, người lạ chỉ tìm theo số điện thoại chính xác
-export const searchUsers = async (req: Request, res: Response): Promise<void> => {
+export const searchUsers = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const userId = (req as any).userId;
     const { query } = req.query;
 
     if (!query) {
-      res.status(400).json({ error: 'Search query is required' });
+      res.status(400).json({ error: "Search query is required" });
       return;
     }
 
     const searchQuery = (query as string).trim();
 
     if (searchQuery.length === 0) {
-      res.status(400).json({ error: 'Search query cannot be empty' });
+      res.status(400).json({ error: "Search query cannot be empty" });
       return;
     }
 
@@ -26,17 +29,17 @@ export const searchUsers = async (req: Request, res: Response): Promise<void> =>
     // Get user's friends list
     const friendships = await prisma.friendship.findMany({
       where: { userId },
-      select: { friendId: true }
+      select: { friendId: true },
     });
 
-    const friendIds = friendships.map(f => f.friendId);
+    const friendIds = friendships.map((f: { friendId: number }) => f.friendId);
     const isFriend = (id: number) => friendIds.includes(id);
 
     let results: any[] = [];
 
     if (isPhoneQuery) {
       // If searching by phone number, first search friends, then all users if not found in friends
-      
+
       // Search in friends first
       const friendUser = await prisma.user.findUnique({
         where: { phone: searchQuery },
@@ -47,8 +50,8 @@ export const searchUsers = async (req: Request, res: Response): Promise<void> =>
           avatar: true,
           bio: true,
           gender: true,
-          dateOfBirth: true
-        }
+          dateOfBirth: true,
+        },
       });
 
       if (friendUser && friendUser.id !== userId) {
@@ -57,17 +60,21 @@ export const searchUsers = async (req: Request, res: Response): Promise<void> =>
           where: {
             OR: [
               { senderId: userId, receiverId: friendUser.id },
-              { senderId: friendUser.id, receiverId: userId }
-            ]
-          }
+              { senderId: friendUser.id, receiverId: userId },
+            ],
+          },
         });
 
         results.push({
           ...friendUser,
           isFriend: isFriend(friendUser.id),
           requestStatus: friendRequest?.status || null,
-          requestDirection: friendRequest ? (friendRequest.senderId === userId ? 'sent' : 'received') : null,
-          source: 'friend' // Found in friends list
+          requestDirection: friendRequest
+            ? friendRequest.senderId === userId
+              ? "sent"
+              : "received"
+            : null,
+          source: "friend", // Found in friends list
         });
       }
 
@@ -82,8 +89,8 @@ export const searchUsers = async (req: Request, res: Response): Promise<void> =>
             avatar: true,
             bio: true,
             gender: true,
-            dateOfBirth: true
-          }
+            dateOfBirth: true,
+          },
         });
 
         if (allUser && allUser.id !== userId) {
@@ -92,17 +99,21 @@ export const searchUsers = async (req: Request, res: Response): Promise<void> =>
             where: {
               OR: [
                 { senderId: userId, receiverId: allUser.id },
-                { senderId: allUser.id, receiverId: userId }
-              ]
-            }
+                { senderId: allUser.id, receiverId: userId },
+              ],
+            },
           });
 
           results.push({
             ...allUser,
             isFriend: isFriend(allUser.id),
             requestStatus: friendRequest?.status || null,
-            requestDirection: friendRequest ? (friendRequest.senderId === userId ? 'sent' : 'received') : null,
-            source: 'stranger' // Found but not in friends
+            requestDirection: friendRequest
+              ? friendRequest.senderId === userId
+                ? "sent"
+                : "received"
+              : null,
+            source: "stranger", // Found but not in friends
           });
         }
       }
@@ -112,8 +123,8 @@ export const searchUsers = async (req: Request, res: Response): Promise<void> =>
         where: {
           id: { in: friendIds },
           fullName: {
-            contains: searchQuery
-          }
+            contains: searchQuery,
+          },
         },
         select: {
           id: true,
@@ -122,27 +133,37 @@ export const searchUsers = async (req: Request, res: Response): Promise<void> =>
           avatar: true,
           bio: true,
           gender: true,
-          dateOfBirth: true
-        }
+          dateOfBirth: true,
+        },
       });
 
-      results = friendUsers.map(user => ({
-        ...user,
-        isFriend: true,
-        requestStatus: null,
-        requestDirection: null,
-        source: 'friend'
-      }));
+      results = friendUsers.map(
+        (user: {
+          id: number;
+          phone: string;
+          fullName: string;
+          avatar: string | null;
+          bio: string | null;
+          gender: string | null;
+          dateOfBirth: Date | null;
+        }) => ({
+          ...user,
+          isFriend: true,
+          requestStatus: null,
+          requestDirection: null,
+          source: "friend",
+        }),
+      );
     }
 
     res.json({
       success: true,
       query: searchQuery,
       isPhoneQuery,
-      data: results
+      data: results,
     });
   } catch (err) {
-    console.error('Error searching users:', err);
-    res.status(500).json({ error: 'Failed to search users' });
+    console.error("Error searching users:", err);
+    res.status(500).json({ error: "Failed to search users" });
   }
 };

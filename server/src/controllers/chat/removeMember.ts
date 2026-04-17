@@ -2,6 +2,7 @@ import { Response } from "express";
 import { Server } from "socket.io";
 import prisma from "../../db.js";
 import { AuthRequest } from "../../middleware/auth.js";
+import { clearCachedMessages } from "../../utils/redis.js";
 
 export const removeMember =
   (io: Server) =>
@@ -46,12 +47,10 @@ export const removeMember =
         !requester ||
         (requester.role !== "owner" && requester.role !== "admin")
       ) {
-        return res
-          .status(403)
-          .json({
-            message:
-              "Permission denied. Only owners or admins can remove members.",
-          });
+        return res.status(403).json({
+          message:
+            "Permission denied. Only owners or admins can remove members.",
+        });
       }
 
       // 2. Get target role and info
@@ -114,9 +113,9 @@ export const removeMember =
       });
 
       // Clear cache to include system message
-      // Note: clearCachedMessages is imported if needed, but in original code it was handled with @ts-ignore
-      // We should import it from redis for consistency.
-      // (I'll add the import to ensure it works)
+      await clearCachedMessages(convId).catch((e) =>
+        console.error("Clear cache error:", e),
+      );
 
       // 4. Delete the participant
       await prisma.conversationParticipant.delete({

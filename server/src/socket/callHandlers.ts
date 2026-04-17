@@ -51,9 +51,10 @@ export const registerCallHandlers = (
       callerName,
       callerAvatar,
       groupTargets,
+      isGroupCall: clientIsGroupCall,
     }: any) => {
       console.log(
-        `[Call] Invite: ${socket.user?.userId} → ${targetUserId} (callId: ${callId})`,
+        `[Call] Invite: ${socket.user?.userId} → ${targetUserId} (callId: ${callId}, isGroup: ${clientIsGroupCall})`,
       );
 
       let resolvedCallId = callId;
@@ -143,8 +144,7 @@ export const registerCallHandlers = (
           await setConversationCallId(conversationId, resolvedCallId);
         }
 
-        const isGroupCall =
-          Array.isArray(currentGroupTargets) && currentGroupTargets.length > 1;
+        const isGroupCall = clientIsGroupCall ?? (Array.isArray(currentGroupTargets) && currentGroupTargets.length > 2);
         if (isGroupCall) {
           socket.join(`group_call:${resolvedCallId}`);
           if (existing) {
@@ -231,6 +231,7 @@ export const registerCallHandlers = (
         callerAvatar,
         callType,
         groupTargets: currentGroupTargets,
+        isGroupCall: clientIsGroupCall ?? (currentGroupTargets.length > 2),
       });
 
       if (!isOnline) {
@@ -253,6 +254,7 @@ export const registerCallHandlers = (
                   callerAvatar,
                   callerId: socket.user?.userId,
                   groupTargets: currentGroupTargets,
+                  isGroupCall: clientIsGroupCall ?? (currentGroupTargets.length > 2),
                   sentAt: Date.now(),
                 },
                 channelId: "call",

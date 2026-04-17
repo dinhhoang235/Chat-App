@@ -61,12 +61,11 @@ export function IncomingCallModal() {
   if (!incomingCall) return null;
 
   const isVideo = incomingCall.callType === 'video';
-  const groupCount = incomingCall.groupTargets?.length ?? incomingCall.targetUserIds?.length ?? 0;
-  const isGroupVideo = isVideo && groupCount > 1;
+  const isGroup = incomingCall.isGroupCall;
   const avatarUrl = getAvatarUrl(incomingCall.remoteAvatar);
   const initials = getInitials(incomingCall.remoteName);
   const callLabel = isVideo
-    ? isGroupVideo
+    ? isGroup
       ? 'Cuộc gọi video nhóm'
       : 'Cuộc gọi video đến'
     : 'Cuộc gọi thoại đến';

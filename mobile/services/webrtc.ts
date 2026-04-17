@@ -49,9 +49,12 @@ class WebRTCService {
   private remoteDescSet = false;
   public currentCallId: string | null = null;
   public isInitializing = false;
+  private isSwitchingCamera = false;
+  private currentFacingMode: 'user' | 'environment' = 'user';
 
   // Callbacks set by the call screen
   onRemoteStream: ((stream: MediaStream) => void) | null = null;
+  onLocalStreamChanged: ((stream: MediaStream) => void) | null = null;
   onIceCandidate: ((candidate: any) => void) | null = null;
   onConnectionStateChange: ((state: string) => void) | null = null;
 
@@ -67,7 +70,7 @@ class WebRTCService {
       audio: true,
       video:
         callType === 'video'
-          ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+          ? { facingMode: this.currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
           : false,
     };
     try {
@@ -181,8 +184,54 @@ class WebRTCService {
   }
 
   async flipCamera(): Promise<void> {
-    const videoTrack = this.localStream?.getVideoTracks()[0] as any;
-    videoTrack?._switchCamera?.();
+    if (this.isSwitchingCamera) return;
+    this.isSwitchingCamera = true;
+    try {
+      console.log('[WebRTCService] flipCamera requested');
+      const oldVideoTrack = this.localStream?.getVideoTracks()[0] as any;
+      if (!oldVideoTrack) {
+        console.warn('[WebRTCService] No video track available to flip');
+        return;
+      }
+      
+      this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+      console.log('[WebRTCService] switching to facingMode:', this.currentFacingMode);
+      
+      const newStream = await mediaDevices.getUserMedia({
+        video: { facingMode: this.currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      
+      const newVideoTrack = newStream.getVideoTracks()[0] as any;
+      
+      if (this.localStream) {
+        this.localStream.removeTrack(oldVideoTrack);
+        this.localStream.addTrack(newVideoTrack);
+        
+        // Create a completely new MediaStream object to trigger RTCView re-render!
+        const newTracks = this.localStream.getTracks();
+        this.localStream = new MediaStream(newTracks as any);
+      }
+      
+      if (this.pc) {
+        const sender = this.pc.getSenders().find((s: any) => s.track && s.track.kind === 'video');
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        }
+      }
+      
+      oldVideoTrack.stop();
+      
+      if (this.onLocalStreamChanged && this.localStream) {
+        this.onLocalStreamChanged(this.localStream);
+      }
+      
+      console.log('[WebRTCService] flipCamera triggered successfully using replaceTrack');
+    } catch (error) {
+      console.error('[WebRTCService] Error flipping camera:', error);
+    } finally {
+      this.isSwitchingCamera = false;
+    }
   }
 
   getLocalStream(): MediaStream | null {
@@ -206,6 +255,7 @@ class WebRTCService {
     this.onRemoteStream = null;
     this.onIceCandidate = null;
     this.onConnectionStateChange = null;
+    this.currentFacingMode = 'user';
   }
 }
 

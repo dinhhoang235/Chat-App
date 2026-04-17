@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCall } from '@/context/callContext';
+import { useAuth } from '@/context/authContext';
 import { webrtcService } from '@/services/webrtc';
 import { socketService } from '@/services/socket';
 import { getAvatarUrl } from '@/utils/avatar';
@@ -23,6 +24,7 @@ export default function CallScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeCall, callStatus, endCall, setCallStatus } = useCall();
+  const { user } = useAuth();
 
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
@@ -202,6 +204,8 @@ export default function CallScreen() {
           socketService.emit('call_accept', {
             callId: activeCall.callId,
             callerId: activeCall.remoteUserId,
+            accepterName: user?.fullName,
+            accepterAvatar: user?.avatar,
           });
         }
       } catch (e: any) {
@@ -234,7 +238,7 @@ export default function CallScreen() {
       socketService.off('call_accepted', onAccepted);
       socketService.off('webrtc_offer', onOffer);
     };
-  }, [activeCall, setCallStatus]);
+  }, [activeCall, setCallStatus, user?.fullName, user?.avatar]);
 
   // ─── Controls ──────────────────────────────────────────────────
   const toggleMute = () => {

@@ -16,21 +16,27 @@ import { Ionicons } from '@expo/vector-icons';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCall } from '@/context/callContext';
+import { useAuth } from '@/context/authContext';
 import { webrtcService } from '@/services/webrtc';
 import { socketService } from '@/services/socket';
 import { getAvatarUrl } from '@/utils/avatar';
+import { getInitials } from '@/utils/initials';
 
 
 export default function VideoCallScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeCall, callStatus, endCall, setCallStatus } = useCall();
+  const { user } = useAuth();
 
   const [localStreamURL, setLocalStreamURL] = useState<string | null>(null);
   const [remoteStreamURL, setRemoteStreamURL] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
+  const [isFrontCamera, setIsFrontCamera] = useState(true);
+  const [remoteCameraOn, setRemoteCameraOn] = useState(true);
   const [duration, setDuration] = useState(0);
+  const isFlippingCamera = useRef(false);
 
   // Tap-to-toggle controls visibility
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -115,6 +121,12 @@ export default function VideoCallScreen() {
 
     const onCameraToggle = ({ userId, enabled }: { userId: number, enabled: boolean }) => {
       console.log('[Socket] Received camera_toggle', enabled, 'from', userId);
+      setRemoteCameraOn(enabled);
+    };
+    
+    // Listen for manual track replacement (flipCamera)
+    webrtcService.onLocalStreamChanged = (stream: any) => {
+      setLocalStreamURL(stream.toURL());
     };
 
     socketService.on('webrtc_answer', onAnswer);
@@ -124,6 +136,7 @@ export default function VideoCallScreen() {
       socketService.off('webrtc_answer', onAnswer);
       socketService.off('webrtc_ice_candidate', onIce);
       socketService.off('camera_toggle', onCameraToggle);
+      webrtcService.onLocalStreamChanged = null;
     };
   }, []);
 
@@ -207,6 +220,8 @@ export default function VideoCallScreen() {
           socketService.emit('call_accept', {
             callId: activeCall.callId,
             callerId: activeCall.remoteUserId,
+            accepterName: user?.fullName,
+            accepterAvatar: user?.avatar,
           });
         }
       } catch (e: any) {
@@ -242,7 +257,7 @@ export default function VideoCallScreen() {
       socketService.off('call_accepted', onAccepted);
       socketService.off('webrtc_offer', onOffer);
     };
-  }, [activeCall, setCallStatus]);
+  }, [activeCall, setCallStatus, user?.fullName, user?.avatar]);
 
   // ─── Controls ──────────────────────────────────────────────────
   const toggleMute = () => {
@@ -266,8 +281,20 @@ export default function VideoCallScreen() {
     });
   };
 
-  const flipCamera = () => {
-    webrtcService.flipCamera();
+  const flipCamera = async () => {
+    if (isFlippingCamera.current) return;
+    isFlippingCamera.current = true;
+    try {
+      await webrtcService.flipCamera();
+      setIsFrontCamera(prev => !prev);
+    } catch (e) {
+      console.warn("Failed to flip camera", e);
+    } finally {
+      // allow small debounce for camera to catch up
+      setTimeout(() => {
+        isFlippingCamera.current = false;
+      }, 500);
+    }
   };
 
   // ─── Display helpers ───────────────────────────────────────────
@@ -297,16 +324,68 @@ export default function VideoCallScreen() {
         <View className={`absolute inset-0 ${(!remoteStreamURL && !isCameraOn) ? 'bg-[#1E40AF]' : 'bg-black'}`} />
 
         {/* ── Background Video Layer ── */}
-        {remoteStreamURL || localStreamURL ? (
+        {(remoteStreamURL && remoteCameraOn) ? (
           <RTCView
-            key={`bg-${remoteStreamURL || localStreamURL}`}
-            streamURL={remoteStreamURL || localStreamURL!}
+            key={`bg-remote`}
+            streamURL={remoteStreamURL}
             style={StyleSheet.absoluteFill}
             objectFit="cover"
             zOrder={0}
-            mirror={!remoteStreamURL}
+            mirror={false}
+          />
+        ) : (!remoteStreamURL && localStreamURL && isCameraOn) ? (
+          <RTCView
+            key={`bg-local`}
+            streamURL={localStreamURL}
+            style={StyleSheet.absoluteFill}
+            objectFit="cover"
+            zOrder={0}
+            mirror={true}
           />
         ) : null}
+
+        {/* ── Avatar Fallback (when remote video is off) ── */}
+        {(callStatus === 'active' && remoteStreamURL && !remoteCameraOn) && (
+          <View className="absolute inset-0 bg-[#111111] items-center justify-center z-0">
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} className="w-[120px] h-[120px] rounded-[60px] border border-white/20" />
+            ) : (
+              <View className="w-[120px] h-[120px] rounded-[60px] border border-white/20 bg-[#0A84FF] items-center justify-center">
+                <Text className="text-white text-[48px] font-bold">{getInitials(remoteName)}</Text>
+              </View>
+            )}
+            <Text className="text-white text-xl mt-4 opacity-80">Đã tắt camera</Text>
+          </View>
+        )}
+
+        {/* ── Picture in Picture for Local Camera ── */}
+        {remoteStreamURL && localStreamURL && (
+          <Animated.View
+            className="absolute right-4 rounded-xl overflow-hidden border border-white/20 bg-black/50"
+            style={[
+              { top: insets.top + 70, width: 110, height: 160 },
+              { opacity: controlsOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) },
+              { zIndex: 10 }
+            ]}
+          >
+            {isCameraOn ? (
+              <RTCView
+                streamURL={localStreamURL}
+                style={StyleSheet.absoluteFill}
+                objectFit="cover"
+                mirror={isFrontCamera}
+                zOrder={1}
+              />
+            ) : (
+              <View className="flex-1 bg-[#111111] items-center justify-center">
+                <Ionicons name="person" size={40} color="#fff" style={{ opacity: 0.3 }} />
+                <View className="absolute bottom-2 right-2 bg-black/60 rounded-full p-1 border border-white/10">
+                  <Ionicons name="videocam-off" size={12} color="#f87171" />
+                </View>
+              </View>
+            )}
+          </Animated.View>
+        )}
 
         {/* ── Top Header – fades in/out on tap ── */}
         <Animated.View

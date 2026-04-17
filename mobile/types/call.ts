@@ -24,4 +24,5 @@ export type CallInfo = {
   remoteAvatar?: string;
   groupTargets?: CallTarget[];
   targetUserIds?: number[];
+  isGroupCall?: boolean;
 };

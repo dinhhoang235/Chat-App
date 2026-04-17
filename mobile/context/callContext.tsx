@@ -128,6 +128,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         remoteName: data.callerName || 'Unknown',
         remoteAvatar: data.callerAvatar,
         groupTargets: incomingGroupTargets,
+        isGroupCall: Boolean(data.isGroupCall || (incomingGroupTargets && incomingGroupTargets.length > 2)),
       };
       setIncomingCall(info);
       setCallStatus('incoming');
@@ -285,6 +286,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       const remoteUserId = params.remoteUserId ?? firstTarget?.userId;
       const remoteName = params.remoteName || firstTarget?.fullName || 'User';
       const remoteAvatar = params.remoteAvatar || firstTarget?.avatar || undefined;
+      const isExplicitGroupCall = params.targetUsers !== undefined;
 
       const call: CallInfo = {
         callId,
@@ -296,6 +298,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         remoteAvatar,
         targetUserIds: groupTargets?.map((target) => Number(target.userId)),
         groupTargets,
+        isGroupCall: isExplicitGroupCall,
       };
       setActiveCall(call);
       setCallStatus(useExistingCall ? 'connecting' : 'calling');
@@ -316,12 +319,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             callerName: user.fullName,
             callerAvatar: user.avatar || '',
             groupTargets: inviteTargets,
+            isGroupCall: isExplicitGroupCall,
           });
         });
       }
 
-      const isGroupCall = Boolean(groupTargets?.length && groupTargets.length > 1);
-      if (isGroupCall) {
+      if (isExplicitGroupCall) {
         router.replace('/groupCall' as any);
       } else if (params.callType === 'video') {
         router.replace('/videoCall' as any);
@@ -339,15 +342,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setIncomingCall(null);
     setCallStatus('connecting');
 
-    // Notify server that we accepted
-    socketService.emit('call_accept', {
-      callId: call.callId,
-      callerId: call.remoteUserId,
-      accepterName: user?.fullName,
-      accepterAvatar: user?.avatar,
-    });
-
-    const isGroupCall = Boolean(call.groupTargets?.length && call.groupTargets.length > 1);
+    const isGroupCall = call.isGroupCall;
     if (isGroupCall) {
       router.replace('/groupCall' as any);
     } else if (call.callType === 'video') {
@@ -355,7 +350,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     } else {
       router.replace('/call' as any);
     }
-  }, [incomingCall, router, user?.fullName, user?.avatar]);
+  }, [incomingCall, router]);
 
   const joinCall = useCallback((incoming: CallInfo) => {
     if (!incoming) return;
@@ -364,14 +359,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setIncomingCall(null);
     setCallStatus('connecting');
 
-    socketService.emit('call_accept', {
-      callId: call.callId,
-      callerId: call.remoteUserId,
-      accepterName: user?.fullName,
-      accepterAvatar: user?.avatar,
-    });
-
-    const isGroupCall = Boolean(call.groupTargets?.length && call.groupTargets.length > 1);
+    const isGroupCall = call.isGroupCall;
     if (isGroupCall) {
       router.replace('/groupCall' as any);
     } else if (call.callType === 'video') {
@@ -379,7 +367,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     } else {
       router.replace('/call' as any);
     }
-  }, [router, user?.fullName, user?.avatar]);
+  }, [router]);
 
   const joinExistingGroupCall = useCallback(
     async (conversationId: number | string) => {
@@ -411,6 +399,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         remoteAvatar: callInfo.callerAvatar,
         groupTargets: callInfo.groupTargets,
         targetUserIds: callInfo.invitedUserIds,
+        isGroupCall: Boolean(callInfo.isGroupCall || (callInfo.groupTargets && callInfo.groupTargets.length > 2)),
       };
 
       joinCall(incomingCallInfo);

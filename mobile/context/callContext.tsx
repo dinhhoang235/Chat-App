@@ -215,17 +215,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     socketService.on('participant_joined', handleParticipantJoined);
     socketService.on('participant_left', handleParticipantLeft);
 
-    // Foreground notification behavior - show banners even when app is active for calls
+    // Only show banners when app is in background
     Notifications.setNotificationHandler({
-      handleNotification: async (notification: any) => {
-        // Mute notification sound if it's a call related notification to avoid clashing with ringtone
-        const isCall = notification.request.content.data?.type === 'call' || 
-                      notification.request.content.categoryIdentifier === 'call';
-        
+      handleNotification: async () => {
+        const isBackground = AppState.currentState !== 'active';
         return {
-          shouldShowBanner: true,
+          shouldShowBanner: isBackground,
           shouldShowList: true,
-          shouldPlaySound: !isCall, // Only play sound if NOT a call
+          shouldPlaySound: false, // Never play sound from notification (ringtone handles it)
           shouldSetBadge: false,
         };
       },
@@ -445,10 +442,17 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Handle persistent notification for active/incoming calls
+  // Only show notifications when app is in background
   useEffect(() => {
     const NOTIF_ID = 'active-call-persistent';
 
     if (callStatus === 'idle' || callStatus === 'ended') {
+      Notifications.dismissNotificationAsync(NOTIF_ID).catch(() => {});
+      return;
+    }
+
+    // App is in foreground - dismiss notification, UI handles everything
+    if (currentAppState === 'active') {
       Notifications.dismissNotificationAsync(NOTIF_ID).catch(() => {});
       return;
     }
@@ -516,13 +520,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         },
         sticky: true,
         autoDismiss: false,
-        sound: null, // Fully disable sound for local call notifications
+        sound: null,
         priority: Notifications.AndroidNotificationPriority.MAX,
         ...(Platform.OS === 'android' && {
           android: {
             channelId: 'call',
             sticky: true,
-            sound: null, // Null is more explicit for disabling sound
+            sound: null,
           },
         }),
       },

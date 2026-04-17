@@ -74,7 +74,7 @@ export const formatConversationLastMessage = (
       const endedStatuses = ["missed", "rejected", "no_answer", "completed"];
       const isGroupCall =
         conv.isGroup ||
-        (Array.isArray(info.groupTargets) && info.groupTargets.length > 1);
+        (Array.isArray(info.groupTargets) && info.groupTargets.length > 2);
 
       if (isGroupCall) {
         if (info.status === "started") {

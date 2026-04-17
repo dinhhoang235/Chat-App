@@ -235,7 +235,7 @@ function AudioMessageBubble({
   );
 }
 
-export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void }) {
+export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -735,8 +735,9 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
 
     const isVideo = callData.callType === 'video';
     const isGroupCall = Boolean(
+      isGroupThread ||
       callData.isGroupCall ||
-      (Array.isArray(callData.groupTargets) && callData.groupTargets.length > 1) ||
+      (Array.isArray(callData.groupTargets) && callData.groupTargets.length > 2) ||
       (Array.isArray(callData.targetUserIds) && callData.targetUserIds.length > 1)
     );
     const isStarted = callData.status === 'started';
@@ -748,9 +749,9 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       label = 'Cuộc gọi nhóm';
     } else if (isEndedGroupCall) {
       label = 'Cuộc gọi nhóm đã kết thúc';
-    } else if (callData.status === 'missed' || callData.status === 'no_answer') {
+    } else if (!isGroupCall && (callData.status === 'missed' || callData.status === 'no_answer')) {
       label = message.fromMe ? 'Bạn đã hủy' : 'Cuộc gọi lỡ';
-    } else if (callData.status === 'rejected') {
+    } else if (!isGroupCall && callData.status === 'rejected') {
       label = 'Cuộc gọi bị từ chối';
     } else {
       label = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';

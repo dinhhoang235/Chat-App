@@ -90,8 +90,8 @@ export default function ChatThread() {
 
   const activeCallConversationId = activeCall?.conversationId;
   const activeCallGroupSize =
-    (activeCall?.groupTargets?.length ?? 0) ||
-    (activeCall?.targetUserIds?.length ?? 0);
+    activeCall?.targetUserIds?.length ??
+    Math.max(0, (activeCall?.groupTargets?.length ?? 0) - 1);
   const isActiveGroupCall = Boolean(
     (activeCallConversationId != null &&
       String(activeCallConversationId) === String(id) &&
@@ -183,9 +183,10 @@ export default function ChatThread() {
         onVoiceCall={startVoiceCall}
         onVideoCall={startVideoCall}
         onCallAction={handleCallAction}
+        isGroupThread={isGroup}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction]);
+  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;

@@ -5,7 +5,6 @@ import * as Notifications from 'expo-notifications';
 import { Asset } from 'expo-asset';
 import notificationSound from '@/assets/sounds/notification.mp3';
 import { socketService } from '@/services/socket';
-import { activeConversationId } from '@/services/notificationState';
 import { useAuth } from '@/context/authContext';
 import { userAPI } from '@/services/user';
 import { useCall } from '@/context/callContext';
@@ -53,13 +52,17 @@ interface IncomingMessage {
   conversation?: { isGroup?: boolean; name?: string };
 }
 
-// foreground notification behavior - hide system banners when app is active
+// Only show banners when app is in background
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: false,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async () => {
+    const isBackground = AppState.currentState !== 'active';
+    return {
+      shouldShowBanner: isBackground,
+      shouldShowList: true,
+      shouldPlaySound: isBackground,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 async function registerForPushNotificationsAsync(): Promise<string | undefined> {
@@ -264,9 +267,8 @@ export default function NotificationHandler() {
       // Ignore own messages
       if (message.senderId === user?.id) return;
 
-      // Skip if user is actively viewing this conversation
-      const convStr = message.conversationId?.toString();
-      if (appState.current === 'active' && convStr && convStr === activeConversationId) {
+      // Skip entirely when app is in foreground - no notifications needed
+      if (appState.current === 'active') {
         return;
       }
 

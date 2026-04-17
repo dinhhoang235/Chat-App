@@ -462,15 +462,42 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       return `${mins}:${s.toString().padStart(2, '0')}`;
     };
 
+    const isGroupCall = currentCall.isGroupCall;
     let title = 'Cuộc gọi';
-    let body = `${currentCall.remoteName} đang gọi...`;
+    let body = '';
 
     if (callStatus === 'active') {
-      title = `Đang trong cuộc gọi với ${currentCall.remoteName} (${formatTime(callDuration)})`;
-      body = ''; 
-    } else if (callStatus === 'calling' || callStatus === 'incoming') {
-      title = `Cuộc gọi ${currentCall.callType === 'video' ? 'video' : 'thoại'} đến`;
-      body = `${currentCall.remoteName} đang gọi cho bạn...`;
+      if (isGroupCall) {
+        title = `Cuộc gọi nhóm đang diễn ra (${formatTime(callDuration)})`;
+        body = '';
+      } else {
+        title = `Đang trong cuộc gọi với ${currentCall.remoteName} (${formatTime(callDuration)})`;
+        body = '';
+      }
+    } else if (callStatus === 'calling') {
+      if (isGroupCall) {
+        title = `${currentCall.remoteName} đang bắt đầu gọi nhóm`;
+        body = '';
+      } else {
+        title = `Cuộc gọi ${currentCall.callType === 'video' ? 'video' : 'thoại'} đi`;
+        body = `Đang gọi cho ${currentCall.remoteName}...`;
+      }
+    } else if (callStatus === 'incoming') {
+      if (isGroupCall) {
+        title = `${currentCall.remoteName} đang bắt đầu gọi nhóm`;
+        body = 'Nhấn để tham gia';
+      } else {
+        title = `Cuộc gọi ${currentCall.callType === 'video' ? 'video' : 'thoại'} đến`;
+        body = `${currentCall.remoteName} đang gọi cho bạn...`;
+      }
+    } else if (callStatus === 'connecting') {
+      if (isGroupCall) {
+        title = `Cuộc gọi nhóm đang diễn ra (${formatTime(callDuration)})`;
+        body = '';
+      } else {
+        title = `Đang kết nối cuộc gọi...`;
+        body = `${currentCall.remoteName}`;
+      }
     }
 
     Notifications.scheduleNotificationAsync({

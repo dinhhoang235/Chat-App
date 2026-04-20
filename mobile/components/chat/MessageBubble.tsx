@@ -73,7 +73,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
 
   if (isOutgoing) {
     bubbleBg = colors.bubbleMe;
-    borderColor = colors.bubbleMe;
+    borderColor = colors.bubbleMeBorder || colors.bubbleMe;
     textColor = colors.bubbleMeText;
   }
 
@@ -93,11 +93,22 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: highlightAnim.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 0.5],
+      outputRange: [0, 0.3],
     }),
     shadowRadius: highlightAnim.interpolate({
       inputRange: [0, 1],
       outputRange: [0, 4],
+    }),
+  };
+
+  const highlightRowStyle = {
+    backgroundColor: highlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['rgba(59, 130, 246, 0)', 'rgba(59, 130, 246, 0.12)'],
+    }),
+    zIndex: highlightAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 10],
     }),
   };
 
@@ -183,6 +194,7 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
       isOutgoing={isOutgoing}
       bubbleBg={bubbleBg}
       animatedBorderStyle={animatedBorderStyle}
+      highlightRowStyle={highlightRowStyle}
       replyBlock={replyBlock}
       colors={colors}
       timeColor={timeColor}

@@ -61,9 +61,9 @@ export default function MessageCallBubble({
     }
   }
 
-  const iconColor = message.fromMe ? '#FFFFFF' : (isMissed ? '#FF3B30' : colors.tint);
-  const iconBg = message.fromMe ? 'rgba(255,255,255,0.18)' : (isMissed ? 'rgba(255, 59, 48, 0.08)' : 'rgba(0, 122, 255, 0.08)');
-  const subTextColor = message.fromMe ? 'rgba(255,255,255,0.7)' : colors.textSecondary;
+  const iconColor = message.fromMe ? colors.tint : (isMissed ? '#FF3B30' : colors.tint);
+  const iconBg = message.fromMe ? (isMissed ? 'rgba(255, 59, 48, 0.08)' : 'rgba(59, 130, 246, 0.08)') : (isMissed ? 'rgba(255, 59, 48, 0.08)' : 'rgba(59, 130, 246, 0.08)');
+  const subTextColor = message.fromMe ? colors.textSecondary : colors.textSecondary;
 
   if (isEndedGroupCall) {
     return (
@@ -103,7 +103,7 @@ export default function MessageCallBubble({
           )}
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: message.fromMe ? '#FFFFFF' : colors.text, fontWeight: '600', fontSize: 15 }}>{label}</Text>
+          <Text style={{ color: message.fromMe ? colors.bubbleMeText : colors.text, fontWeight: '600', fontSize: 15 }}>{label}</Text>
           <Text style={{ color: subTextColor, fontSize: 12, marginTop: 2 }}>
             {isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại'}
           </Text>
@@ -132,7 +132,7 @@ export default function MessageCallBubble({
         activeOpacity={0.7}
       >
         <Text style={{
-          color: message.fromMe ? '#FFFFFF' : '#007AFF',
+          color: message.fromMe ? colors.tint : '#007AFF',
           fontWeight: '700',
           fontSize: 12,
           letterSpacing: 0.3

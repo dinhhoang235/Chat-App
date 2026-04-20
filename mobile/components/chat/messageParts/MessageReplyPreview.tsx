@@ -56,7 +56,7 @@ export default function MessageReplyPreview({ replyTo, onReplyPress, isOutgoing,
         <Text style={{ fontSize: 13, fontWeight: '700', color: isOutgoing ? colors.bubbleMeText : colors.bubbleOtherText, marginBottom: 2 }}>
           {replyTo.sender?.fullName || 'Người dùng'}
         </Text>
-        <Text style={{ fontSize: 13, color: isOutgoing ? 'rgba(255,255,255,0.85)' : colors.textSecondary }} numberOfLines={1} ellipsizeMode="tail">
+        <Text style={{ fontSize: 13, color: isOutgoing ? colors.textSecondary : colors.textSecondary }} numberOfLines={1} ellipsizeMode="tail">
           {replyTo.type === 'text'
             ? replyTo.content?.replace(/\n/g, ' ')
             : replyTo.type === 'image' || replyTo.type === 'image_group'

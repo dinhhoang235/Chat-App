@@ -29,9 +29,10 @@ export const Colors = {
 
     /* chat */
     input: '#F1F5F9',
-    bubbleMe: tintColorLight,
+    bubbleMe: '#E0F2FE',
+    bubbleMeBorder: '#93C5FD',
     bubbleOther: '#F1F5F9',
-    bubbleMeText: '#FFFFFF',
+    bubbleMeText: '#0F172A',
     bubbleOtherText: '#0F172A',
 
     /* ui */
@@ -64,7 +65,8 @@ export const Colors = {
 
     /* chat */
     input: '#202020',
-    bubbleMe: tintColorDark,     // brand blue
+    bubbleMe: '#273346',         // Dark slate blue background
+    bubbleMeBorder: '#3B82F6',    // Vibrant blue border
     bubbleOther: '#262626',
     bubbleMeText: '#FFFFFF',
     bubbleOtherText: 'rgba(255,255,255,0.88)',

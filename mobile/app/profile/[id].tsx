@@ -221,7 +221,8 @@ export default function UserProfile() {
       params: { 
         targetUserId: profile.id.toString(),
         name: profile.fullName,
-        avatar: profile.avatar || ''
+        avatar: profile.avatar || '',
+        fromProfile: 'true'
       }
     });
   }, [profile, router]);

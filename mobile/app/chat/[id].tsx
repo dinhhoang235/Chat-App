@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text } from 'react-native';
+import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
@@ -87,6 +87,27 @@ export default function ChatThread() {
   });
   const { activeCall, callStatus } = useCall();
   const [remoteActiveGroupCall, setRemoteActiveGroupCall] = React.useState(false);
+  // Handle Android hardware back to ensure we return to chat list when opened from Profile
+  React.useEffect(() => {
+    const onHardwareBack = () => {
+      try {
+        if ((params as any)?.fromProfile === 'true') {
+          router.replace('/(tabs)');
+          return true;
+        }
+      } catch {
+        // ignore
+      }
+      return false;
+    };
+
+    if (Platform.OS === 'android') {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+      return () => subscription.remove();
+    }
+    // no-op on other platforms
+    return;
+  }, [params, router]);
 
   const activeCallConversationId = activeCall?.conversationId;
   const activeCallGroupSize =
@@ -275,7 +296,13 @@ export default function ChatThread() {
                   </View>
                 </TouchableOpacity>
               }
-              onBackPress={() => router.back()}
+              onBackPress={() => {
+                if ((params as any)?.fromProfile === 'true') {
+                  router.replace('/(tabs)');
+                } else {
+                  router.back();
+                }
+              }}
               rightActions={isGroup ? [
                 { icon: 'video', onPress: handleGroupVideoHeaderPress, active: isActiveGroupCall },
                 { icon: 'search', onPress: () => setSearchMode(true) },

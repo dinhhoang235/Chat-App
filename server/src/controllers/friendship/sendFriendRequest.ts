@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../../db.js';
+import { sendPushNotifications } from '../../utils/notification.js';
 
 // Gửi lời mời kết bạn
 export const sendFriendRequest = async (req: Request, res: Response): Promise<void> => {
@@ -54,6 +55,15 @@ export const sendFriendRequest = async (req: Request, res: Response): Promise<vo
             message: 'Friend request updated successfully',
             data: updatedRequest
           });
+
+          if (receiver.pushToken) {
+            await sendPushNotifications([receiver.pushToken], {
+              title: 'Lời mời kết bạn',
+              body: `${updatedRequest.sender.fullName} đã gửi lời mời kết bạn cho bạn`,
+              data: { type: 'friend_request', senderId: senderId }
+            });
+          }
+
           return;
         } else {
           // If the old request was from them to me, delete it and create a new one from me to them
@@ -102,6 +112,14 @@ export const sendFriendRequest = async (req: Request, res: Response): Promise<vo
       message: 'Friend request sent successfully',
       data: friendRequest
     });
+
+    if (receiver.pushToken) {
+      await sendPushNotifications([receiver.pushToken], {
+        title: 'Lời mời kết bạn',
+        body: `${friendRequest.sender.fullName} đã gửi lời mời kết bạn cho bạn`,
+        data: { type: 'friend_request', senderId: senderId }
+      });
+    }
   } catch (err) {
     console.error('Error sending friend request:', err);
     res.status(500).json({ error: 'Failed to send friend request' });

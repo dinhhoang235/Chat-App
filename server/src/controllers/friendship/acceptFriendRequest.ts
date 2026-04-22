@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../../db.js';
+import { sendPushNotifications } from '../../utils/notification.js';
 
 // Chấp nhận lời mời kết bạn
 export const acceptFriendRequest = async (req: Request, res: Response): Promise<void> => {
@@ -55,6 +56,24 @@ export const acceptFriendRequest = async (req: Request, res: Response): Promise<
       success: true,
       message: 'Friend request accepted'
     });
+
+    // Send notification to the sender
+    try {
+      const [sender, receiver] = await Promise.all([
+        prisma.user.findUnique({ where: { id: senderId }, select: { pushToken: true } }),
+        prisma.user.findUnique({ where: { id: receiverId }, select: { fullName: true } })
+      ]);
+
+      if (sender?.pushToken && receiver) {
+        await sendPushNotifications([sender.pushToken], {
+          title: 'Chấp nhận kết bạn',
+          body: `${receiver.fullName} đã chấp nhận lời mời kết bạn`,
+          data: { type: 'friend_accepted', userId: receiverId }
+        });
+      }
+    } catch (err) {
+      console.error('Error sending acceptance notification:', err);
+    }
   } catch (err) {
     console.error('Error accepting friend request:', err);
     res.status(500).json({ error: 'Failed to accept friend request' });

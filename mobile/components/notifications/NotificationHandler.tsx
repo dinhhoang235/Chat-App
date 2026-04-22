@@ -164,6 +164,21 @@ export default function NotificationHandler() {
           if (data.isGroup) params.isGroup = 'true';
           if (data.name) params.name = data.name;
           router.push({ pathname: '/chat/[id]', params });
+          return;
+        }
+
+        if (data?.type === 'friend_request') {
+          router.push('/friend-requests');
+          return;
+        }
+
+        if (data?.type === 'friend_accepted') {
+          if (data.conversationId) {
+            router.push({ pathname: '/chat/[id]', params: { id: data.conversationId } });
+          } else {
+            router.push('/(tabs)/contacts');
+          }
+          return;
         }
       }
     );
@@ -198,13 +213,20 @@ export default function NotificationHandler() {
               });
               setCallStatus('incoming');
             } else {
-              console.log('[NotificationHandler] Ignoring stale/expired cold start call notification');
             }
           } else if (convId) {
             const params: any = { id: convId };
             if (data.isGroup) params.isGroup = 'true';
             if (data.name) params.name = data.name;
             router.push({ pathname: '/chat/[id]', params });
+          } else if (data?.type === 'friend_request') {
+            router.push('/friend-requests');
+          } else if (data?.type === 'friend_accepted') {
+            if (data.conversationId) {
+              router.push({ pathname: '/chat/[id]', params: { id: data.conversationId } });
+            } else {
+              router.push('/(tabs)/contacts');
+            }
           }
         }
         coldHandled.current = true;

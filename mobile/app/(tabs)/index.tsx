@@ -1,16 +1,63 @@
-import { FlatList, View, ActivityIndicator, Alert } from "react-native";
+import { FlatList, View, ActivityIndicator, Alert, Animated, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Header, SelectionHeader, BottomActionBar, MessageRow, StartChatModal, EmptyConversations } from '@/components';
 import { useAddMenu } from '@/context/addMenuContext';
 import { useTabBar } from '@/context/tabBarContext';
 import { useConversations } from '@/hooks/useConversations';
+import { useSocketStatus } from '@/hooks/useSocketStatus';
+import { useTheme } from '@/context/themeContext';
 
 export default function Messages() {
   const { toggle, setAddLayout, setHeaderLayout } = useAddMenu();
   const { tabBarHeight } = useTabBar();
   const [bottomBarHeight, setBottomBarHeight] = useState<number>(0);
   
+  const { scheme, colors } = useTheme();
+  const { isConnected } = useSocketStatus();
+  const [showStatus, setShowStatus] = useState(false);
+  const [statusText, setStatusText] = useState("");
+  const [statusColor, setStatusColor] = useState("");
+  const [textColor, setTextColor] = useState("#fff");
+  const lastConnected = useRef(isConnected);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!isConnected) {
+      // Disconnected
+      setStatusText("Không có kết nối");
+      setStatusColor(scheme === 'dark' ? '#333' : '#F1F5F9'); 
+      setTextColor(scheme === 'dark' ? '#fff' : '#64748B');
+      setShowStatus(true);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    } else if (isConnected && !lastConnected.current) {
+      // Reconnected
+      setStatusText("Đã kết nối");
+      setStatusColor(colors.success); 
+      setTextColor("#fff");
+      setShowStatus(true);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+
+      const timer = setTimeout(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }).start(() => setShowStatus(false));
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+    lastConnected.current = isConnected;
+  }, [isConnected, fadeAnim, scheme, colors.success]);
+
   const {
     data,
     setData,
@@ -32,8 +79,7 @@ export default function Messages() {
     handleUnmute,
     handlePin,
     handleMarkUnread,
-    router,
-    colors
+    router
   } = useConversations();
 
   const handleSearch = (text: string) => {
@@ -118,6 +164,24 @@ export default function Messages() {
           onAddLayout={(layout) => setAddLayout?.(layout)}
           onHeaderLayout={(layout) => setHeaderLayout?.(layout)}
         />
+      )}
+
+      {showStatus && (
+        <Animated.View 
+          style={{ 
+            height: fadeAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 28]
+            }),
+            backgroundColor: statusColor, 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            overflow: 'hidden',
+            opacity: fadeAnim,
+          }}
+        >
+          <Text style={{ color: textColor, fontSize: 13, fontWeight: '600' }}>{statusText}</Text>
+        </Animated.View>
       )}
 
       {loading ? (

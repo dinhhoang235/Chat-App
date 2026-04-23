@@ -8,6 +8,7 @@ class SocketService {
   private socket: Socket | null = null;
   private emitQueue: { event: string; data: any }[] = [];
   private listenerQueue: { event: string; callback: (data: any) => void }[] = [];
+  private statusListeners: ((connected: boolean) => void)[] = [];
 
   connect() {
     if (this.socket) return; 
@@ -19,10 +20,16 @@ class SocketService {
         this.socket = io(SOCKET_URL, {
           auth: { token },
           transports: ['websocket'],
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          timeout: 20000,
         });
 
         this.socket.on('connect', () => {
           console.log('Connected to socket server');
+          this.notifyStatusListeners(true);
           // Send all queued emits
           while (this.emitQueue.length > 0) {
             const item = this.emitQueue.shift();
@@ -36,12 +43,18 @@ class SocketService {
           if (item) this.socket.on(item.event, item.callback);
         }
 
-        this.socket.on('disconnect', () => {
-          console.log('Disconnected from socket server');
+        this.socket.on('disconnect', (reason) => {
+          console.log('Disconnected from socket server:', reason);
+          this.notifyStatusListeners(false);
         });
 
         this.socket.on('connect_error', (error) => {
           console.log('Socket connect error:', error.message);
+          this.notifyStatusListeners(false);
+        });
+
+        this.socket.on('reconnect_attempt', () => {
+          console.log('Attempting to reconnect...');
         });
       }
     });
@@ -51,7 +64,25 @@ class SocketService {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
+      this.notifyStatusListeners(false);
     }
+  }
+
+  isConnected() {
+    return this.socket?.connected || false;
+  }
+
+  onStatusChange(callback: (connected: boolean) => void) {
+    this.statusListeners.push(callback);
+    // Call immediately with current status
+    callback(this.isConnected());
+    return () => {
+      this.statusListeners = this.statusListeners.filter(l => l !== callback);
+    };
+  }
+
+  private notifyStatusListeners(connected: boolean) {
+    this.statusListeners.forEach(listener => listener(connected));
   }
 
   getSocket() {

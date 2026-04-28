@@ -1,7 +1,9 @@
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Header } from '@/components';
+import { LogoutSheet } from "@/components/modals";
 import { useAuth } from '@/context/authContext';
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from '@/context/themeContext';
@@ -26,19 +28,15 @@ const settingsItems: { title: string; icon: string; route: SettingsRoute }[] = [
 export default function Settings() {
   const router = useRouter();
   const { logout } = useAuth();
+  const [logoutSheetVisible, setLogoutSheetVisible] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert("Đăng xuất", "Bạn có chắc muốn đăng xuất?", [
-      { text: "Hủy", style: "cancel" },
-      {
-        text: "Đăng xuất",
-        style: "destructive",
-        onPress: () => {
-          logout();
-          router.replace("/login");
-        },
-      },
-    ]);
+    setLogoutSheetVisible(true);
+  };
+
+  const onConfirmLogout = () => {
+    logout();
+    router.replace("/login");
   };
 
   const { colors } = useTheme();
@@ -70,13 +68,19 @@ export default function Settings() {
       <SafeAreaView edges={["bottom"]} style={{ backgroundColor: colors.background }}>
         <TouchableOpacity
           className="flex-row items-center justify-center mx-6 py-3 rounded-full mb-6"
-          style={{ backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.border }}
+          style={{ backgroundColor: colors.danger }}
           onPress={handleLogout}
         >
-          <MaterialIcons name="logout" color={colors.text} size={20} />
-          <Text style={{ color: colors.text, fontWeight: '600', marginLeft: 8 }}>Đăng xuất</Text>
+          <MaterialIcons name="logout" color="#FFFFFF" size={20} />
+          <Text style={{ color: '#FFFFFF', fontWeight: '700', marginLeft: 8 }}>Đăng xuất</Text>
         </TouchableOpacity>
       </SafeAreaView>
+
+      <LogoutSheet 
+        visible={logoutSheetVisible} 
+        onClose={() => setLogoutSheetVisible(false)} 
+        onLogout={onConfirmLogout} 
+      />
     </SafeAreaView>
   );
 }

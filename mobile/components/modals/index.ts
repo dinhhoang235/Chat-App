@@ -23,3 +23,4 @@ export { default as ReportModal } from './ReportModal';
 export { default as StartChatModal } from './StartChatModal';
 export { default as EmojiSheet } from './EmojiSheet';
 export { default as ScannerModal } from './ScannerModal';
+export { default as LogoutSheet } from './LogoutSheet';

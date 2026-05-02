@@ -134,7 +134,27 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 - npm hoặc yarn
 - Expo Go (cho thử nghiệm nhanh) hoặc Development Build
 
-3. Khởi chạy ứng dụng:
+### 🧱 Cài đặt lần đầu
+
+1. Cài dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Nếu cần tạo cấu trúc native local để chạy Android/iOS bằng `expo run`, thực hiện:
+
+   ```bash
+   npx expo prebuild
+   ```
+
+3. Hoặc chạy trực tiếp Android trên thiết bị/emulator:
+   ```bash
+   npx expo run:android
+   ```
+
+4. Khởi chạy ứng dụng:
+
    ```bash
    npx expo start
    ```

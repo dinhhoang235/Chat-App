@@ -113,7 +113,8 @@ npm run dev
 # Terminal 2
 cd mobile
 npm install
-npx expo start
+npx expo prebuild
+npx expo run:android
 ```
 
 ## Chạy Backend

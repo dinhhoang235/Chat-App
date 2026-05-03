@@ -1,7 +1,7 @@
-import * as FileSystem from 'expo-file-system/legacy';
-import { Platform } from 'react-native';
+import * as FileSystem from "expo-file-system/legacy";
+import { Platform } from "react-native";
 
-import { compressImage } from './imageUpload';
+import { compressImage } from "./imageUpload";
 
 export type AttachmentFile = {
   uri: string;
@@ -24,11 +24,11 @@ const VIDEO_COMPRESSION_MIN_SIZE_BYTES = 8 * 1024 * 1024;
 async function getFileSize(uri: string, fallbackSize?: number) {
   try {
     const info = await FileSystem.getInfoAsync(uri);
-    if (info.exists && typeof (info as any).size === 'number') {
+    if (info.exists && typeof (info as any).size === "number") {
       return (info as any).size as number;
     }
   } catch (error) {
-    console.warn('Failed to inspect file size after media preparation:', error);
+    console.warn("Failed to inspect file size after media preparation:", error);
   }
 
   return fallbackSize;
@@ -39,43 +39,50 @@ async function compressVideoIfNeeded(file: AttachmentFile) {
     return file.uri;
   }
 
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     return file.uri;
   }
 
   try {
-    const { Video } = await import('react-native-compressor');
+    const { Video } = await import("react-native-compressor");
     const compressedUri = await Video.compress(file.uri, {
-      compressionMethod: 'auto',
+      compressionMethod: "auto",
       minimumFileSizeForCompress: VIDEO_COMPRESSION_MIN_SIZE_BYTES,
       progressDivider: 10,
     });
 
     return compressedUri || file.uri;
   } catch (error) {
-    console.warn('Video compression failed, using original file:', error);
+    console.warn("Video compression failed, using original file:", error);
     return file.uri;
   }
 }
 
-export async function prepareAttachmentForUpload(file: AttachmentFile): Promise<PreparedAttachment> {
-  const isImage = file.type.startsWith('image/');
-  const isVideo = file.type.startsWith('video/');
+export async function prepareAttachmentForUpload(
+  file: AttachmentFile,
+): Promise<PreparedAttachment> {
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/");
 
   let uploadUri = file.uri;
   if (isImage) {
-    uploadUri = await compressImage(file.uri, 'cover');
+    uploadUri = await compressImage(file.uri, "cover");
   } else if (isVideo) {
     uploadUri = await compressVideoIfNeeded(file);
   }
 
   const uploadSize = await getFileSize(uploadUri, file.size);
 
+  const uploadName = file.type.startsWith("image/")
+    ? `${file.name.replace(/\.[^/.]+$/, "")}.webp`
+    : file.name;
+  const uploadType = file.type.startsWith("image/") ? "image/webp" : file.type;
+
   return {
     uploadUri,
-    uploadName: file.name,
+    uploadName,
     uploadSize,
-    type: file.type,
+    type: uploadType,
     duration: file.duration,
   };
 }

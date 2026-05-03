@@ -1,8 +1,8 @@
-import * as ImageManipulator from 'expo-image-manipulator';
-import { SaveFormat } from 'expo-image-manipulator';
-import apiClient from './api';
+import * as ImageManipulator from "expo-image-manipulator";
+import { SaveFormat } from "expo-image-manipulator";
+import apiClient from "./api";
 
-export type ImageType = 'avatar' | 'cover';
+export type ImageType = "avatar" | "cover";
 
 interface ImageUploadOptions {
   imageUri: string;
@@ -12,42 +12,46 @@ interface ImageUploadOptions {
 
 export const compressImage = async (imageUri: string, type: ImageType) => {
   try {
-    const isAvatar = type === 'avatar';
+    const isAvatar = type === "avatar";
 
     const result = await ImageManipulator.manipulateAsync(
       imageUri,
       [{ resize: { width: isAvatar ? 600 : 1440 } }],
-      { 
-        compress: isAvatar ? 0.92 : 0.95, 
-        format: SaveFormat.JPEG 
-      }
+      {
+        compress: isAvatar ? 0.95 : 0.95,
+        format: SaveFormat.WEBP,
+      },
     );
 
     return result.uri;
   } catch (error) {
-    console.warn('Image compression failed, using original:', error);
+    console.warn("Image compression failed, using original:", error);
     return imageUri;
   }
 };
 
-export const uploadImage = async ({ imageUri, type, userId }: ImageUploadOptions) => {
+export const uploadImage = async ({
+  imageUri,
+  type,
+  userId,
+}: ImageUploadOptions) => {
   try {
     // Compress image
     const compressedUri = await compressImage(imageUri, type);
 
     // React Native FormData with file object
     const formData = new FormData();
-    const fieldName = type === 'avatar' ? 'avatar' : 'coverImage';
-    
+    const fieldName = type === "avatar" ? "avatar" : "coverImage";
+
     formData.append(fieldName, {
       uri: compressedUri,
-      type: 'image/jpeg',
-      name: `${type}.jpg`,
+      type: "image/webp",
+      name: `${type}.webp`,
     } as any);
 
     const uploadResponse = await apiClient.patch(`/users/${userId}`, formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        "Content-Type": "multipart/form-data",
       },
       // Prevent axios from JSON-serializing the FormData
       transformRequest: (data) => data,
@@ -55,7 +59,7 @@ export const uploadImage = async ({ imageUri, type, userId }: ImageUploadOptions
 
     return { success: true, data: uploadResponse.data };
   } catch (error) {
-    console.error('Error uploading image:', error);
+    console.error("Error uploading image:", error);
     throw error;
   }
 };

@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router } from "express";
 import {
   login,
   signup,
+  logout,
   refreshToken,
   getAllUsers,
   getUserById,
@@ -12,8 +13,8 @@ import {
   saveSearchHistory,
   getSearchHistory,
   deleteSearchHistory,
-  clearSearchHistory
-} from '../controllers/user/index.js';
+  clearSearchHistory,
+} from "../controllers/user/index.js";
 import {
   sendFriendRequest,
   acceptFriendRequest,
@@ -24,43 +25,54 @@ import {
   getFriendsList,
   removeFriend,
   checkFriendshipStatus,
-  searchFriendByPhone
-} from '../controllers/friendship/index.js';
-import { upload } from '../middleware/upload.js';
-import { authMiddleware } from '../middleware/auth.js';
+  searchFriendByPhone,
+} from "../controllers/friendship/index.js";
+import { upload } from "../middleware/upload.js";
+import { authMiddleware } from "../middleware/auth.js";
 
 const router = Router();
 
 // Auth routes (không cần auth)
-router.post('/login', login);
-router.post('/signup', signup);
-router.post('/refresh', refreshToken);
+router.post("/login", login);
+router.post("/signup", signup);
+router.post("/refresh", refreshToken);
+
+// Auth routes (yêu cầu auth)
+router.post("/logout", authMiddleware, logout);
 
 // User routes
-router.get('/', getAllUsers);
-router.get('/search', authMiddleware, searchUsers);
-router.get('/:id', getUserById);
-router.post('/', createUser);
-router.patch('/:id', upload.any(), updateUser);
-router.put('/:id', upload.any(), updateUser);
-router.delete('/:id', deleteUser);
+router.get("/", getAllUsers);
+router.get("/search", authMiddleware, searchUsers);
+router.get("/:id", getUserById);
+router.post("/", createUser);
+router.patch("/:id", upload.any(), updateUser);
+router.put("/:id", upload.any(), updateUser);
+router.delete("/:id", deleteUser);
 
 // Search history routes
-router.post('/search/history', authMiddleware, saveSearchHistory);
-router.get('/search/history', authMiddleware, getSearchHistory);
-router.post('/search/history/remove', authMiddleware, deleteSearchHistory);
-router.post('/search/history/clear', authMiddleware, clearSearchHistory);
+router.post("/search/history", authMiddleware, saveSearchHistory);
+router.get("/search/history", authMiddleware, getSearchHistory);
+router.post("/search/history/remove", authMiddleware, deleteSearchHistory);
+router.post("/search/history/clear", authMiddleware, clearSearchHistory);
 
 // Friend request routes (yêu cầu auth)
-router.post('/friends/request/send', authMiddleware, sendFriendRequest);
-router.post('/friends/request/accept', authMiddleware, acceptFriendRequest);
-router.post('/friends/request/reject', authMiddleware, rejectFriendRequest);
-router.post('/friends/request/cancel', authMiddleware, cancelFriendRequest);
-router.get('/friends/requests/pending', authMiddleware, getPendingFriendRequests);
-router.get('/friends/requests/sent', authMiddleware, getSentFriendRequests);
-router.get('/friends/list', authMiddleware, getFriendsList);
-router.post('/friends/remove', authMiddleware, removeFriend);
-router.get('/friends/status/:targetUserId', authMiddleware, checkFriendshipStatus);
-router.get('/friends/search', authMiddleware, searchFriendByPhone);
+router.post("/friends/request/send", authMiddleware, sendFriendRequest);
+router.post("/friends/request/accept", authMiddleware, acceptFriendRequest);
+router.post("/friends/request/reject", authMiddleware, rejectFriendRequest);
+router.post("/friends/request/cancel", authMiddleware, cancelFriendRequest);
+router.get(
+  "/friends/requests/pending",
+  authMiddleware,
+  getPendingFriendRequests,
+);
+router.get("/friends/requests/sent", authMiddleware, getSentFriendRequests);
+router.get("/friends/list", authMiddleware, getFriendsList);
+router.post("/friends/remove", authMiddleware, removeFriend);
+router.get(
+  "/friends/status/:targetUserId",
+  authMiddleware,
+  checkFriendshipStatus,
+);
+router.get("/friends/search", authMiddleware, searchFriendByPhone);
 
 export default router;

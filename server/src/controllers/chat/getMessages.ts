@@ -151,7 +151,7 @@ export const getMessages =
               .filter(
                 (p: ChatParticipantWithUser) =>
                   p.userId !== msg.senderId &&
-                  new Date(p.lastReadAt).getTime() >=
+                  new Date(p.lastReadAt).getTime() >
                     new Date(msg.createdAt).getTime(),
               )
               .map((p: ChatParticipantWithUser) => ({

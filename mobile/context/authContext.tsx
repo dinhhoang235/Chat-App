@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from "react";
 import { authAPI } from "@/services/auth";
 import { tokenStorage } from "@/utils/tokenStorage";
 import { socketService } from "@/services/socket";
+import { userAPI } from "@/services/user";
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -93,6 +94,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    try {
+      // If user exists, clear their push token on backend and call logout API
+      if (user) {
+        await userAPI.updatePushToken(user.id, null);
+      }
+      await authAPI.logout();
+    } catch (error) {
+      console.error("Logout API error:", error);
+      // Continue with local logout even if API call fails
+    }
+    
+    // Always do local cleanup
     setIsLoggedIn(false);
     setUser(null);
     await Promise.all([tokenStorage.removeTokens(), tokenStorage.removeUser()]);

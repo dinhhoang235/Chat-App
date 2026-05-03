@@ -1,16 +1,19 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { authAPI } from "@/services/auth";
-import { tokenStorage } from "@/utils/tokenStorage";
+import { tokenStorage, SavedAccount } from "@/utils/tokenStorage";
 import { socketService } from "@/services/socket";
 
 interface AuthContextType {
   isLoggedIn: boolean;
   initialized: boolean; // true once hydration from storage finished
   user: { id: number; phone: string; fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null } | null;
+  savedAccounts: SavedAccount[];
   login: (phone: string, password: string) => Promise<boolean>;
   signup: (phone: string, fullName: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (data: Partial<{ fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null }>) => void;
+  switchAccount: (account: SavedAccount) => Promise<void>;
+  removeAccount: (userId: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,6 +24,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<{ id: number; phone: string; fullName: string; avatar?: string; coverImage?: string; bio?: string; gender?: string | null; dateOfBirth?: string | null } | null>(
     null
   );
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+
+  const loadSavedAccounts = async () => {
+    const accounts = await tokenStorage.getSavedAccounts();
+    setSavedAccounts(accounts);
+  };
 
   // restore login state when the provider mounts
   useEffect(() => {
@@ -35,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await tokenStorage.removeTokens();
         await tokenStorage.removeUser();
       }
+      await loadSavedAccounts();
       setInitialized(true);
     })();
   }, []);
@@ -55,6 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user);
         await tokenStorage.saveTokens(data.accessToken, data.refreshToken);
         await tokenStorage.saveUser(data.user);
+        await tokenStorage.addSavedAccount(data.user, data.accessToken, data.refreshToken);
+        await loadSavedAccounts();
         return true;
       }
       return false;
@@ -76,6 +88,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user);
         await tokenStorage.saveTokens(data.accessToken, data.refreshToken);
         await tokenStorage.saveUser(data.user);
+        await tokenStorage.addSavedAccount(data.user, data.accessToken, data.refreshToken);
+        await loadSavedAccounts();
         return true;
       }
       return false;
@@ -98,8 +112,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await Promise.all([tokenStorage.removeTokens(), tokenStorage.removeUser()]);
   };
 
+  const switchAccount = async (account: SavedAccount) => {
+    setIsLoggedIn(true);
+    setUser(account.user);
+    await tokenStorage.saveTokens(account.accessToken, account.refreshToken);
+    await tokenStorage.saveUser(account.user);
+    await tokenStorage.addSavedAccount(account.user, account.accessToken, account.refreshToken);
+    await loadSavedAccounts();
+  };
+
+  const removeAccount = async (userId: number) => {
+    await tokenStorage.removeSavedAccount(userId);
+    await loadSavedAccounts();
+    
+    // If we removed the currently active account, log out
+    if (user?.id === userId) {
+      await logout();
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ isLoggedIn, initialized, user, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider value={{ isLoggedIn, initialized, user, savedAccounts, login, signup, logout, updateProfile, switchAccount, removeAccount }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import FullscreenImageViewer from '../../modals/FullscreenImageViewer';
 import { resolveMediaUri } from './messageHelpers';
@@ -15,10 +15,11 @@ type MessageImageBubbleProps = {
 export default function MessageImageBubble({ message, screenWidth, colors, allMedia, progress }: MessageImageBubbleProps) {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(() => {
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(() => {
     const uri = message.fileInfo?.url ? resolveMediaUri(message.fileInfo.url) : null;
-    return uri ? null : null;
+    return uri ? IMAGE_SIZE_CACHE.get(uri) || null : null;
   });
+  const { height: screenHeight } = useWindowDimensions();
 
   const fullImageUri = useMemo(() => {
     if (message.type !== 'image' || !message.fileInfo) return null;
@@ -46,7 +47,12 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
   }
 
   const maxWidth = screenWidth * 0.75;
-  const imageHeight = imgSize ? (imgSize.height * (maxWidth / imgSize.width)) : maxWidth * 0.75;
+  const maxHeight = screenHeight * 0.48;
+  const cachedSize = imageSize || (fullImageUri ? IMAGE_SIZE_CACHE.get(fullImageUri) || null : null);
+  const aspectRatio = cachedSize && cachedSize.width > 0 && cachedSize.height > 0
+    ? cachedSize.width / cachedSize.height
+    : 1;
+  const imageHeight = Math.min(maxWidth / aspectRatio, maxHeight);
 
   return (
     <>
@@ -66,19 +72,22 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
         }}
         activeOpacity={0.9}
       >
-        <View>
+        <View style={{ width: maxWidth, height: imageHeight, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.surfaceVariant }}>
           <Image
             source={{ uri: fullImageUri }}
             style={{
-              width: maxWidth,
-              height: imageHeight,
-              borderRadius: 12,
+              width: '100%',
+              height: '100%',
               backgroundColor: colors.surfaceVariant,
             }}
-            contentFit="cover"
-            onLoad={(e) => {
-              const { width, height } = e.source;
-              setImgSize({ width, height });
+            contentFit="contain"
+            onLoad={(event) => {
+              const { width, height } = event.source;
+              if (width > 0 && height > 0) {
+                const nextSize = { width, height };
+                IMAGE_SIZE_CACHE.set(fullImageUri, nextSize);
+                setImageSize(nextSize);
+              }
             }}
             onError={(err) => console.log('Image load error:', fullImageUri, err)}
           />
@@ -114,3 +123,5 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
     </>
   );
 }
+
+const IMAGE_SIZE_CACHE = new Map<string, { width: number; height: number }>();

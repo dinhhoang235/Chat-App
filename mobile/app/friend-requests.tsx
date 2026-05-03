@@ -163,7 +163,7 @@ export default function FriendRequests() {
                   phone: user?.phone || '', 
                   time,
                   initials,
-                  color: '#6B7280'
+                  color: colors.tint
                 }}
                 avatar={user?.avatar}
                 userId={user?.id}

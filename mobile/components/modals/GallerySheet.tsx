@@ -128,10 +128,21 @@ export default function GallerySheet({
         }
       }
 
+      // Detect GIF files by extension
+      const isGif = asset.filename?.toLowerCase().endsWith('.gif');
+      let mimeType: string | undefined;
+      if (asset.mediaType === 'video') {
+        mimeType = 'video/mp4';
+      } else if (isGif) {
+        mimeType = 'image/gif';
+      } else if (asset.mediaType === 'photo') {
+        mimeType = 'image/jpeg';
+      }
+
       const file: FileObject = {
         uri,
         name: asset.filename,
-        type: asset.mediaType === 'photo' ? 'image/jpeg' : (asset.mediaType === 'video' ? 'video/mp4' : undefined),
+        type: mimeType,
         size,
         duration: asset.duration,
       };

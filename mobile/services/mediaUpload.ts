@@ -62,10 +62,12 @@ export async function prepareAttachmentForUpload(
   file: AttachmentFile,
 ): Promise<PreparedAttachment> {
   const isImage = file.type.startsWith("image/");
+  const isGif = file.type === "image/gif";
   const isVideo = file.type.startsWith("video/");
 
   let uploadUri = file.uri;
-  if (isImage) {
+  if (isImage && !isGif) {
+    // Don't compress GIFs - they need to stay as-is to preserve animation
     uploadUri = await compressImage(file.uri, "cover");
   } else if (isVideo) {
     uploadUri = await compressVideoIfNeeded(file);
@@ -73,10 +75,13 @@ export async function prepareAttachmentForUpload(
 
   const uploadSize = await getFileSize(uploadUri, file.size);
 
-  const uploadName = file.type.startsWith("image/")
+  // Keep GIFs in their original format, convert other images to WebP
+  const uploadName = isGif
+    ? file.name
+    : file.type.startsWith("image/")
     ? `${file.name.replace(/\.[^/.]+$/, "")}.webp`
     : file.name;
-  const uploadType = file.type.startsWith("image/") ? "image/webp" : file.type;
+  const uploadType = isGif ? "image/gif" : file.type.startsWith("image/") ? "image/webp" : file.type;
 
   return {
     uploadUri,

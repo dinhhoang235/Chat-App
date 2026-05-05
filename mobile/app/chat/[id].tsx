@@ -218,6 +218,11 @@ export default function ChatThread() {
     ? Math.round(sheetHeight + composerHeight)
     : sheetHeight;
 
+  // Only show body loading if we have no messages AND either:
+  // 1. Messages are still loading OR
+  // 2. It's a 1-1 chat and we're waiting for user status
+  const showBodyLoading = (loading || (!isGroup && !!targetUserIdState && targetUserStatus === null)) && processedMessages.length === 0;
+
   return (
     <View className="flex-1" style={{ backgroundColor: colors.surface, paddingTop: insets.top }}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -359,7 +364,7 @@ export default function ChatThread() {
 
           {/* Wrapper for messages and composer that pushes up with keyboard */}
             <Animated.View style={[{ flex: 1 }, animatedContentStyle]}>
-              {loading ? (
+              {showBodyLoading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                   <ActivityIndicator size="large" color={colors.tint} />
                 </View>
@@ -385,9 +390,11 @@ export default function ChatThread() {
                       // the backend returns a message with a missing id.
                       return `msg-${idx}`;
                     }}
-                    initialNumToRender={20}
-                    maxToRenderPerBatch={40}
-                    windowSize={21}
+                    initialNumToRender={8}
+                    maxToRenderPerBatch={10}
+                    windowSize={9}
+                    updateCellsBatchingPeriod={16}
+                    removeClippedSubviews
                     maintainVisibleContentPosition={{
                       minIndexForVisible: 0,
                       autoscrollToTopThreshold: 10,
@@ -401,6 +408,7 @@ export default function ChatThread() {
                         fetchMessages(true);
                       }
                     }}
+                    ListEmptyComponent={() => null}
                     ListHeaderComponent={() => isTyping ? (
                       <View className="px-4 py-2 flex-row items-center">
                         <Image

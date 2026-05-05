@@ -56,8 +56,8 @@ export default function MessageFooter({ message, isOutgoing, isLastInGroup, isTh
                   onError={(e) => console.log('Avatar load error:', e)}
                 />
               ) : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>{getInitials(u.fullName)}</Text>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}>
+                  <Text style={{ fontSize: 12, color: '#FFFFFF' }}>{getInitials(u.fullName)}</Text>
                 </View>
               )}
             </View>

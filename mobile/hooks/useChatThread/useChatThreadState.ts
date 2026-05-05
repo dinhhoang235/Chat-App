@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 interface UseChatThreadStateParams {
   id: string | null;
   targetUserId: string | null;
   paramsTargetUserId: string | null;
   isNewConversation: boolean;
+  initialMessages?: any[];
+  initialTargetUserStatus?: {
+    status: string;
+    lastSeen: number | null;
+  } | null;
 }
 
 export function useChatThreadState({
@@ -12,12 +17,18 @@ export function useChatThreadState({
   targetUserId,
   paramsTargetUserId,
   isNewConversation,
+  initialMessages = [],
+  initialTargetUserStatus = null,
 }: UseChatThreadStateParams) {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(!isNewConversation);
+  const [messages, setMessages] = useState<any[]>(() => initialMessages);
+  const [loading, setLoading] = useState(
+    !(isNewConversation || initialMessages.length > 0),
+  );
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [conversationId, setConversationId] = useState<string | null>(id || null);
+  const [conversationId, setConversationId] = useState<string | null>(
+    id || null,
+  );
   const [targetUserIdState, setTargetUserIdState] = useState<string | null>(
     targetUserId || paramsTargetUserId || null,
   );
@@ -27,7 +38,7 @@ export function useChatThreadState({
   const [targetUserStatus, setTargetUserStatus] = useState<{
     status: string;
     lastSeen: number | null;
-  } | null>(null);
+  } | null>(initialTargetUserStatus);
   const [targetUser, setTargetUser] = useState<any>(null);
   const [replyingTo, setReplyingTo] = useState<any>(null);
 

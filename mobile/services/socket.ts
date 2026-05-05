@@ -1,5 +1,5 @@
-import { io, Socket } from 'socket.io-client';
-import { tokenStorage } from '@/utils/tokenStorage';
+import { io, Socket } from "socket.io-client";
+import { tokenStorage } from "@/utils/tokenStorage";
 
 // Use environment variable for socket URL
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL;
@@ -7,56 +7,64 @@ const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL;
 class SocketService {
   private socket: Socket | null = null;
   private emitQueue: { event: string; data: any }[] = [];
-  private listenerQueue: { event: string; callback: (data: any) => void }[] = [];
+  private listenerQueue: { event: string; callback: (data: any) => void }[] =
+    [];
   private statusListeners: ((connected: boolean) => void)[] = [];
 
-  connect() {
-    if (this.socket) return; 
+  private createSocket(token: string) {
+    if (this.socket) return;
 
-    tokenStorage.getAccessToken().then(token => {
-      if (!token) return;
+    this.socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+    });
 
-      if (!this.socket) {
-        this.socket = io(SOCKET_URL, {
-          auth: { token },
-          transports: ['websocket'],
-          reconnection: true,
-          reconnectionAttempts: Infinity,
-          reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
-          timeout: 20000,
-        });
-
-        this.socket.on('connect', () => {
-          console.log('Connected to socket server');
-          this.notifyStatusListeners(true);
-          // Send all queued emits
-          while (this.emitQueue.length > 0) {
-            const item = this.emitQueue.shift();
-            if (item) this.socket?.emit(item.event, item.data);
-          }
-        });
-
-        // Register all queued listeners
-        while (this.listenerQueue.length > 0) {
-          const item = this.listenerQueue.shift();
-          if (item) this.socket.on(item.event, item.callback);
-        }
-
-        this.socket.on('disconnect', (reason) => {
-          console.log('Disconnected from socket server:', reason);
-          this.notifyStatusListeners(false);
-        });
-
-        this.socket.on('connect_error', (error) => {
-          console.log('Socket connect error:', error.message);
-          this.notifyStatusListeners(false);
-        });
-
-        this.socket.on('reconnect_attempt', () => {
-          console.log('Attempting to reconnect...');
-        });
+    this.socket.on("connect", () => {
+      console.log("Connected to socket server");
+      this.notifyStatusListeners(true);
+      while (this.emitQueue.length > 0) {
+        const item = this.emitQueue.shift();
+        if (item) this.socket?.emit(item.event, item.data);
       }
+    });
+
+    while (this.listenerQueue.length > 0) {
+      const item = this.listenerQueue.shift();
+      if (item) this.socket.on(item.event, item.callback);
+    }
+
+    this.socket.on("disconnect", (reason) => {
+      console.log("Disconnected from socket server:", reason);
+      this.notifyStatusListeners(false);
+    });
+
+    this.socket.on("connect_error", (error) => {
+      console.log("Socket connect error:", error.message);
+      this.notifyStatusListeners(false);
+    });
+
+    this.socket.on("reconnect_attempt", () => {
+      console.log("Attempting to reconnect...");
+    });
+  }
+
+  connect() {
+    if (this.socket) return;
+
+    const cachedToken = tokenStorage.getCachedAccessToken();
+    if (cachedToken) {
+      this.createSocket(cachedToken);
+      return;
+    }
+
+    tokenStorage.getAccessToken().then((token) => {
+      if (!token) return;
+      this.createSocket(token);
     });
   }
 
@@ -77,12 +85,12 @@ class SocketService {
     // Call immediately with current status
     callback(this.isConnected());
     return () => {
-      this.statusListeners = this.statusListeners.filter(l => l !== callback);
+      this.statusListeners = this.statusListeners.filter((l) => l !== callback);
     };
   }
 
   private notifyStatusListeners(connected: boolean) {
-    this.statusListeners.forEach(listener => listener(connected));
+    this.statusListeners.forEach((listener) => listener(connected));
   }
 
   getSocket() {
@@ -101,7 +109,7 @@ class SocketService {
       if (!this.socket) this.connect();
       if (callback) {
         // If socket isn't connected yet, queue an immediate callback failure
-        setTimeout(() => callback({ error: 'Socket not connected' }), 0);
+        setTimeout(() => callback({ error: "Socket not connected" }), 0);
       }
     }
   }
@@ -126,10 +134,12 @@ class SocketService {
       // Remove from queue if it hasn't been registered yet
       if (callback) {
         this.listenerQueue = this.listenerQueue.filter(
-          l => l.event !== event || l.callback !== callback
+          (l) => l.event !== event || l.callback !== callback,
         );
       } else {
-        this.listenerQueue = this.listenerQueue.filter(l => l.event !== event);
+        this.listenerQueue = this.listenerQueue.filter(
+          (l) => l.event !== event,
+        );
       }
     }
   }

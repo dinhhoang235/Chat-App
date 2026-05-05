@@ -53,7 +53,7 @@ export const getConversations = async (
           },
         },
         messages: {
-          take: 1,
+          take: 20,
           orderBy: { createdAt: "desc" },
         },
       },
@@ -100,11 +100,18 @@ export const getConversations = async (
             conv.participants.map(
               async (p: ConversationParticipantWithUser) => {
                 const status = await getUserStatus(p.userId);
+                const isOnline = status === "online";
+                const lastSeen = isOnline
+                  ? null
+                  : status && !Number.isNaN(Number(status))
+                    ? Number(status)
+                    : null;
                 return {
                   ...p,
                   user: {
                     ...p.user,
-                    status: status === "online" ? "online" : "offline",
+                    status: isOnline ? "online" : "offline",
+                    lastSeen,
                   },
                 };
               },
@@ -114,7 +121,28 @@ export const getConversations = async (
           return {
             ...conv,
             isPinned: !!participant?.isPinned,
-            messages: lastMessage,
+            messages: lastMessage.map((msg: any) => {
+              // Compute seenBy for initial messages just like in getMessages
+              const seenBy = msg.senderId
+                ? participantsWithStatus
+                    .filter(
+                      (p: any) =>
+                        p.userId !== msg.senderId &&
+                        new Date(p.lastReadAt || 0).getTime() >
+                          new Date(msg.createdAt).getTime(),
+                    )
+                    .map((p: any) => ({
+                      id: p.user.id,
+                      fullName: p.user.fullName,
+                      avatar: p.user.avatar
+                        ? p.user.avatar.startsWith("http")
+                          ? p.user.avatar
+                          : p.user.avatar
+                        : null,
+                    }))
+                : [];
+              return { ...msg, seenBy, fromMe: msg.senderId === userId };
+            }),
             participants: participantsWithStatus,
             membersCount: conv.participants.length,
             _count: {

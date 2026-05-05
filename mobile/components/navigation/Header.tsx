@@ -239,11 +239,13 @@ const Header = ({
           </>
         )}
       </View>
-      <ScannerModal 
-        visible={scannerVisible} 
-        onClose={closeScanner} 
-        onScan={handleScan} 
-      />
+      {scannerVisible ? (
+        <ScannerModal
+          visible={scannerVisible}
+          onClose={closeScanner}
+          onScan={handleScan}
+        />
+      ) : null}
     </View>
   );
 };

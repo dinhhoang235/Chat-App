@@ -5,6 +5,8 @@ const REFRESH_TOKEN_KEY = "refresh_token";
 const USER_KEY = "user";
 const SAVED_ACCOUNTS_KEY = "saved_accounts";
 
+let cachedAccessToken: string | null = null;
+
 export interface SavedAccount {
   user: any;
   accessToken: string;
@@ -14,6 +16,7 @@ export interface SavedAccount {
 export const tokenStorage = {
   saveTokens: async (accessToken: string, refreshToken: string) => {
     try {
+      cachedAccessToken = accessToken;
       await Promise.all([
         SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken),
         SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken),
@@ -25,11 +28,23 @@ export const tokenStorage = {
 
   getAccessToken: async () => {
     try {
-      return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+      if (cachedAccessToken !== null) {
+        return cachedAccessToken;
+      }
+
+      const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+      cachedAccessToken = token;
+      return token;
     } catch (error) {
       console.error("Error getting access token:", error);
       return null;
     }
+  },
+
+  getCachedAccessToken: () => cachedAccessToken,
+
+  setCachedAccessToken: (token: string | null) => {
+    cachedAccessToken = token;
   },
 
   getRefreshToken: async () => {
@@ -43,6 +58,7 @@ export const tokenStorage = {
 
   removeTokens: async () => {
     try {
+      cachedAccessToken = null;
       await Promise.all([
         SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
         SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
@@ -81,6 +97,7 @@ export const tokenStorage = {
 
   clearAll: async () => {
     try {
+      cachedAccessToken = null;
       await Promise.all([
         SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
         SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
@@ -102,19 +119,26 @@ export const tokenStorage = {
     }
   },
 
-  addSavedAccount: async (user: any, accessToken: string, refreshToken: string) => {
+  addSavedAccount: async (
+    user: any,
+    accessToken: string,
+    refreshToken: string,
+  ) => {
     try {
       const accounts = await tokenStorage.getSavedAccounts();
       const existingIndex = accounts.findIndex((a) => a.user.id === user.id);
-      
+
       const newAccount = { user, accessToken, refreshToken };
       if (existingIndex >= 0) {
         accounts[existingIndex] = newAccount;
       } else {
         accounts.push(newAccount);
       }
-      
-      await SecureStore.setItemAsync(SAVED_ACCOUNTS_KEY, JSON.stringify(accounts));
+
+      await SecureStore.setItemAsync(
+        SAVED_ACCOUNTS_KEY,
+        JSON.stringify(accounts),
+      );
     } catch (error) {
       console.error("Error adding saved account:", error);
     }
@@ -124,7 +148,10 @@ export const tokenStorage = {
     try {
       const accounts = await tokenStorage.getSavedAccounts();
       const filtered = accounts.filter((a) => a.user.id !== userId);
-      await SecureStore.setItemAsync(SAVED_ACCOUNTS_KEY, JSON.stringify(filtered));
+      await SecureStore.setItemAsync(
+        SAVED_ACCOUNTS_KEY,
+        JSON.stringify(filtered),
+      );
     } catch (error) {
       console.error("Error removing saved account:", error);
     }

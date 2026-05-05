@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
-import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
-import { getThreadStatusText } from '@/utils/chatThread';
+import { useMemo } from "react";
+import { getAvatarUrl } from "@/utils/avatar";
+import { getInitials } from "@/utils/initials";
+import { getThreadStatusText } from "@/utils/chatThread";
 
 interface UseChatThreadMetaParams {
   typingUser: any;
@@ -39,13 +39,29 @@ export function useChatThreadMeta({
           initials: getInitials(p.user.fullName),
         }));
     }
-    return paramsAvatars
-      ? Array.isArray(paramsAvatars)
-        ? paramsAvatars
-        : typeof paramsAvatars === 'string' && paramsAvatars.includes(',')
-          ? paramsAvatars.split(',')
-          : [paramsAvatars as string]
-      : [];
+
+    // Parse JSON avatars from params
+    if (paramsAvatars) {
+      try {
+        const parsed =
+          typeof paramsAvatars === "string"
+            ? JSON.parse(paramsAvatars)
+            : paramsAvatars;
+
+        if (Array.isArray(parsed)) {
+          return parsed.map((url: string) => ({ url }));
+        }
+      } catch (e) {
+        // Fall back to handling as CSV
+        return Array.isArray(paramsAvatars)
+          ? paramsAvatars
+          : typeof paramsAvatars === "string" && paramsAvatars.includes(",")
+            ? paramsAvatars.split(",")
+            : [paramsAvatars as string];
+      }
+    }
+
+    return [];
   }, [groupDetails, paramsAvatars]);
 
   const membersCount =

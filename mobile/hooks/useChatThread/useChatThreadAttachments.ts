@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { Alert } from "react-native";
+import { Alert, Image as RNImage } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { chatApi } from "@/services/chat";
@@ -34,6 +34,41 @@ type UseChatThreadAttachmentsArgs = {
 const MAX_ATTACHMENT_SIZE_BYTES = 100 * 1024 * 1024;
 const DEFAULT_MULTIPART_THRESHOLD_BYTES = 5 * 1024 * 1024;
 const AUDIO_MULTIPART_THRESHOLD_BYTES = 2 * 1024 * 1024;
+
+const getImageDimensions = async (
+  uri: string,
+  isImage: boolean,
+): Promise<{ width?: number; height?: number }> => {
+  if (!isImage) return {};
+  try {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        console.warn("Image getSize timeout for", uri);
+        resolve({});
+      }, 5000); // 5 second timeout
+
+      RNImage.getSize(
+        uri,
+        (width, height) => {
+          clearTimeout(timeout);
+          if (width > 0 && height > 0) {
+            resolve({ width, height });
+          } else {
+            resolve({});
+          }
+        },
+        () => {
+          clearTimeout(timeout);
+          console.warn("Failed to get image dimensions for", uri);
+          resolve({});
+        },
+      );
+    });
+  } catch (error) {
+    console.warn("Error getting image dimensions:", error);
+    return {};
+  }
+};
 
 const getAttachmentType = (mime: string) => {
   if (mime.startsWith("image/")) return "image";
@@ -75,6 +110,10 @@ export function useChatThreadAttachments({
 
       const replyToSnapshot = replyingTo;
       setReplyingTo(null);
+
+      // Capture dimensions early from original file for images
+      const isImage = file.type.startsWith("image/");
+      const originalDimensions = await getImageDimensions(file.uri, isImage);
 
       const preparedAttachment = await prepareAttachmentForUpload(file);
       const uploadFileUri = preparedAttachment.uploadUri;
@@ -182,6 +221,7 @@ export function useChatThreadAttachments({
               duration: file.duration,
               waveform: file.waveform,
               thumbnailUrl: thumbnailUrl || undefined,
+              ...originalDimensions,
             };
 
             const response = await chatApi.startConversation(
@@ -297,6 +337,7 @@ export function useChatThreadAttachments({
           duration: file.duration,
           waveform: file.waveform,
           thumbnailUrl: thumbnailUrl || undefined,
+          ...originalDimensions,
         };
 
         const response = await chatApi.sendMessage(

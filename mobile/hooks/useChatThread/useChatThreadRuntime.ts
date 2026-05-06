@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   setActiveConversationId,
@@ -12,6 +12,8 @@ import {
   mapThreadMedia,
   mapThreadMessage,
 } from "@/utils/chatThread";
+import { log, error } from '@/utils/logger';
+
 
 const MESSAGE_CACHE_PREFIX = "chat_messages_cache:";
 const messageCacheMemory = new Map<string, any[]>();
@@ -95,6 +97,35 @@ export function useChatThreadRuntime({
     return `${MESSAGE_CACHE_PREFIX}${conversationIdValue}`;
   }, []);
 
+  const markAsReadWithRetry = useCallback(
+    async (conversationId: number, retries = 3, initialDelay = 200) => {
+      let currentDelay = initialDelay;
+      for (let i = 0; i < retries; i++) {
+        try {
+          await chatApi.markAsRead(conversationId);
+          log(
+            `[ChatThread] ✅ Marked conversation ${conversationId} as read`,
+          );
+          return;
+        } catch (err) {
+          if (i < retries - 1) {
+            log(
+              `[ChatThread] ⚠️ Mark as read retry ${i + 1}/${retries - 1}, waiting ${currentDelay}ms...`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, currentDelay));
+            currentDelay *= 2; // exponential backoff
+          } else {
+            error(
+              `[ChatThread] ❌ Mark as read failed after ${retries} retries:`,
+              err,
+            );
+          }
+        }
+      }
+    },
+    [],
+  );
+
   const persistMessagesCache = useCallback(
     async (conversationIdValue: string, nextMessages: any[]) => {
       try {
@@ -103,8 +134,8 @@ export function useChatThreadRuntime({
           getMessageCacheKey(conversationIdValue),
           JSON.stringify(nextMessages.slice(0, 50)),
         );
-      } catch (error) {
-        console.error("Persist messages cache error:", error);
+      } catch (err) {
+        error("Persist messages cache error:", err);
       }
     },
     [getMessageCacheKey],
@@ -125,8 +156,8 @@ export function useChatThreadRuntime({
 
         const parsed = JSON.parse(cached);
         return Array.isArray(parsed) ? parsed : [];
-      } catch (error) {
-        console.error("Load messages cache error:", error);
+      } catch (err) {
+        error("Load messages cache error:", err);
         return [] as any[];
       }
     },
@@ -150,7 +181,7 @@ export function useChatThreadRuntime({
             setConversationId(convId.toString());
           }
         } catch {
-          console.log(
+          log(
             "No existing conversation found yet, sticking with 'new' mode",
           );
         }
@@ -183,8 +214,8 @@ export function useChatThreadRuntime({
         }
 
         setHasMoreMedia(newMedia.length >= 30);
-      } catch (error) {
-        console.error("Fetch all media error:", error);
+      } catch (err) {
+        error("Fetch all media error:", err);
       } finally {
         if (isLoadMore) setLoadingMoreMedia(false);
       }
@@ -201,13 +232,28 @@ export function useChatThreadRuntime({
     ],
   );
 
+  const markAsReadWithRetryRef = useRef(markAsReadWithRetry);
+  useEffect(() => {
+    markAsReadWithRetryRef.current = markAsReadWithRetry;
+  }, [markAsReadWithRetry]);
+
+  const fetchMessagesRef = useRef(fetchMessages);
+  useEffect(() => {
+    fetchMessagesRef.current = fetchMessages;
+  }, [fetchMessages]);
+
+  const fetchGroupDetailsRef = useRef(fetchGroupDetails);
+  useEffect(() => {
+    fetchGroupDetailsRef.current = fetchGroupDetails;
+  }, [fetchGroupDetails]);
+
   const fetchGroupDetails = useCallback(async () => {
     if (!id || params.isGroup !== "true") return;
     try {
       const response = await chatApi.getConversationDetails(id);
       setGroupDetails(response.data);
-    } catch (error) {
-      console.error("Fetch group details error:", error);
+    } catch (err) {
+      error("Fetch group details error:", err);
     }
   }, [id, params.isGroup, setGroupDetails]);
 
@@ -239,7 +285,7 @@ export function useChatThreadRuntime({
         setTargetUser(data);
       }
     } catch (err) {
-      console.error("Fetch target user status error:", err);
+      error("Fetch target user status error:", err);
     }
   }, [targetUserIdState, setTargetUserStatus, setTargetUser]);
 
@@ -311,7 +357,7 @@ export function useChatThreadRuntime({
           }
         }
       } catch (err) {
-        console.error("[ChatThread] Fetch messages error:", err);
+          error("[ChatThread] Fetch messages error:", err);
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -408,17 +454,26 @@ export function useChatThreadRuntime({
   }, [conversationId, initialFetchDone, messages, persistMessagesCache]);
 
   useEffect(() => {
+    if (!isFocused || !conversationId || conversationId === "new") return;
+
+    const conversationIdNum = parseInt(conversationId, 10);
+
+    socketService.emit("join_conversation", conversationIdNum);
+
+    // Mark as read with retry logic
+    markAsReadWithRetry(conversationIdNum);
+
+    return () => {
+      socketService.emit("leave_conversation", conversationIdNum);
+    };
+  }, [conversationId, isFocused, markAsReadWithRetry]);
+
+  useEffect(() => {
     if (!isFocused || !conversationId) return;
     if (initialFetchDone) return;
-    const conversationIdNum = parseInt(conversationId, 10);
 
     fetchMessages(false);
     fetchAllMedia();
-    socketService.emit("join_conversation", conversationIdNum);
-
-    chatApi.markAsRead(conversationIdNum).catch((err) => {
-      console.error("Mark as read focus error:", err);
-    });
   }, [
     conversationId,
     isFocused,
@@ -430,13 +485,17 @@ export function useChatThreadRuntime({
   useEffect(() => {
     if (!isFocused) return;
 
-    const conversationIdNum = conversationId
-      ? parseInt(conversationId, 10)
-      : null;
+    log(
+      `[ChatThread] 📡 Setting up socket listeners for conversation ${conversationId}`,
+    );
 
     const handleMessageSeen = (data: any) => {
       const { userId: seenByUserId, seenAt, user: seenUser } = data;
       if (seenByUserId === userId) return;
+
+      log(
+        `[ChatThread] 👁️ Message seen update from user ${seenByUserId}`,
+      );
 
       const userData = seenUser || {
         id: seenByUserId,
@@ -467,10 +526,13 @@ export function useChatThreadRuntime({
         conversationId &&
         message.conversationId === parseInt(conversationId, 10)
       ) {
+        log(
+          `[ChatThread] 💬 New message received in conversation ${conversationId}:`,
+          message,
+        );
         if (message.senderId !== userId) {
-          chatApi.markAsRead(message.conversationId).catch((err) => {
-            console.error("Mark as read new message error:", err);
-          });
+          // Mark as read with retry (fire and forget)
+          markAsReadWithRetryRef.current(message.conversationId);
         }
       }
 
@@ -561,8 +623,8 @@ export function useChatThreadRuntime({
     const handleConversationUpdated = (data: any) => {
       if (data.conversationId?.toString() === conversationId?.toString()) {
         if (data.action === "members_added" || data.action === "member_left") {
-          fetchMessages(false);
-          if (isGroup) fetchGroupDetails();
+          fetchMessagesRef.current(false);
+          if (isGroup) fetchGroupDetailsRef.current();
         }
       }
     };
@@ -570,22 +632,11 @@ export function useChatThreadRuntime({
     socketService.on("conversation_updated", handleConversationUpdated);
 
     return () => {
-      if (conversationIdNum)
-        socketService.emit("leave_conversation", conversationIdNum);
       socketService.off("new_message", handleNewMessage);
       socketService.off("message_seen", handleMessageSeen);
       socketService.off("conversation_updated", handleConversationUpdated);
     };
-  }, [
-    conversationId,
-    userId,
-    isFocused,
-    fetchMessages,
-    isGroup,
-    flatListRef,
-    fetchGroupDetails,
-    setMessages,
-  ]);
+  }, [conversationId, userId, isFocused, isGroup, flatListRef, setMessages]);
 
   useEffect(() => {
     setActiveConversationId(conversationId);

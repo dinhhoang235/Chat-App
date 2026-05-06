@@ -5,6 +5,8 @@ import { useCall } from '@/context/callContext';
 import { useAuth } from '@/context/authContext';
 import { groupCallService } from '@/services/groupCall';
 import GroupVideoCall, { GroupParticipant } from '@/components/call/GroupVideoCall';
+import { log, error, warn } from '@/utils/logger';
+
 
 export default function GroupCallScreen() {
   const router = useRouter();
@@ -117,7 +119,7 @@ export default function GroupCallScreen() {
 
     groupCallService.onConnectionStateChange = (state) => {
       if (!mounted) return;
-      console.log('[GroupCall] connection state:', state);
+      log('[GroupCall] connection state:', state);
       if (state === 'connected') {
         setCallStatus('active');
       }
@@ -161,8 +163,8 @@ export default function GroupCallScreen() {
           const vTrack = groupCallService.localTracks.find(t => t.kind === 'video');
           if (vTrack) setLocalVideoTrack(vTrack);
         }
-      } catch (error) {
-        console.error('[GroupCall] init failed:', error);
+      } catch (err) {
+        error('[GroupCall] init failed:', err);
         if (mounted) {
           Alert.alert('Lỗi', 'Không thể khởi động cuộc gọi nhóm.');
           setCallStatus('ended');
@@ -175,7 +177,7 @@ export default function GroupCallScreen() {
     return () => {
       mounted = false;
       // Use fire-and-forget for leave to avoid blocking unmount
-      groupCallService.leave().catch((err: any) => console.warn('[GroupCall] Error during cleanup leave:', err));
+      groupCallService.leave().catch((err: any) => warn('[GroupCall] Error during cleanup leave:', err));
     };
   }, [activeCallId, activeCallType, activeCallGroupSize, setCallStatus, userId]);
 
@@ -203,7 +205,7 @@ export default function GroupCallScreen() {
   }, [callStatus, router]);
 
   const handleHangup = async () => {
-    console.log('[GroupCall] User initiated hangup');
+    log('[GroupCall] User initiated hangup');
     try {
       // 1. Notify signaling server
       endCall();
@@ -215,8 +217,8 @@ export default function GroupCallScreen() {
       } else {
         router.replace('/(tabs)');
       }
-    } catch (error) {
-      console.warn('[GroupCall] Error during hangup:', error);
+    } catch (err) {
+      warn('[GroupCall] Error during hangup:', err);
       router.replace('/(tabs)');
     }
   };

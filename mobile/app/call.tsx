@@ -17,6 +17,7 @@ import { webrtcService } from '@/services/webrtc';
 import { socketService } from '@/services/socket';
 import { getAvatarUrl } from '@/utils/avatar';
 import { getInitials } from '@/utils/initials';
+import { log, error } from '@/utils/logger';
 
 const AVATAR_SIZE = 140;
 
@@ -107,22 +108,22 @@ export default function CallScreen() {
   // ─── Global socket events: answer + ICE ───────────────────────
   useEffect(() => {
     const onAnswer = async ({ callId, answer }: any) => {
-      console.log('[Socket] Received webrtc_answer for', callId);
+      log('[Socket] Received webrtc_answer for', callId);
       if (callId !== activeCallRef.current?.callId) return;
       try {
         await webrtcService.setRemoteDescription(answer);
       } catch (e) {
-        console.error('[WebRTC] setRemoteDescription(answer):', e);
+        error('[WebRTC] setRemoteDescription(answer):', e);
       }
     };
 
     const onIce = async ({ callId, candidate }: any) => {
-      console.log('[Socket] Received webrtc_ice_candidate');
+      log('[Socket] Received webrtc_ice_candidate');
       if (callId !== activeCallRef.current?.callId) return;
       try {
         await webrtcService.addIceCandidate(candidate);
       } catch (e) {
-        console.error('[WebRTC] addIceCandidate:', e);
+        error('[WebRTC] addIceCandidate:', e);
       }
     };
 
@@ -140,12 +141,12 @@ export default function CallScreen() {
     let mounted = true;
 
     const onAccepted = async ({ callId }: any) => {
-      console.log('[Socket] Received call_accepted for', callId);
+      log('[Socket] Received call_accepted for', callId);
       if (!mounted) return;
       if (callId !== activeCallRef.current?.callId) return;
       try {
         const offer = await webrtcService.createOffer();
-        console.log('[WebRTC] Created offer, emitting...');
+        log('[WebRTC] Created offer, emitting...');
         socketService.emit('webrtc_offer', {
           callId,
           targetUserId: activeCallRef.current?.remoteUserId,
@@ -153,25 +154,25 @@ export default function CallScreen() {
         });
         setCallStatus('connecting');
       } catch (e) {
-        console.error('[WebRTC] createOffer:', e);
+        error('[WebRTC] createOffer:', e);
       }
     };
 
     const onOffer = async ({ callId, offer }: any) => {
-      console.log('[Socket] Received webrtc_offer for', callId);
+      log('[Socket] Received webrtc_offer for', callId);
       if (!mounted) return;
       if (callId !== activeCallRef.current?.callId) return;
       try {
         await webrtcService.setRemoteDescription(offer);
         const answer = await webrtcService.createAnswer();
-        console.log('[WebRTC] Created answer, emitting...');
+        log('[WebRTC] Created answer, emitting...');
         socketService.emit('webrtc_answer', {
           callId,
           targetUserId: activeCallRef.current?.remoteUserId,
           answer,
         });
       } catch (e) {
-        console.error('[WebRTC] handle offer:', e);
+        error('[WebRTC] handle offer:', e);
       }
     };
 
@@ -181,7 +182,7 @@ export default function CallScreen() {
       }
 
       webrtcService.isInitializing = true;
-      console.log('[WebRTC] Starting init for', activeCall.callId);
+      log('[WebRTC] Starting init for', activeCall.callId);
       
       try {
         // 1. Acquire local media
@@ -209,7 +210,7 @@ export default function CallScreen() {
           });
         }
       } catch (e: any) {
-        console.error('[WebRTC] init:', e);
+        error('[WebRTC] init:', e);
         Alert.alert('Lỗi', 'Không thể truy cập camera / microphone');
         if (mounted) setCallStatus('ended');
       }
@@ -226,7 +227,7 @@ export default function CallScreen() {
         });
       };
       webrtcService.onConnectionStateChange = (state) => {
-        console.log('[WebRTC] state →', state);
+        log('[WebRTC] state →', state);
         if (state === 'connected' && mounted) setCallStatus('active');
         if ((state === 'failed' || state === 'closed') && mounted) setCallStatus('ended');
       };

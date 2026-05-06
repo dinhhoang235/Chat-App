@@ -6,6 +6,8 @@ import FullscreenImageViewer from '../../modals/FullscreenImageViewer';
 import InlineVideoPlayer from './InlineVideoPlayer';
 import { CircularProgress } from '../CircularProgress';
 import { resolveMediaUri } from './messageHelpers';
+import { warn } from '@/utils/logger';
+
 
 type MessageVideoBubbleProps = {
   message: any;
@@ -53,7 +55,7 @@ export default function MessageVideoBubble({ message, screenWidth, colors, allMe
           const { uri } = await VideoThumbnails.getThumbnailAsync(message.fileInfo.url, { time: 0 });
           setLocalThumb(uri);
         } catch (e) {
-          console.warn('Local video thumb failed', e);
+          warn('Local video thumb failed', e);
         }
       })();
     }

@@ -8,6 +8,8 @@ import { useFocusEffect } from 'expo-router';
 import { getPendingFriendRequests, getSentFriendRequests, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '@/services/friendship';
 import type { FriendRequest } from '@/services/friendship';
 import { getInitials } from '@/utils/initials';
+import { error as logErro } from '@/utils/logger';
+
 
 export default function FriendRequests() {
   const { colors } = useTheme();
@@ -31,7 +33,7 @@ export default function FriendRequests() {
       setSentRequests(sent);
     } catch (err) {
       setError('Không thể tải dữ liệu');
-      console.error(err);
+      logErro.error(err);
     } finally {
       setLoading(false);
     }

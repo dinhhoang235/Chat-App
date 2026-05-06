@@ -19,6 +19,7 @@ import {
   CallTarget, 
   CallInfo 
 } from '@/types/call';
+import { log, error } from '@/utils/logger';
 
 export type { CallType, CallStatus, CallTarget, CallInfo };
 
@@ -107,10 +108,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleIncomingCall = (data: any) => {
-      console.log('Incoming call received:', data.callId, 'from:', data.callerId);
+      log('Incoming call received:', data.callId, 'from:', data.callerId);
       // Skip if already in a call
       if (activeCallRef.current) {
-        console.log('Incoming call ignored: active call in progress');
+        log('Incoming call ignored: active call in progress');
         return;
       }
       const incomingGroupTargets: CallTarget[] | undefined = Array.isArray(data.groupTargets)
@@ -139,7 +140,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         setActiveCall(null);
         setCallStatus('ended');
       } else {
-        console.log('[Call] One invite rejected, still waiting for others', data);
+        log('[Call] One invite rejected, still waiting for others', data);
       }
     };
 
@@ -153,7 +154,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleParticipantJoined = (data: any) => {
-      console.log('[Call] Participant joined:', data);
+      log('[Call] Participant joined:', data);
       if (activeCallRef.current && data.callId === activeCallRef.current.callId) {
         setActiveCall(prev => {
           if (!prev) return null;
@@ -188,7 +189,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleParticipantLeft = (data: any) => {
-      console.log('[Call] Participant left:', data);
+      log('[Call] Participant left:', data);
       if (activeCallRef.current && data.callId === activeCallRef.current.callId) {
         if (data.userId === Number(user?.id)) {
            // Self left
@@ -274,7 +275,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             callId = response.callId;
             existingCallInfo = activeCallInfo;
             groupTargets = activeCallInfo.groupTargets ?? initialGroupTargets;
-            console.log('[Call] Joining existing active group call:', callId);
+            log('[Call] Joining existing active group call:', callId);
           }
         }
       }
@@ -437,7 +438,6 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         });
       }
       groupCallService.leave();
-      socketService.disconnect();
     };
   }, []);
 
@@ -531,7 +531,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         }),
       },
       trigger: null,
-    }).catch((err: any) => console.error('Failed to schedule local call notification:', err));
+    }).catch((err: any) => error('Failed to schedule local call notification:', err));
   }, [callStatus, activeCall, incomingCall, currentAppState, callDuration]);
 
   return (

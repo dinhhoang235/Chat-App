@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../../db.js";
-import { getUserStatus } from "../../utils/redis.js";
+import { getUserStatusStructured } from "../../utils/redis.js";
 
 export const getAllUsers = async (
   _req: Request,
@@ -24,10 +24,10 @@ export const getAllUsers = async (
 
     const usersWithStatus = await Promise.all(
       users.map(async (u: { id: number }) => {
-        const status = await getUserStatus(u.id);
+        const structured = await getUserStatusStructured(u.id);
         return {
           ...u,
-          status: status === "online" ? "online" : "offline",
+          status: structured ? structured.status : "offline",
         };
       }),
     );

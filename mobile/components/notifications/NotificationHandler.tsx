@@ -9,6 +9,7 @@ import { useAuth } from '@/context/authContext';
 import { userAPI } from '@/services/user';
 import { useCall } from '@/context/callContext';
 import { useRouter } from 'expo-router';
+import { log, warn, error } from '@/utils/logger';
 
 // Register notification categories at the top level for reliability
 Notifications.setNotificationCategoryAsync('call', [
@@ -25,7 +26,7 @@ Notifications.setNotificationCategoryAsync('call', [
 ], {
   allowInCarPlay: true,
   allowAnnouncement: true,
-}).catch((err: any) => console.error('Category registration error:', err));
+}).catch((err: any) => error('Category registration error:', err));
 
 // minimal response type used locally to avoid export issues
 interface NotificationResponse {
@@ -69,7 +70,7 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
   if (Platform.OS === 'web') return;
 
   if (!Constants.isDevice && Platform.OS === 'ios') {
-    console.warn('Push notifications require a real device on iOS');
+    warn('Push notifications require a real device on iOS');
     return;
   }
 
@@ -82,7 +83,7 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
   }
 
   if (finalStatus !== 'granted') {
-    console.warn('Push permission denied');
+    warn('Push permission denied');
     return;
   }
 
@@ -91,19 +92,19 @@ async function registerForPushNotificationsAsync(): Promise<string | undefined> 
       Constants.expoConfig?.extra?.eas?.projectId ??
       Constants.easConfig?.projectId;
 
-    console.log('[Push] Registering with projectId:', projectId);
+    log('[Push] Registering with projectId:', projectId);
 
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId,
     });
     return tokenData.data;
-  } catch (e: any) {
+    } catch (e: any) {
     if (e.message?.includes('FirebaseApp is not initialized')) {
-      console.error(
+      error(
         'FCM not configured. See: https://docs.expo.dev/push-notifications/fcm-credentials/'
       );
     } else {
-      console.error('Error getting push token:', e);
+      error('Error getting push token:', e);
     }
     return;
   }
@@ -127,10 +128,10 @@ export default function NotificationHandler() {
     const subscription = Notifications.addNotificationResponseReceivedListener(
       (response: NotificationResponse) => {
         const data: any = response.notification.request.content.data;
-        console.log('notification tapped data', data);
+        log('notification tapped data', data);
 
         if (data?.type === 'call') {
-          console.log('Call notification action:', response.actionIdentifier);
+          log('Call notification action:', response.actionIdentifier);
           
           const callInfo = {
             callId: data.callId,
@@ -191,9 +192,9 @@ export default function NotificationHandler() {
     if (user && !coldHandled.current) {
       (async () => {
         const lastResponse = await Notifications.getLastNotificationResponseAsync();
-        if (lastResponse) {
+          if (lastResponse) {
           const data: any = lastResponse.notification.request.content.data;
-          console.log('cold start notification data', data);
+          log('cold start notification data', data);
           const convId = data?.conversationId;
           if (data?.type === 'call') {
             const now = Date.now();
@@ -271,14 +272,14 @@ export default function NotificationHandler() {
 
     registerForPushNotificationsAsync().then(async token => {
       if (!token) {
-        console.warn('No push token obtained');
+        warn('No push token obtained');
         return;
       }
       try {
         await userAPI.updatePushToken(user.id, token);
-        console.log('Push token saved to backend');
+        log('Push token saved to backend');
       } catch (err) {
-        console.error('Failed to save push token:', err);
+        error('Failed to save push token:', err);
       }
     });
   }, [user]);
@@ -342,7 +343,7 @@ export default function NotificationHandler() {
           trigger: null,
         });
       } catch (e) {
-        console.error('Failed to schedule notification:', e);
+        error('Failed to schedule notification:', e);
       }
     };
 

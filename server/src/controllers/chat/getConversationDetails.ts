@@ -1,7 +1,7 @@
 import { Response } from "express";
 import prisma from "../../db.js";
 import { AuthRequest } from "../../middleware/auth.js";
-import { getUserStatus } from "../../utils/redis.js";
+import { getUserStatusStructured } from "../../utils/redis.js";
 
 type ConversationParticipantWithUser = {
   id: number;
@@ -71,7 +71,7 @@ export const getConversationDetails = async (
     const participantsWithStatus = await Promise.all(
       conversation.participants.map(
         async (p: ConversationParticipantWithUser) => {
-          const status = await getUserStatus(p.userId);
+          const structured = await getUserStatusStructured(p.userId);
           return {
             id: p.id,
             userId: p.userId,
@@ -82,7 +82,7 @@ export const getConversationDetails = async (
             mutedUntil: p.mutedUntil,
             user: {
               ...p.user,
-              status: status === "online" ? "online" : "offline",
+              status: structured ? structured.status : "offline",
             },
           };
         },

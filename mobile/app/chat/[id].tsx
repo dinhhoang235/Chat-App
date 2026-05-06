@@ -191,6 +191,7 @@ export default function ChatThread() {
         highlightQuery={searchQuery}
         isLastInGroup={isLastInConsecutiveGroup}
         isThreadLast={isThreadLast}
+        contactAvatarFallback={!isGroup ? (targetUser?.avatar || (params.avatar as string | undefined)) : undefined}
         onPress={() => { if (composerVisible) closeAll(); }}
         onAvatarPress={() => {
           if (item.fromMe) return router.push('/profile/me');
@@ -207,7 +208,7 @@ export default function ChatThread() {
         isGroupThread={isGroup}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup]);
+  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
@@ -376,6 +377,7 @@ export default function ChatThread() {
                   <FlatList
                     ref={flatListRef}
                     data={processedMessages}
+                    extraData={isTyping ? displayTypingAvatar || true : false}
                     inverted
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"

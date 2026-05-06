@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { tokenStorage } from "@/utils/tokenStorage";
+import { log } from '@/utils/logger';
 
 const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL}/api`;
 export const API_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -69,10 +70,12 @@ apiClient.interceptors.response.use(
         const refreshToken = await tokenStorage.getRefreshToken();
         if (!refreshToken) {
           // No refresh token available, clear and reject
+          log("[API] ⚠️ No refresh token available");
           await tokenStorage.removeTokens();
           return Promise.reject(error);
         }
 
+        log("[API] 🔄 Refreshing token...");
         const refreshResponse = await axios.post(
           `${process.env.EXPO_PUBLIC_API_URL}/api/users/refresh`,
           { refreshToken },
@@ -81,8 +84,12 @@ apiClient.interceptors.response.use(
         const { accessToken, refreshToken: newRefreshToken } =
           refreshResponse.data;
 
-        // Save new tokens
+        // Save new tokens (updates both SecureStore and in-memory cache)
         await tokenStorage.saveTokens(accessToken, newRefreshToken);
+        log("[API] ✅ Token refreshed successfully");
+
+        // Note: Socket will auto-reconnect via its reconnection mechanism
+        // No need to manually disconnect/reconnect as it would interrupt HTTP requests
 
         // Update the original request with new access token
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
@@ -94,6 +101,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         // Refresh failed, clear tokens and reject
+        error("[API] ❌ Token refresh failed:", refreshError);
         await tokenStorage.removeTokens();
         processQueue("");
         return Promise.reject(refreshError);

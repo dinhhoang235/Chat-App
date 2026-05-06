@@ -56,15 +56,20 @@ export const setupSocket = (io: Server) => {
     registerCallHandlers(io, socket);
     registerSignalingHandlers(io, socket);
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       console.log(`User disconnected: ${socket.user?.userId}`);
       if (socket.user) {
         const userId = Number(socket.user.userId);
-        setUserStatus(userId, "offline");
+        const lastSeen = Date.now();
+        try {
+          await setUserStatus(userId, "offline");
+        } catch (err) {
+          console.error("Failed to set user status on disconnect:", err);
+        }
         io.emit("user_status_changed", {
           userId,
           status: "offline",
-          lastSeen: Date.now(),
+          lastSeen,
         });
       }
     });

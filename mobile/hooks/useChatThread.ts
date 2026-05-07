@@ -163,16 +163,21 @@ export function useChatThread(options?: UseChatThreadOptions) {
   const fetchMessages = runtimeFetchMessages;
   const fetchAllMedia = runtimeFetchAllMedia;
 
-  const { displayTypingAvatar, groupAvatars, membersCount, statusText } =
-    useChatThreadMeta({
-      typingUser,
-      groupDetails,
-      paramsAvatars: params.avatars,
-      paramAvatar: params.avatar,
-      paramsMembersCount: params.membersCount,
-      isGroup,
-      targetUserStatus,
-    });
+  const {
+    displayTypingAvatar,
+    typingUserInitials,
+    groupAvatars,
+    membersCount,
+    statusText,
+  } = useChatThreadMeta({
+    typingUser,
+    groupDetails,
+    paramsAvatars: params.avatars,
+    paramAvatar: params.avatar,
+    paramsMembersCount: params.membersCount,
+    isGroup,
+    targetUserStatus,
+  });
 
   const { startCall } = useCall();
   const {
@@ -302,6 +307,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     creatingConversation,
     isTyping,
     displayTypingAvatar,
+    typingUserInitials,
     flatListRef,
     inputRef,
     searchMode,

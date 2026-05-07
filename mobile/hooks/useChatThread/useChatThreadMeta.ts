@@ -29,6 +29,10 @@ export function useChatThreadMeta({
       ? getAvatarUrl(avatarParam)
       : undefined;
 
+  const typingUserInitials = typingUser?.fullName
+    ? getInitials(typingUser.fullName)
+    : "?";
+
   const groupAvatars = useMemo(() => {
     if (groupDetails?.participants) {
       return [...groupDetails.participants]
@@ -51,7 +55,7 @@ export function useChatThreadMeta({
         if (Array.isArray(parsed)) {
           return parsed.map((url: string) => ({ url }));
         }
-      } catch (e) {
+      } catch {
         // Fall back to handling as CSV
         return Array.isArray(paramsAvatars)
           ? paramsAvatars
@@ -72,6 +76,7 @@ export function useChatThreadMeta({
 
   return {
     displayTypingAvatar,
+    typingUserInitials,
     groupAvatars,
     membersCount,
     statusText,

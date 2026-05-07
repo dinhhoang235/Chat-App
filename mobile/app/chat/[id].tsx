@@ -30,6 +30,7 @@ export default function ChatThread() {
     creatingConversation,
     isTyping,
     displayTypingAvatar,
+    typingUserInitials,
     flatListRef,
     inputRef,
     searchMode,
@@ -413,11 +414,21 @@ export default function ChatThread() {
                     ListEmptyComponent={() => null}
                     ListHeaderComponent={() => isTyping ? (
                       <View className="px-4 py-2 flex-row items-center">
-                        <Image
-                          source={displayTypingAvatar ? { uri: displayTypingAvatar } : undefined}
-                          className="w-10 h-10 rounded-full mr-3"
-                          style={{ backgroundColor: colors.surfaceVariant }}
-                        />
+                        <View
+                          className="w-10 h-10 rounded-full mr-3 items-center justify-center"
+                          style={{ backgroundColor: displayTypingAvatar ? 'transparent' : colors.tint }}
+                        >
+                          {displayTypingAvatar ? (
+                            <Image
+                              source={{ uri: displayTypingAvatar }}
+                              className="w-10 h-10 rounded-full"
+                            />
+                          ) : (
+                            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>
+                              {typingUserInitials}
+                            </Text>
+                          )}
+                        </View>
                         <View
                           style={{
                             backgroundColor: colors.bubbleOther,

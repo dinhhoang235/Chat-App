@@ -68,6 +68,7 @@ export default function ChatThread() {
     currentResultIndices,
     statusText,
     handleSend,
+    handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,
     pickDocument,
@@ -207,9 +208,10 @@ export default function ChatThread() {
         onVideoCall={startVideoCall}
         onCallAction={handleCallAction}
         isGroupThread={isGroup}
+        onRetry={handleRetryMessage}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar]);
+  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;

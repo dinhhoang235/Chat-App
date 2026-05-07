@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
-import { FlatList } from 'react-native';
-import { chatApi } from '@/services/chat';
-import { mapThreadMessage } from '@/utils/chatThread';
+import { useCallback } from "react";
+import { FlatList } from "react-native";
+import { chatApi } from "@/services/chat";
+import { mapThreadMessage } from "@/utils/chatThread";
 
 interface UseChatThreadSendTextParams {
   attachments: { uri: string; name: string; type: string; size?: number }[];
@@ -47,7 +47,7 @@ export function useChatThreadSendText({
 }: UseChatThreadSendTextParams) {
   const handleSendText = useCallback(
     async (text: string) => {
-      setMessageText('');
+      setMessageText("");
 
       flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
 
@@ -62,10 +62,10 @@ export function useChatThreadSendText({
         senderId: userId,
         createdAt: new Date().toISOString(),
         time: new Date().toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
+          hour: "2-digit",
+          minute: "2-digit",
         }),
-        status: 'sending',
+        status: "sending",
         replyTo: replyToSnapshot,
       };
 
@@ -88,7 +88,7 @@ export function useChatThreadSendText({
               if (lastMessage) {
                 setMessages([
                   mapThreadMessage(lastMessage, userId, {
-                    status: 'sent',
+                    status: "sent",
                     includeSeenBy: true,
                   }),
                 ]);
@@ -96,7 +96,7 @@ export function useChatThreadSendText({
             }
             return;
           } catch (err) {
-            console.error('Error creating conversation on send:', err);
+            console.error("Error creating conversation on send:", err);
             setMessages([]);
             setMessageText(text);
             return;
@@ -110,7 +110,7 @@ export function useChatThreadSendText({
         const response = await chatApi.sendMessage(
           Number(targetConversationId),
           text,
-          'text',
+          "text",
           undefined,
           replyToSnapshot?.id,
           tempId,
@@ -122,7 +122,7 @@ export function useChatThreadSendText({
           if (idx !== -1) {
             const newMessages = [...prev];
             newMessages[idx] = mapThreadMessage(sentMessage, userId, {
-              status: 'sent',
+              status: "sent",
               includeSeenBy: true,
             });
             return newMessages;
@@ -130,9 +130,19 @@ export function useChatThreadSendText({
           return prev;
         });
       } catch (err) {
-        console.error('Send error:', err);
-        setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        setMessageText(text);
+        console.error("Send error:", err);
+        setMessages((prev) => {
+          const idx = prev.findIndex((m) => m.id === tempId);
+          if (idx !== -1) {
+            const newMessages = [...prev];
+            newMessages[idx] = {
+              ...newMessages[idx],
+              status: "error",
+            };
+            return newMessages;
+          }
+          return prev;
+        });
       }
     },
     [
@@ -180,9 +190,59 @@ export function useChatThreadSendText({
     handleSendText,
   ]);
 
+  const handleRetryMessage = useCallback(
+    async (failedMessage: any) => {
+      if (!failedMessage || failedMessage.status !== "error") return;
+
+      // Mark as sending
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === failedMessage.id);
+        if (idx !== -1) {
+          const newMessages = [...prev];
+          newMessages[idx] = {
+            ...newMessages[idx],
+            status: "sending",
+          };
+          return newMessages;
+        }
+        return prev;
+      });
+
+      try {
+        const response = await chatApi.sendMessage(
+          Number(conversationId),
+          failedMessage.content,
+          "text",
+          undefined,
+          failedMessage.replyTo?.id,
+          failedMessage.id,
+        );
+        const sentMessage = response.data;
+
+        setMessages((prev) => {
+          const idx = prev.findIndex((m) => m.id === failedMessage.id);
+          if (idx !== -1) {
+            const newMessages = [...prev];
+            newMessages[idx] = mapThreadMessage(sentMessage, userId, {
+              status: "sent",
+              includeSeenBy: true,
+            });
+            return newMessages;
+          }
+          return prev;
+        });
+      } catch (err) {
+        console.error("Retry send error:", err);
+        // Keep status as error for user to retry again
+      }
+    },
+    [conversationId, userId, setMessages],
+  );
+
   return {
     handleSend,
     sendTextDirect,
     handleSendText,
+    handleRetryMessage,
   };
 }

@@ -141,9 +141,11 @@ export function useConversations() {
     const handleStatusChanged = (data: { userId: number; status: string }) => {
       setData((prev) =>
         prev.map((conv) => {
-          if (conv.targetUserId === data.userId.toString()) {
+          // Update 1-1 conversations by targetUserId
+          if (Number(conv.targetUserId) === data.userId) {
             return { ...conv, status: data.status };
           }
+          // Update group conversations (update is still valid but status might be used differently)
           return conv;
         }),
       );

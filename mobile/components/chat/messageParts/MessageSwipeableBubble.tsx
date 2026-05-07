@@ -27,6 +27,7 @@ type MessageSwipeableBubbleProps = {
   colors: any;
   timeColor: string;
   highlightRowStyle?: any;
+  onRetry?: (message: any) => void;
 };
 
 export default function MessageSwipeableBubble({
@@ -48,6 +49,7 @@ export default function MessageSwipeableBubble({
   colors,
   timeColor,
   highlightRowStyle,
+  onRetry,
 }: MessageSwipeableBubbleProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
 
@@ -199,6 +201,7 @@ export default function MessageSwipeableBubble({
                 isThreadLast={isThreadLast}
                 colors={colors}
                 timeColor={timeColor}
+                onRetry={onRetry}
               />
             </View>
           </Pressable>

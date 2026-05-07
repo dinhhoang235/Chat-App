@@ -373,8 +373,18 @@ export function useChatThreadAttachments({
         clearUploadProgress();
       } catch (error) {
         console.error("Attachment send error:", error);
-        alert("Không thể gửi tệp, vui lòng thử lại");
-        setMessages((prev) => prev.filter((message) => message.id !== tempId));
+        setMessages((prev) => {
+          const idx = prev.findIndex((message) => message.id === tempId);
+          if (idx !== -1) {
+            const newMessages = [...prev];
+            newMessages[idx] = {
+              ...newMessages[idx],
+              status: "error",
+            };
+            return newMessages;
+          }
+          return prev;
+        });
         clearUploadProgress();
       }
     },

@@ -270,24 +270,25 @@ export function useChatThread(options?: UseChatThreadOptions) {
     setUploadProgress,
   });
 
-  const { handleSend, sendTextDirect } = useChatThreadSendText({
-    attachments,
-    clearAttachments,
-    setGalleryVisible,
-    messageText,
-    setMessageText,
-    handleSendAttachment,
-    flatListRef,
-    replyingTo,
-    setReplyingTo,
-    userId: user?.id,
-    conversationId,
-    isNewConversation,
-    targetUserIdState,
-    setMessages,
-    setCreatingConversation,
-    setConversationId,
-  });
+  const { handleSend, sendTextDirect, handleRetryMessage } =
+    useChatThreadSendText({
+      attachments,
+      clearAttachments,
+      setGalleryVisible,
+      messageText,
+      setMessageText,
+      handleSendAttachment,
+      flatListRef,
+      replyingTo,
+      setReplyingTo,
+      userId: user?.id,
+      conversationId,
+      isNewConversation,
+      targetUserIdState,
+      setMessages,
+      setCreatingConversation,
+      setConversationId,
+    });
 
   return {
     colors,
@@ -336,6 +337,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     animatedContentStyle,
     fetchMessages,
     handleSend,
+    handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,
     pickDocument,

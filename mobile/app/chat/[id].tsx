@@ -395,10 +395,13 @@ export default function ChatThread() {
                       // the backend returns a message with a missing id.
                       return `msg-${idx}`;
                     }}
-                    initialNumToRender={8}
-                    maxToRenderPerBatch={10}
-                    windowSize={9}
-                    updateCellsBatchingPeriod={16}
+                    // Tuned for smoother UI: lower initial render + smaller window
+                    // reduces JS work during navigation/scroll. Increase batching
+                    // period so renders are grouped and less likely to block frames.
+                    initialNumToRender={6}
+                    maxToRenderPerBatch={6}
+                    windowSize={5}
+                    updateCellsBatchingPeriod={50}
                     removeClippedSubviews={true}
                     scrollEventThrottle={16}
                     maintainVisibleContentPosition={{

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { InteractionManager } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   setActiveConversationId,
@@ -124,14 +125,23 @@ export function useChatThreadRuntime({
   );
 
   const persistMessagesCache = useCallback(
-    async (conversationIdValue: string, nextMessages: any[]) => {
+    (conversationIdValue: string, nextMessages: any[]) => {
       try {
-        // OPTIMIZATION #5: Increased cache from 50 to 200 messages for faster offline access & 2nd open
+        // OPTIMIZATION #5: Keep a memory cache immediately for quick access
+        // and defer heavy serialization + AsyncStorage write until after
+        // UI interactions complete so it doesn't block navigation animations.
         messageCacheMemory.set(conversationIdValue, nextMessages.slice(0, 200));
-        await AsyncStorage.setItem(
-          getMessageCacheKey(conversationIdValue),
-          JSON.stringify(nextMessages.slice(0, 200)),
-        );
+
+        InteractionManager.runAfterInteractions(async () => {
+          try {
+            await AsyncStorage.setItem(
+              getMessageCacheKey(conversationIdValue),
+              JSON.stringify(nextMessages.slice(0, 200)),
+            );
+          } catch (err) {
+            error("Persist messages cache error:", err);
+          }
+        });
       } catch (err) {
         error("Persist messages cache error:", err);
       }
@@ -398,19 +408,25 @@ export function useChatThreadRuntime({
         return; // Don't fetch if we have preloaded messages
       }
 
-      // Try to load from cache
-      const cachedMessages = await loadMessagesCache(conversationId);
-
-      if (
-        !cancelled &&
-        cachedMessages.length > 0 &&
-        messagesRef.current.length === 0
-      ) {
-        setMessages(cachedMessages);
-        setInitialFetchDone(true);
-        setLoading(false);
-        return; // Don't fetch if we have cache
-      }
+      // Defer cache read until after interactions so it doesn't block
+      // navigation/animations. If cache exists we'll still set it, but
+      // we continue to fetch fresh messages in the background.
+      InteractionManager.runAfterInteractions(() => {
+        loadMessagesCache(conversationId)
+          .then((cachedMessages) => {
+            if (
+              !cancelled &&
+              cachedMessages.length > 0 &&
+              messagesRef.current.length === 0
+            ) {
+              setMessages(cachedMessages);
+              setInitialFetchDone(true);
+              setLoading(false);
+              // do not return early; still fetch fresh messages below
+            }
+          })
+          .catch(() => {});
+      });
 
       // Set aggressive timeout to ensure loading is cleared
       timeout = setTimeout(() => {

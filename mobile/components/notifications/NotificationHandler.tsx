@@ -270,6 +270,8 @@ export default function NotificationHandler() {
   useEffect(() => {
     if (!user) return;
 
+    Notifications.setAutoServerRegistrationEnabledAsync(false).catch(() => {});
+
     registerForPushNotificationsAsync().then(async token => {
       if (!token) {
         warn('No push token obtained');

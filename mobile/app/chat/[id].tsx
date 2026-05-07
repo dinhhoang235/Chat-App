@@ -397,7 +397,8 @@ export default function ChatThread() {
                     maxToRenderPerBatch={10}
                     windowSize={9}
                     updateCellsBatchingPeriod={16}
-                    removeClippedSubviews
+                    removeClippedSubviews={true}
+                    scrollEventThrottle={16}
                     maintainVisibleContentPosition={{
                       minIndexForVisible: 0,
                       autoscrollToTopThreshold: 10,

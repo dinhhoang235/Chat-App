@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import { TokenPayload } from "../utils/jwt.js";
 import { setUserStatus } from "../utils/redis.js";
+import prisma from "../db.js";
 import { AuthenticatedSocket } from "./types.js";
 import { registerCallHandlers } from "./callHandlers.js";
 import { registerSignalingHandlers } from "./signalingHandlers.js";
@@ -28,7 +29,7 @@ export const setupSocket = (io: Server) => {
     }
   });
 
-  io.on("connection", (socket: AuthenticatedSocket) => {
+  io.on("connection", async (socket: AuthenticatedSocket) => {
     console.log(`User connected: ${socket.user?.userId}`);
 
     if (socket.user) {
@@ -36,6 +37,22 @@ export const setupSocket = (io: Server) => {
       socket.join(`user:${userId}`);
       setUserStatus(userId, "online");
       io.emit("user_status_changed", { userId, status: "online" });
+
+      // OPTIMIZATION #6: Cache user profile once on connection instead of querying DB on every typing event
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { avatar: true, fullName: true },
+        });
+        if (user) {
+          socket.cachedUserData = {
+            avatar: user.avatar || null,
+            fullName: user.fullName || null,
+          };
+        }
+      } catch (err) {
+        console.error("Error caching user data on connection:", err);
+      }
     }
 
     socket.on("join_conversation", (conversationId: number) => {

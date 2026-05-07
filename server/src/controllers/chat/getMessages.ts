@@ -144,28 +144,42 @@ export const getMessages =
         },
       });
 
-      // Map messages to include seenBy info - ALWAYS recompute from current DB state
-      const messagesWithSeen = messages.map((msg: MessageWithSender) => {
-        const seenBy = msg.senderId
-          ? participants
-              .filter(
-                (p: ChatParticipantWithUser) =>
-                  p.userId !== msg.senderId &&
-                  new Date(p.lastReadAt).getTime() >
-                    new Date(msg.createdAt).getTime(),
-              )
-              .map((p: ChatParticipantWithUser) => ({
-                id: p.user.id,
-                fullName: p.user.fullName,
-                avatar: p.user.avatar
-                  ? p.user.avatar.startsWith("http")
-                    ? p.user.avatar
-                    : p.user.avatar
-                  : null,
-              }))
-          : [];
-        return { ...msg, seenBy, fromMe: msg.senderId === userId };
-      });
+      // OPTIMIZATION #2: Compute seenBy for all messages at once (O(N*M) single pass)
+      // Instead of: messages.map() -> for each message, filter participants (separate operations)
+      // Do: Pre-build seenBy map in one pass through participants for all messages
+      const seenByMap = new Map<number, any[]>();
+
+      for (const participant of participants) {
+        // For each participant, check which messages they've seen
+        for (const msg of messages) {
+          if (
+            msg.senderId &&
+            msg.senderId !== participant.userId &&
+            new Date(participant.lastReadAt).getTime() >
+              new Date(msg.createdAt).getTime()
+          ) {
+            if (!seenByMap.has(msg.id)) {
+              seenByMap.set(msg.id, []);
+            }
+            seenByMap.get(msg.id)!.push({
+              id: participant.user.id,
+              fullName: participant.user.fullName,
+              avatar: participant.user.avatar
+                ? participant.user.avatar.startsWith("http")
+                  ? participant.user.avatar
+                  : participant.user.avatar
+                : null,
+            });
+          }
+        }
+      }
+
+      // Map messages to include seenBy info using pre-computed map
+      const messagesWithSeen = messages.map((msg: MessageWithSender) => ({
+        ...msg,
+        seenBy: seenByMap.get(msg.id) || [],
+        fromMe: msg.senderId === userId,
+      }));
 
       // 2. Cache first page if we just fetched it from DB (store raw messages, not computed seenBy)
       if (!cursor && !fromCache) {

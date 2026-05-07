@@ -115,6 +115,8 @@ export const sendMessage =
       });
 
       // 3. Broadcast via socket
+      // OPTIMIZATION #3: Single efficient broadcast instead of duplicate events
+      // Emit to conversation room (users currently viewing this conversation)
       io.to(`conversation:${convId}`).emit("new_message", {
         ...message,
         tempId,
@@ -123,17 +125,28 @@ export const sendMessage =
       // 3. Cache the new message
       cacheMessage(convId, message).catch((e) => console.error(e));
 
-      // Also notify users who might not be in the conversation room currently
-      // but should see an updated list of conversations
+      // Get participants for sidebar update and push notifications
       const participants = await prisma.conversationParticipant.findMany({
         where: { conversationId: convId },
-        include: { user: true },
+        select: {
+          userId: true,
+          mutedUntil: true,
+          user: { select: { pushToken: true } },
+        },
       });
 
-      participants.forEach((p: { userId: number }) => {
+      // Emit lightweight conversation_updated event for sidebar/list updates
+      // Only include metadata, not full message data (users in conversation room got new_message event)
+      participants.forEach((p) => {
         io.to(`user:${p.userId}`).emit("conversation_updated", {
           conversationId: message.conversationId,
-          lastMessage: message,
+          // Lightweight data for list update only - avoids processing duplicate message data
+          messageId: message.id,
+          lastMessagePreview: {
+            id: message.id,
+            type: message.type,
+            senderId: message.senderId,
+          },
         });
       });
 

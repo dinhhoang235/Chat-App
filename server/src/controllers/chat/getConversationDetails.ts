@@ -1,7 +1,7 @@
 import { Response } from "express";
 import prisma from "../../db.js";
 import { AuthRequest } from "../../middleware/auth.js";
-import { getUserStatusStructured } from "../../utils/redis.js";
+import { getUsersStatusStructured } from "../../utils/redis.js";
 
 type ConversationParticipantWithUser = {
   id: number;
@@ -68,25 +68,32 @@ export const getConversationDetails = async (
     }
 
     // Add status for each participant
-    const participantsWithStatus = await Promise.all(
-      conversation.participants.map(
-        async (p: ConversationParticipantWithUser) => {
-          const structured = await getUserStatusStructured(p.userId);
-          return {
-            id: p.id,
-            userId: p.userId,
-            role: p.role,
-            lastReadAt: p.lastReadAt,
-            joinedAt: p.joinedAt,
-            isPinned: p.isPinned,
-            mutedUntil: p.mutedUntil,
-            user: {
-              ...p.user,
-              status: structured ? structured.status : "offline",
-            },
-          };
-        },
-      ),
+    // OPTIMIZATION #7: Use batch status query instead of individual queries
+    const userIds = conversation.participants.map(
+      (p: ConversationParticipantWithUser) => p.userId,
+    );
+    const userStatusMap = await getUsersStatusStructured(userIds);
+
+    const participantsWithStatus = conversation.participants.map(
+      (p: ConversationParticipantWithUser) => {
+        const structured = userStatusMap.get(p.userId) || {
+          status: "offline",
+          lastSeen: null,
+        };
+        return {
+          id: p.id,
+          userId: p.userId,
+          role: p.role,
+          lastReadAt: p.lastReadAt,
+          joinedAt: p.joinedAt,
+          isPinned: p.isPinned,
+          mutedUntil: p.mutedUntil,
+          user: {
+            ...p.user,
+            status: structured.status,
+          },
+        };
+      },
     );
 
     return res.json({

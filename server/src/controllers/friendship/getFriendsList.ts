@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../../db.js";
-import { getUserStatusStructured } from "../../utils/redis.js";
+import { getUsersStatusStructured } from "../../utils/redis.js";
 
 // Lấy danh sách bạn bè
 export const getFriendsList = async (
@@ -34,15 +34,14 @@ export const getFriendsList = async (
 
     const friends = friendships.map((f) => f.friend);
 
-    const friendsWithStatus = await Promise.all(
-      friends.map(async (f) => {
-        const structured = await getUserStatusStructured(f.id);
-        return {
-          ...f,
-          status: structured ? structured.status : "offline",
-        };
-      }),
-    );
+    // OPTIMIZATION #7: Use batch status query instead of individual queries
+    const friendIds = friends.map((f) => f.id);
+    const friendStatusMap = await getUsersStatusStructured(friendIds);
+
+    const friendsWithStatus = friends.map((f) => ({
+      ...f,
+      status: (friendStatusMap.get(f.id) || { status: "offline" }).status,
+    }));
 
     res.json({
       success: true,

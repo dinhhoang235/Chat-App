@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 // Removed useChatThread import to prevent infinite loop
 import { View, Text, useWindowDimensions, Animated } from 'react-native';
 import { useTheme } from '@/context/themeContext';
@@ -29,7 +29,7 @@ type ChatMessage = {
   progress?: number;
 };
 
-export default function MessageBubble({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread, contactAvatarFallback }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean, contactAvatarFallback?: string }) {
+function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread, contactAvatarFallback }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean, contactAvatarFallback?: string }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -204,3 +204,20 @@ export default function MessageBubble({ message, onPress, highlightQuery, onAvat
     </MessageSwipeableBubble>
   );
 }
+
+// OPTIMIZATION #4: Memoize MessageBubble to prevent re-renders when props haven't changed
+// This is critical for FlatList performance - prevents jank during scrolling
+// Custom comparator: only re-render if message ID, highlighted status, or media changes
+const MessageBubble = memo(MessageBubbleComponent, (prevProps, nextProps) => {
+  // Return true if props are equal (skip re-render), false if different (re-render)
+  return (
+    prevProps.message?.id === nextProps.message?.id &&
+    prevProps.isHighlighted === nextProps.isHighlighted &&
+    prevProps.progress === nextProps.progress &&
+    prevProps.highlightQuery === nextProps.highlightQuery &&
+    prevProps.allMedia?.length === nextProps.allMedia?.length
+  );
+});
+
+export default MessageBubble;
+

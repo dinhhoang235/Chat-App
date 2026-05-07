@@ -12,8 +12,7 @@ import {
   mapThreadMedia,
   mapThreadMessage,
 } from "@/utils/chatThread";
-import { log, error } from '@/utils/logger';
-
+import { log, error } from "@/utils/logger";
 
 const MESSAGE_CACHE_PREFIX = "chat_messages_cache:";
 const messageCacheMemory = new Map<string, any[]>();
@@ -103,9 +102,7 @@ export function useChatThreadRuntime({
       for (let i = 0; i < retries; i++) {
         try {
           await chatApi.markAsRead(conversationId);
-          log(
-            `[ChatThread] ✅ Marked conversation ${conversationId} as read`,
-          );
+          log(`[ChatThread] ✅ Marked conversation ${conversationId} as read`);
           return;
         } catch (err) {
           if (i < retries - 1) {
@@ -129,10 +126,11 @@ export function useChatThreadRuntime({
   const persistMessagesCache = useCallback(
     async (conversationIdValue: string, nextMessages: any[]) => {
       try {
-        messageCacheMemory.set(conversationIdValue, nextMessages.slice(0, 50));
+        // OPTIMIZATION #5: Increased cache from 50 to 200 messages for faster offline access & 2nd open
+        messageCacheMemory.set(conversationIdValue, nextMessages.slice(0, 200));
         await AsyncStorage.setItem(
           getMessageCacheKey(conversationIdValue),
-          JSON.stringify(nextMessages.slice(0, 50)),
+          JSON.stringify(nextMessages.slice(0, 200)),
         );
       } catch (err) {
         error("Persist messages cache error:", err);
@@ -181,9 +179,7 @@ export function useChatThreadRuntime({
             setConversationId(convId.toString());
           }
         } catch {
-          log(
-            "No existing conversation found yet, sticking with 'new' mode",
-          );
+          log("No existing conversation found yet, sticking with 'new' mode");
         }
       }
     };
@@ -357,7 +353,7 @@ export function useChatThreadRuntime({
           }
         }
       } catch (err) {
-          error("[ChatThread] Fetch messages error:", err);
+        error("[ChatThread] Fetch messages error:", err);
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -493,9 +489,7 @@ export function useChatThreadRuntime({
       const { userId: seenByUserId, seenAt, user: seenUser } = data;
       if (seenByUserId === userId) return;
 
-      log(
-        `[ChatThread] 👁️ Message seen update from user ${seenByUserId}`,
-      );
+      log(`[ChatThread] 👁️ Message seen update from user ${seenByUserId}`);
 
       const userData = seenUser || {
         id: seenByUserId,

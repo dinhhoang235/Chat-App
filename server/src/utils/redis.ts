@@ -20,7 +20,7 @@ export const connectRedis = async () => {
 
 const MESSAGE_CACHE_KEY_PREFIX = "chat:messages:";
 const USER_STATUS_KEY_PREFIX = "user:status:";
-const CACHE_LIMIT = 50; // Cache 50 messages per conversation
+const CACHE_LIMIT = 200; // OPTIMIZATION #5: Increased from 50 to 200 messages per conversation for better offline access and faster 2nd+ open
 
 /**
  * Set user online status in Redis
@@ -101,6 +101,73 @@ export const getUserStatusStructured = async (
   } catch (err) {
     console.error("Redis Get Structured User Status Error:", err);
     return null;
+  }
+};
+
+/**
+ * Batch get user statuses for multiple users (optimized N+1 query fix)
+ * Uses Redis MGET to fetch all statuses in one round trip instead of N requests
+ */
+export const getUsersStatusStructured = async (
+  userIds: number[],
+): Promise<
+  Map<number, { status: "online" | "offline"; lastSeen: number | null }>
+> => {
+  try {
+    if (userIds.length === 0) return new Map();
+
+    // Build keys for all users
+    const keys = userIds.map((id) => `${USER_STATUS_KEY_PREFIX}${id}`);
+
+    // Fetch all in one Redis call (mget)
+    const results = await redisClient.mGet(keys);
+
+    // Map results back to userIds
+    const statusMap = new Map();
+
+    userIds.forEach((userId, index) => {
+      const raw = results[index];
+
+      if (!raw) {
+        statusMap.set(userId, { status: "offline", lastSeen: null });
+        return;
+      }
+
+      // If stored as 'online'
+      if (raw === "online") {
+        statusMap.set(userId, { status: "online", lastSeen: null });
+        return;
+      }
+
+      // Try parse as JSON
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.status) {
+          statusMap.set(userId, {
+            status: parsed.status === "online" ? "online" : "offline",
+            lastSeen: parsed.lastSeen || null,
+          });
+          return;
+        }
+      } catch {
+        // Not JSON
+      }
+
+      // Otherwise assume it's a timestamp string
+      const ts = Number(raw);
+      if (!Number.isNaN(ts)) {
+        statusMap.set(userId, { status: "offline", lastSeen: ts });
+        return;
+      }
+
+      statusMap.set(userId, { status: "offline", lastSeen: null });
+    });
+
+    return statusMap;
+  } catch (err) {
+    console.error("Redis Get Users Status Batch Error:", err);
+    // Return empty map on error to not break the flow
+    return new Map();
   }
 };
 

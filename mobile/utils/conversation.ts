@@ -199,8 +199,12 @@ export const mapConversationResponse = (conv: any, user: any, colors: any) => {
     isGroup: conv.isGroup,
     targetUserId: otherParticipant?.userId.toString(),
     status: otherParticipant?.user.status || "offline",
+    lastSeen: otherParticipant?.user.lastSeen
+      ? Number(otherParticipant.user.lastSeen)
+      : null,
     isMuted: !!(mutedUntil && mutedUntil > new Date()),
     isPinned: !!ownParticipant?.isPinned,
     updatedAt,
+    initialMessages: Array.isArray(conv.messages) ? conv.messages : [],
   };
 };

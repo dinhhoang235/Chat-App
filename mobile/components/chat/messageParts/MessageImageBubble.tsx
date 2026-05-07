@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, useWindowDimensions } from 'react-native'
 import { Image } from 'expo-image';
 import FullscreenImageViewer from '../../modals/FullscreenImageViewer';
 import { resolveMediaUri } from './messageHelpers';
+import { error } from '@/utils/logger';
 
 type MessageImageBubbleProps = {
   message: any;
@@ -16,6 +17,11 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(() => {
+    // First, check if dimensions are stored in fileInfo
+    if (message.fileInfo?.width && message.fileInfo?.height) {
+      return { width: message.fileInfo.width, height: message.fileInfo.height };
+    }
+    // Otherwise check the cache
     const uri = message.fileInfo?.url ? resolveMediaUri(message.fileInfo.url) : null;
     return uri ? IMAGE_SIZE_CACHE.get(uri) || null : null;
   });
@@ -27,6 +33,8 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
     if (!url) return null;
     return resolveMediaUri(url);
   }, [message.fileInfo, message.type]);
+
+
 
   const { threadImageUris, threadImageIds } = useMemo(() => {
     const uris: string[] = [];
@@ -49,10 +57,17 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
   const maxWidth = screenWidth * 0.75;
   const maxHeight = screenHeight * 0.48;
   const cachedSize = imageSize || (fullImageUri ? IMAGE_SIZE_CACHE.get(fullImageUri) || null : null);
+  // Use 1:1 (square) as default - safer for both landscape and portrait images
   const aspectRatio = cachedSize && cachedSize.width > 0 && cachedSize.height > 0
     ? cachedSize.width / cachedSize.height
     : 1;
-  const imageHeight = Math.min(maxWidth / aspectRatio, maxHeight);
+  let imageWidth = maxWidth;
+  let imageHeight = maxWidth / aspectRatio;
+
+  if (imageHeight > maxHeight) {
+    imageHeight = maxHeight;
+    imageWidth = imageHeight * aspectRatio;
+  }
 
   return (
     <>
@@ -72,7 +87,7 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
         }}
         activeOpacity={0.9}
       >
-        <View style={{ width: maxWidth, height: imageHeight, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.surfaceVariant }}>
+        <View style={{ width: imageWidth, height: imageHeight, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.surfaceVariant }}>
           <Image
             source={{ uri: fullImageUri }}
             style={{
@@ -89,7 +104,7 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
                 setImageSize(nextSize);
               }
             }}
-            onError={(err) => console.log('Image load error:', fullImageUri, err)}
+            onError={(err) => error('Image load error:', fullImageUri, err)}
           />
           {message.status === 'sending' && (
             <View style={{

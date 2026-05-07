@@ -7,6 +7,7 @@ import { useTabBar } from '@/context/tabBarContext';
 import { useConversations } from '@/hooks/useConversations';
 import { useSocketStatus } from '@/hooks/useSocketStatus';
 import { useTheme } from '@/context/themeContext';
+import { chatThreadCache } from '@/utils/chatThreadCache';
 
 export default function Messages() {
   const { toggle, setAddLayout, setHeaderLayout } = useAddMenu();
@@ -201,6 +202,9 @@ export default function Messages() {
                 if (!selectionMode) {
                   // Optimistically clear unread count
                   setData(prev => prev.map(m => m.id === item.id ? { ...m, unread: 0 } : m));
+                  if (item.initialMessages?.length) {
+                    chatThreadCache.setMessages(item.id, item.initialMessages);
+                  }
                   
                   router.push({ 
                     pathname: '/chat/[id]', 
@@ -209,9 +213,11 @@ export default function Messages() {
                       name: item.name,
                       targetUserId: item.targetUserId,
                       avatar: item.avatar,
+                      status: item.status,
+                      lastSeen: item.lastSeen ? String(item.lastSeen) : '',
                       isGroup: item.isGroup ? 'true' : 'false',
                       membersCount: item.membersCount,
-                      avatars: Array.isArray(item.avatars) ? item.avatars.join(',') : (item.avatars || '')
+                      avatars: item.isGroup ? JSON.stringify(item.avatars.map((a: any) => a.url)) : ''
                     } 
                   }); 
                 } 

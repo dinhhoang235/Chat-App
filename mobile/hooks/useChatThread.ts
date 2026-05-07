@@ -1,23 +1,24 @@
-import { useMemo } from 'react';
-import { useTheme } from '@/context/themeContext';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
-import { useAuth } from '@/context/authContext';
-import { useTyping } from './useTyping';
-import { useCall } from '@/context/callContext';
-import { useChatThreadCalls } from './useChatThread/useChatThreadCalls';
-import { useChatThreadAttachments } from './useChatThread/useChatThreadAttachments';
-import { useChatThreadComposer } from './useChatThread/useChatThreadComposer';
-import { useChatThreadMessageNavigation } from './useChatThread/useChatThreadMessageNavigation';
-import { useChatThreadMeta } from './useChatThread/useChatThreadMeta';
-import { useChatThreadRefs } from './useChatThread/useChatThreadRefs';
-import { useChatThreadSheetAnimation } from './useChatThread/useChatThreadSheetAnimation';
-import { useChatThreadSendText } from './useChatThread/useChatThreadSendText';
-import { useChatThreadState } from './useChatThread/useChatThreadState';
-import { useChatThreadSearch } from './useChatThread/useChatThreadSearch';
-import { useChatThreadRuntime } from './useChatThread/useChatThreadRuntime';
-import { useChatThreadGroupCall } from './useChatThread/useChatThreadGroupCall';
-import { buildProcessedMessages } from '@/utils/chatThread';
+import { useMemo } from "react";
+import { useTheme } from "@/context/themeContext";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
+import { useAuth } from "@/context/authContext";
+import { useTyping } from "./useTyping";
+import { useCall } from "@/context/callContext";
+import { useChatThreadCalls } from "./useChatThread/useChatThreadCalls";
+import { useChatThreadAttachments } from "./useChatThread/useChatThreadAttachments";
+import { useChatThreadComposer } from "./useChatThread/useChatThreadComposer";
+import { useChatThreadMessageNavigation } from "./useChatThread/useChatThreadMessageNavigation";
+import { useChatThreadMeta } from "./useChatThread/useChatThreadMeta";
+import { useChatThreadRefs } from "./useChatThread/useChatThreadRefs";
+import { useChatThreadSheetAnimation } from "./useChatThread/useChatThreadSheetAnimation";
+import { useChatThreadSendText } from "./useChatThread/useChatThreadSendText";
+import { useChatThreadState } from "./useChatThread/useChatThreadState";
+import { useChatThreadSearch } from "./useChatThread/useChatThreadSearch";
+import { useChatThreadRuntime } from "./useChatThread/useChatThreadRuntime";
+import { useChatThreadGroupCall } from "./useChatThread/useChatThreadGroupCall";
+import { buildProcessedMessages, mapThreadMessage } from "@/utils/chatThread";
+import { chatThreadCache } from "@/utils/chatThreadCache";
 
 type UseChatThreadOptions = {
   openGroupVideoCallModal?: () => void;
@@ -28,10 +29,35 @@ export function useChatThread(options?: UseChatThreadOptions) {
   const { user } = useAuth();
   const params = useLocalSearchParams();
   const router = useRouter();
-  const id = (params.id as string) === 'new' ? null : (params.id as string);
+  const id = (params.id as string) === "new" ? null : (params.id as string);
   const targetUserId = params.targetUserId as string;
   const paramName = params.name as string | undefined;
-  const isNewConversation = (!id || id === 'new') && !!targetUserId;
+  const paramStatus = params.status as string | undefined;
+  const paramLastSeen = params.lastSeen as string | undefined;
+  const initialMessages = useMemo(() => {
+    if (id && chatThreadCache.hasMessages(id)) {
+      return chatThreadCache
+        .getMessages(id)
+        .map((message: any) =>
+          mapThreadMessage(message, user?.id, { includeSeenBy: true }),
+        );
+    }
+
+    const raw = params.initialMessages as string | undefined;
+    if (!raw) return [] as any[];
+
+    try {
+      const parsed = JSON.parse(decodeURIComponent(raw));
+      if (!Array.isArray(parsed)) return [] as any[];
+
+      return parsed.map((message: any) =>
+        mapThreadMessage(message, user?.id, { includeSeenBy: true }),
+      );
+    } catch {
+      return [] as any[];
+    }
+  }, [id, params.initialMessages, user?.id]);
+  const isNewConversation = (!id || id === "new") && !!targetUserId;
 
   const {
     messages,
@@ -71,14 +97,28 @@ export function useChatThread(options?: UseChatThreadOptions) {
     targetUserId,
     paramsTargetUserId: params.targetUserId as string | null,
     isNewConversation,
+    initialMessages,
+    initialTargetUserStatus: paramStatus
+      ? {
+          status: paramStatus,
+          lastSeen:
+            paramStatus === "online" || !paramLastSeen
+              ? null
+              : Number(paramLastSeen),
+        }
+      : null,
   });
 
-  const { isTyping, typingUser, handleType } = useTyping(conversationId, user?.id);
+  const { isTyping, typingUser, handleType } = useTyping(
+    conversationId,
+    user?.id,
+  );
   const isFocused = useIsFocused();
-  const isGroup = params.isGroup === 'true';
+  const isGroup = params.isGroup === "true";
 
-  const { messagesRef, allMediaRef, flatListRef, inputRef } =
-    useChatThreadRefs({ messages, allMedia });
+  const { messagesRef, allMediaRef, flatListRef, inputRef } = useChatThreadRefs(
+    { messages, allMedia },
+  );
 
   const {
     fetchMessages: runtimeFetchMessages,
@@ -123,19 +163,29 @@ export function useChatThread(options?: UseChatThreadOptions) {
   const fetchMessages = runtimeFetchMessages;
   const fetchAllMedia = runtimeFetchAllMedia;
 
-  const { displayTypingAvatar, groupAvatars, membersCount, statusText } =
-    useChatThreadMeta({
-      typingUser,
-      groupDetails,
-      paramsAvatars: params.avatars,
-      paramAvatar: params.avatar,
-      paramsMembersCount: params.membersCount,
-      isGroup,
-      targetUserStatus,
-    });
+  const {
+    displayTypingAvatar,
+    typingUserInitials,
+    groupAvatars,
+    membersCount,
+    statusText,
+  } = useChatThreadMeta({
+    typingUser,
+    groupDetails,
+    paramsAvatars: params.avatars,
+    paramAvatar: params.avatar,
+    paramsMembersCount: params.membersCount,
+    isGroup,
+    targetUserStatus,
+  });
 
   const { startCall } = useCall();
-  const { startVoiceCall, startVideoCall, startVideoCallToTarget, startGroupVideoCall } = useChatThreadCalls({
+  const {
+    startVoiceCall,
+    startVideoCall,
+    startVideoCallToTarget,
+    startGroupVideoCall,
+  } = useChatThreadCalls({
     isGroupParam: params.isGroup as string | undefined,
     targetUserIdState,
     conversationId,
@@ -220,24 +270,25 @@ export function useChatThread(options?: UseChatThreadOptions) {
     setUploadProgress,
   });
 
-  const { handleSend, sendTextDirect } = useChatThreadSendText({
-    attachments,
-    clearAttachments,
-    setGalleryVisible,
-    messageText,
-    setMessageText,
-    handleSendAttachment,
-    flatListRef,
-    replyingTo,
-    setReplyingTo,
-    userId: user?.id,
-    conversationId,
-    isNewConversation,
-    targetUserIdState,
-    setMessages,
-    setCreatingConversation,
-    setConversationId,
-  });
+  const { handleSend, sendTextDirect, handleRetryMessage } =
+    useChatThreadSendText({
+      attachments,
+      clearAttachments,
+      setGalleryVisible,
+      messageText,
+      setMessageText,
+      handleSendAttachment,
+      flatListRef,
+      replyingTo,
+      setReplyingTo,
+      userId: user?.id,
+      conversationId,
+      isNewConversation,
+      targetUserIdState,
+      setMessages,
+      setCreatingConversation,
+      setConversationId,
+    });
 
   return {
     colors,
@@ -257,6 +308,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     creatingConversation,
     isTyping,
     displayTypingAvatar,
+    typingUserInitials,
     flatListRef,
     inputRef,
     searchMode,
@@ -285,6 +337,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     animatedContentStyle,
     fetchMessages,
     handleSend,
+    handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,
     pickDocument,

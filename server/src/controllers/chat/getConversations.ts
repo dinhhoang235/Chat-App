@@ -1,7 +1,7 @@
 import { Response } from "express";
 import prisma from "../../db.js";
 import { AuthRequest } from "../../middleware/auth.js";
-import { getUserStatus } from "../../utils/redis.js";
+import { getUsersStatusStructured } from "../../utils/redis.js";
 
 type ConversationParticipantWithUser = {
   userId: number;
@@ -53,7 +53,7 @@ export const getConversations = async (
           },
         },
         messages: {
-          take: 1,
+          take: 20,
           orderBy: { createdAt: "desc" },
         },
       },
@@ -63,6 +63,19 @@ export const getConversations = async (
     });
 
     // Manually calculate unread count and add user status for each conversation
+    // OPTIMIZATION: Batch fetch all user statuses in ONE Redis call instead of N calls per conversation
+    const allUserIds = new Set<number>();
+    conversations.forEach((conv) => {
+      conv.participants.forEach((p) => {
+        allUserIds.add(p.userId);
+      });
+    });
+
+    // Fetch all user statuses at once (reduces from ~150 Redis calls to 1-2 calls)
+    const userStatusMap = await getUsersStatusStructured(
+      Array.from(allUserIds),
+    );
+
     const mappedConversations = await Promise.all(
       conversations.map(
         async (conv: {
@@ -95,26 +108,50 @@ export const getConversations = async (
             },
           });
 
-          // Add status for each participant
-          const participantsWithStatus = await Promise.all(
-            conv.participants.map(
-              async (p: ConversationParticipantWithUser) => {
-                const status = await getUserStatus(p.userId);
-                return {
-                  ...p,
-                  user: {
-                    ...p.user,
-                    status: status === "online" ? "online" : "offline",
-                  },
-                };
-              },
-            ),
+          // Add status for each participant - NOW just lookup from pre-fetched map
+          const participantsWithStatus = conv.participants.map(
+            (p: ConversationParticipantWithUser) => {
+              const structured = userStatusMap.get(p.userId) || {
+                status: "offline",
+                lastSeen: null,
+              };
+              const isOnline = structured.status === "online";
+              return {
+                ...p,
+                user: {
+                  ...p.user,
+                  status: isOnline ? "online" : "offline",
+                  lastSeen: structured.lastSeen,
+                },
+              };
+            },
           );
 
           return {
             ...conv,
             isPinned: !!participant?.isPinned,
-            messages: lastMessage,
+            messages: lastMessage.map((msg: any) => {
+              // Compute seenBy for initial messages just like in getMessages
+              const seenBy = msg.senderId
+                ? participantsWithStatus
+                    .filter(
+                      (p: any) =>
+                        p.userId !== msg.senderId &&
+                        new Date(p.lastReadAt || 0).getTime() >
+                          new Date(msg.createdAt).getTime(),
+                    )
+                    .map((p: any) => ({
+                      id: p.user.id,
+                      fullName: p.user.fullName,
+                      avatar: p.user.avatar
+                        ? p.user.avatar.startsWith("http")
+                          ? p.user.avatar
+                          : p.user.avatar
+                        : null,
+                    }))
+                : [];
+              return { ...msg, seenBy, fromMe: msg.senderId === userId };
+            }),
             participants: participantsWithStatus,
             membersCount: conv.participants.length,
             _count: {

@@ -1,9 +1,16 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { socketService } from '@/services/socket';
+import { useState, useRef, useEffect, useCallback } from "react";
+import { socketService } from "@/services/socket";
 
-export const useTyping = (conversationId: string | null, userId: number | undefined) => {
+export const useTyping = (
+  conversationId: string | null,
+  userId: number | undefined,
+) => {
   const [isTyping, setIsTyping] = useState(false);
-  const [typingUser, setTypingUser] = useState<{ id: number, avatar?: string } | null>(null);
+  const [typingUser, setTypingUser] = useState<{
+    id: number;
+    avatar?: string;
+    fullName?: string;
+  } | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingEventRef = useRef<number>(0);
 
@@ -15,7 +22,11 @@ export const useTyping = (conversationId: string | null, userId: number | undefi
     const handleStart = (data: any) => {
       if (data.conversationId === conversationIdNum && data.userId !== userId) {
         setIsTyping(true);
-        setTypingUser({ id: data.userId, avatar: data.avatar });
+        setTypingUser({
+          id: data.userId,
+          avatar: data.avatar,
+          fullName: data.fullName,
+        });
       }
     };
 
@@ -26,12 +37,12 @@ export const useTyping = (conversationId: string | null, userId: number | undefi
       }
     };
 
-    socketService.on('user_typing_start', handleStart);
-    socketService.on('user_typing_stop', handleStop);
+    socketService.on("user_typing_start", handleStart);
+    socketService.on("user_typing_stop", handleStop);
 
     return () => {
-      socketService.off('user_typing_start', handleStart);
-      socketService.off('user_typing_stop', handleStop);
+      socketService.off("user_typing_start", handleStart);
+      socketService.off("user_typing_stop", handleStop);
     };
   }, [conversationId, userId]);
 
@@ -42,7 +53,7 @@ export const useTyping = (conversationId: string | null, userId: number | undefi
     const now = Date.now();
     // Throttle typing events: only send every 2 seconds
     if (now - lastTypingEventRef.current > 2000) {
-      socketService.emit('typing_start', parseInt(conversationId, 10));
+      socketService.emit("typing_start", parseInt(conversationId, 10));
       lastTypingEventRef.current = now;
     }
 
@@ -54,7 +65,7 @@ export const useTyping = (conversationId: string | null, userId: number | undefi
     // Set timeout to send stop typing event after 3 seconds of inactivity
     typingTimeoutRef.current = setTimeout(() => {
       if (conversationId) {
-        socketService.emit('typing_stop', parseInt(conversationId, 10));
+        socketService.emit("typing_stop", parseInt(conversationId, 10));
       }
     }, 3000);
   }, [conversationId]);

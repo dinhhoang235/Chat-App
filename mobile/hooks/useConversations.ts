@@ -6,6 +6,10 @@ import { useAuth } from "@/context/authContext";
 import { chatApi } from "@/services/chat";
 import { socketService } from "@/services/socket";
 import { mapConversationResponse } from "@/utils/conversation";
+import {
+  loadConversationListCache,
+  saveConversationListCache,
+} from "@/utils/conversationListCache";
 import { useConversationSelection } from "@/hooks/useConversations/useConversationSelection";
 import { useConversationActions } from "@/hooks/useConversations/useConversationActions";
 
@@ -16,6 +20,7 @@ export function useConversations() {
   const isFocused = useIsFocused();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cacheReadyUserId, setCacheReadyUserId] = useState<number | null>(null);
   const {
     selectionMode,
     setSelectionMode,
@@ -43,6 +48,35 @@ export function useConversations() {
     setSelectionMode,
     setSelectedIds,
   });
+
+  useEffect(() => {
+    if (!user) {
+      setData([]);
+      setLoading(false);
+      setCacheReadyUserId(null);
+      return;
+    }
+
+    let cancelled = false;
+    setCacheReadyUserId(null);
+
+    const hydrateCache = async () => {
+      const cached = await loadConversationListCache(user.id, colors);
+      if (cancelled || cached.length === 0) return;
+
+      setData(cached);
+    };
+
+    hydrateCache().finally(() => {
+      if (!cancelled) {
+        setCacheReadyUserId(user.id);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, colors]);
 
   const fetchConversations = useCallback(async () => {
     // don't attempt to hit the API if we don't have a logged-in user yet
@@ -72,6 +106,25 @@ export function useConversations() {
   }, [user, colors]);
 
   useEffect(() => {
+    if (!user || cacheReadyUserId !== user.id) return;
+
+    saveConversationListCache(user.id, data);
+  }, [cacheReadyUserId, data, user]);
+
+  useEffect(() => {
+    setData((prev) =>
+      prev.map((conversation) => ({
+        ...conversation,
+        color: conversation.isGroup
+          ? colors.tint
+          : conversation.avatar
+            ? undefined
+            : colors.tint,
+      })),
+    );
+  }, [colors]);
+
+  useEffect(() => {
     if (isFocused && user) {
       fetchConversations();
     }
@@ -88,9 +141,11 @@ export function useConversations() {
     const handleStatusChanged = (data: { userId: number; status: string }) => {
       setData((prev) =>
         prev.map((conv) => {
-          if (conv.targetUserId === data.userId.toString()) {
+          // Update 1-1 conversations by targetUserId
+          if (Number(conv.targetUserId) === data.userId) {
             return { ...conv, status: data.status };
           }
+          // Update group conversations (update is still valid but status might be used differently)
           return conv;
         }),
       );

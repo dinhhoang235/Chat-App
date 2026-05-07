@@ -30,6 +30,8 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
     return { threadImageUris: uris, threadImageIds: ids };
   }, [allMedia]);
 
+
+
   const maxWidth = screenWidth * 0.75;
   const spacing = 4;
   const total = message.images.length;
@@ -54,7 +56,11 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
         const imgHeight = currentColCount === 1
           ? maxWidth * 0.6
           : (() => {
-              const cachedSize = IMAGE_SIZE_CACHE.get(uri);
+              // Check fileInfo dimensions first, then cache
+              const fileInfoSize = img.fileInfo?.width && img.fileInfo?.height 
+                ? { width: img.fileInfo.width, height: img.fileInfo.height }
+                : IMAGE_SIZE_CACHE.get(uri);
+              const cachedSize = fileInfoSize || IMAGE_SIZE_CACHE.get(uri);
               const isLand = cachedSize ? cachedSize.width > cachedSize.height : true;
               return isLand ? imgWidth * 0.75 : imgWidth * 1.3;
             })();

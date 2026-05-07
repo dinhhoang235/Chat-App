@@ -2,7 +2,9 @@ import React, { createContext, useState, useContext, useEffect } from "react";
 import { authAPI } from "@/services/auth";
 import { tokenStorage, SavedAccount } from "@/utils/tokenStorage";
 import { socketService } from "@/services/socket";
+import { log } from '@/utils/logger';
 import { userAPI } from "@/services/user";
+
 
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -35,6 +37,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // restore login state when the provider mounts
   useEffect(() => {
     (async () => {
+      // First, initialize cached token from storage
+      await tokenStorage.initCachedToken();
+      
       const access = await tokenStorage.getAccessToken();
       const storedUser = await tokenStorage.getUser();
       if (access && storedUser) {
@@ -52,8 +57,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoggedIn) {
+      log("[AuthContext] ✅ Logged in, connecting socket...");
       socketService.connect();
     } else {
+      log("[AuthContext] 🚫 Logged out, disconnecting socket...");
       socketService.disconnect();
     }
   }, [isLoggedIn]);
@@ -71,8 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true;
       }
       return false;
-    } catch (error) {
-      console.error("Login error:", error);
+    } catch (err) {
+      error("Login error:", err);
       return false;
     }
   };
@@ -94,8 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true;
       }
       return false;
-    } catch (error) {
-      console.error("Signup error:", error);
+    } catch (err) {
+      error("Signup error:", err);
       return false;
     }
   };
@@ -113,8 +120,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         await userAPI.updatePushToken(user.id, null);
       }
-    } catch (error) {
-      console.error("Logout cleanup error:", error);
+    } catch (err) {
+      error("Logout cleanup error:", err);
     }
     
     // Always do local cleanup

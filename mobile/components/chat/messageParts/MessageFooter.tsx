@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { getAvatarUrl } from '@/utils/avatar';
 import { getInitials } from '@/utils/initials';
 import { Image } from 'expo-image';
@@ -11,21 +11,26 @@ type MessageFooterProps = {
   isThreadLast?: boolean;
   colors: any;
   timeColor: string;
+  onRetry?: (message: any) => void;
 };
 
-export default function MessageFooter({ message, isOutgoing, isLastInGroup, isThreadLast, colors, timeColor }: MessageFooterProps) {
+export default function MessageFooter({ message, isOutgoing, isLastInGroup, isThreadLast, colors, timeColor, onRetry }: MessageFooterProps) {
   if (!isLastInGroup) return null;
 
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, justifyContent: isOutgoing ? 'flex-end' : 'flex-start' }}>
-        <Text style={{ color: timeColor, fontSize: 12, marginRight: isOutgoing ? 0 : 8, marginLeft: isOutgoing ? 8 : 0 }}>
-          {message.status === 'sending' ? (
-            <Text style={{ color: timeColor, fontSize: 12 }}>Đang gửi</Text>
-          ) : (isOutgoing && isThreadLast) ? (
-            (message.seenBy && message.seenBy.length > 0) ? '' : 'Đã gửi'
-          ) : message.time}
-        </Text>
+        <Pressable onPress={() => onRetry?.(message)}>
+          <Text style={{ color: message.status === 'error' ? '#FF4444' : timeColor, fontSize: 12, marginRight: isOutgoing ? 0 : 8, marginLeft: isOutgoing ? 8 : 0 }}>
+            {message.status === 'sending' ? (
+              <Text style={{ color: timeColor, fontSize: 12 }}>Đang gửi</Text>
+            ) : message.status === 'error' ? (
+              <Text style={{ color: '#FF4444', fontSize: 12 }}>Gửi lỗi</Text>
+            ) : (isOutgoing && isThreadLast) ? (
+              (message.seenBy && message.seenBy.length > 0) ? '' : 'Đã gửi'
+            ) : message.time}
+          </Text>
+        </Pressable>
         {message.reactions && message.reactions.length > 0 && (
           <View style={{ backgroundColor: colors.surfaceVariant, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
             <Text style={{ fontSize: 12, color: colors.text }}>{message.reactions[0].emoji} {message.reactions[0].count ?? ''}</Text>
@@ -56,8 +61,8 @@ export default function MessageFooter({ message, isOutgoing, isLastInGroup, isTh
                   onError={(e) => console.log('Avatar load error:', e)}
                 />
               ) : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>{getInitials(u.fullName)}</Text>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}>
+                  <Text style={{ fontSize: 12, color: '#FFFFFF' }}>{getInitials(u.fullName)}</Text>
                 </View>
               )}
             </View>

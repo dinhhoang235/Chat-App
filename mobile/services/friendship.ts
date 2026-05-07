@@ -1,4 +1,4 @@
-import apiClient from './api';
+import apiClient from "./api";
 
 // Interface types
 export interface User {
@@ -11,6 +11,8 @@ export interface User {
   gender?: string;
   dateOfBirth?: string;
   online?: boolean;
+  status?: "online" | "offline";
+  lastSeen?: number | null;
 }
 
 export interface FriendRequest {
@@ -19,7 +21,7 @@ export interface FriendRequest {
   sender?: User;
   receiver?: User;
   receiverId: number;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: "pending" | "accepted" | "rejected";
   createdAt: string;
   updatedAt: string;
 }
@@ -46,12 +48,12 @@ export interface Friendship {
 // Tìm kiếm bạn theo số điện thoại
 export const searchFriendByPhone = async (phone: string) => {
   try {
-    const response = await apiClient.get('/users/friends/search', {
-      params: { phone }
+    const response = await apiClient.get("/users/friends/search", {
+      params: { phone },
     });
     return response.data;
   } catch (error) {
-    console.error('Error searching friend:', error);
+    console.error("Error searching friend:", error);
     throw error;
   }
 };
@@ -59,12 +61,12 @@ export const searchFriendByPhone = async (phone: string) => {
 // Gửi lời mời kết bạn
 export const sendFriendRequest = async (receiverId: number) => {
   try {
-    const response = await apiClient.post('/users/friends/request/send', {
-      receiverId
+    const response = await apiClient.post("/users/friends/request/send", {
+      receiverId,
     });
     return response.data;
   } catch (error) {
-    console.error('Error sending friend request:', error);
+    console.error("Error sending friend request:", error);
     throw error;
   }
 };
@@ -72,12 +74,12 @@ export const sendFriendRequest = async (receiverId: number) => {
 // Chấp nhận lời mời kết bạn
 export const acceptFriendRequest = async (senderId: number) => {
   try {
-    const response = await apiClient.post('/users/friends/request/accept', {
-      senderId
+    const response = await apiClient.post("/users/friends/request/accept", {
+      senderId,
     });
     return response.data;
   } catch (error) {
-    console.error('Error accepting friend request:', error);
+    console.error("Error accepting friend request:", error);
     throw error;
   }
 };
@@ -85,12 +87,12 @@ export const acceptFriendRequest = async (senderId: number) => {
 // Từ chối lời mời kết bạn
 export const rejectFriendRequest = async (senderId: number) => {
   try {
-    const response = await apiClient.post('/users/friends/request/reject', {
-      senderId
+    const response = await apiClient.post("/users/friends/request/reject", {
+      senderId,
     });
     return response.data;
   } catch (error) {
-    console.error('Error rejecting friend request:', error);
+    console.error("Error rejecting friend request:", error);
     throw error;
   }
 };
@@ -98,12 +100,12 @@ export const rejectFriendRequest = async (senderId: number) => {
 // Hủy lời mời kết bạn đã gửi
 export const cancelFriendRequest = async (receiverId: number) => {
   try {
-    const response = await apiClient.post('/users/friends/request/cancel', {
-      receiverId
+    const response = await apiClient.post("/users/friends/request/cancel", {
+      receiverId,
     });
     return response.data;
   } catch (error) {
-    console.error('Error cancelling friend request:', error);
+    console.error("Error cancelling friend request:", error);
     throw error;
   }
 };
@@ -111,10 +113,10 @@ export const cancelFriendRequest = async (receiverId: number) => {
 // Lấy danh sách lời mời kết bạn chưa xử lý (nhận được)
 export const getPendingFriendRequests = async () => {
   try {
-    const response = await apiClient.get('/users/friends/requests/pending');
+    const response = await apiClient.get("/users/friends/requests/pending");
     return response.data.data;
   } catch (error) {
-    console.error('Error fetching pending requests:', error);
+    console.error("Error fetching pending requests:", error);
     throw error;
   }
 };
@@ -122,10 +124,10 @@ export const getPendingFriendRequests = async () => {
 // Lấy danh sách lời mời kết bạn đã gửi
 export const getSentFriendRequests = async () => {
   try {
-    const response = await apiClient.get('/users/friends/requests/sent');
+    const response = await apiClient.get("/users/friends/requests/sent");
     return response.data.data;
   } catch (error) {
-    console.error('Error fetching sent requests:', error);
+    console.error("Error fetching sent requests:", error);
     throw error;
   }
 };
@@ -133,10 +135,10 @@ export const getSentFriendRequests = async () => {
 // Lấy danh sách bạn bè
 export const getFriendsList = async () => {
   try {
-    const response = await apiClient.get('/users/friends/list');
+    const response = await apiClient.get("/users/friends/list");
     return response.data.data;
   } catch (error) {
-    console.error('Error fetching friends:', error);
+    console.error("Error fetching friends:", error);
     throw error;
   }
 };
@@ -144,12 +146,12 @@ export const getFriendsList = async () => {
 // Xóa bạn
 export const removeFriend = async (friendId: number) => {
   try {
-    const response = await apiClient.post('/users/friends/remove', {
-      friendId
+    const response = await apiClient.post("/users/friends/remove", {
+      friendId,
     });
     return response.data;
   } catch (error) {
-    console.error('Error removing friend:', error);
+    console.error("Error removing friend:", error);
     throw error;
   }
 };
@@ -157,10 +159,12 @@ export const removeFriend = async (friendId: number) => {
 // Kiểm tra trạng thái bạn bè
 export const checkFriendshipStatus = async (targetUserId: number) => {
   try {
-    const response = await apiClient.get(`/users/friends/status/${targetUserId}`);
+    const response = await apiClient.get(
+      `/users/friends/status/${targetUserId}`,
+    );
     return response.data;
   } catch (error) {
-    console.error('Error checking friendship status:', error);
+    console.error("Error checking friendship status:", error);
     throw error;
   }
 };

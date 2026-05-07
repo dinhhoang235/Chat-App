@@ -4,6 +4,8 @@ import "../global.css";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
+import { AntDesign, Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { NotificationHandler } from '@/components/';
 import { IncomingCallModal } from '@/components/call';
 import { AuthProvider, useAuth } from "@/context/authContext";
@@ -17,6 +19,16 @@ import { CallProvider } from "@/context/callContext";
 function ThemeRoot() {
   const { scheme, colors } = useTheme();
   const rootClass = scheme === "dark" ? "flex-1 dark" : "flex-1";
+  const [fontsLoaded] = useFonts({
+    ...MaterialIcons.font,
+    ...Ionicons.font,
+    ...Feather.font,
+    ...AntDesign.font,
+  });
+
+  if (!fontsLoaded) {
+    return <View className={rootClass} style={{ backgroundColor: colors.background }} />;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

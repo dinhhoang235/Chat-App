@@ -30,6 +30,7 @@ export default function ChatThread() {
     creatingConversation,
     isTyping,
     displayTypingAvatar,
+    typingUserInitials,
     flatListRef,
     inputRef,
     searchMode,
@@ -67,6 +68,7 @@ export default function ChatThread() {
     currentResultIndices,
     statusText,
     handleSend,
+    handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,
     pickDocument,
@@ -191,6 +193,7 @@ export default function ChatThread() {
         highlightQuery={searchQuery}
         isLastInGroup={isLastInConsecutiveGroup}
         isThreadLast={isThreadLast}
+        contactAvatarFallback={!isGroup ? (targetUser?.avatar || (params.avatar as string | undefined)) : undefined}
         onPress={() => { if (composerVisible) closeAll(); }}
         onAvatarPress={() => {
           if (item.fromMe) return router.push('/profile/me');
@@ -205,9 +208,10 @@ export default function ChatThread() {
         onVideoCall={startVideoCall}
         onCallAction={handleCallAction}
         isGroupThread={isGroup}
+        onRetry={handleRetryMessage}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup]);
+  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
@@ -217,6 +221,11 @@ export default function ChatThread() {
   const micSheetHeight = micVoiceFlowActive
     ? Math.round(sheetHeight + composerHeight)
     : sheetHeight;
+
+  // Only show body loading if we have no messages AND either:
+  // 1. Messages are still loading OR
+  // 2. It's a 1-1 chat and we're waiting for user status
+  const showBodyLoading = (loading || (!isGroup && !!targetUserIdState && targetUserStatus === null)) && processedMessages.length === 0;
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.surface, paddingTop: insets.top }}>
@@ -359,7 +368,7 @@ export default function ChatThread() {
 
           {/* Wrapper for messages and composer that pushes up with keyboard */}
             <Animated.View style={[{ flex: 1 }, animatedContentStyle]}>
-              {loading ? (
+              {showBodyLoading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                   <ActivityIndicator size="large" color={colors.tint} />
                 </View>
@@ -371,6 +380,7 @@ export default function ChatThread() {
                   <FlatList
                     ref={flatListRef}
                     data={processedMessages}
+                    extraData={isTyping ? displayTypingAvatar || true : false}
                     inverted
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
@@ -385,9 +395,15 @@ export default function ChatThread() {
                       // the backend returns a message with a missing id.
                       return `msg-${idx}`;
                     }}
-                    initialNumToRender={20}
-                    maxToRenderPerBatch={40}
-                    windowSize={21}
+                    // Tuned for smoother UI: lower initial render + smaller window
+                    // reduces JS work during navigation/scroll. Increase batching
+                    // period so renders are grouped and less likely to block frames.
+                    initialNumToRender={6}
+                    maxToRenderPerBatch={6}
+                    windowSize={5}
+                    updateCellsBatchingPeriod={50}
+                    removeClippedSubviews={true}
+                    scrollEventThrottle={16}
                     maintainVisibleContentPosition={{
                       minIndexForVisible: 0,
                       autoscrollToTopThreshold: 10,
@@ -401,13 +417,24 @@ export default function ChatThread() {
                         fetchMessages(true);
                       }
                     }}
+                    ListEmptyComponent={() => null}
                     ListHeaderComponent={() => isTyping ? (
                       <View className="px-4 py-2 flex-row items-center">
-                        <Image
-                          source={displayTypingAvatar ? { uri: displayTypingAvatar } : undefined}
-                          className="w-10 h-10 rounded-full mr-3"
-                          style={{ backgroundColor: colors.surfaceVariant }}
-                        />
+                        <View
+                          className="w-10 h-10 rounded-full mr-3 items-center justify-center"
+                          style={{ backgroundColor: displayTypingAvatar ? 'transparent' : colors.tint }}
+                        >
+                          {displayTypingAvatar ? (
+                            <Image
+                              source={{ uri: displayTypingAvatar }}
+                              className="w-10 h-10 rounded-full"
+                            />
+                          ) : (
+                            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>
+                              {typingUserInitials}
+                            </Text>
+                          )}
+                        </View>
                         <View
                           style={{
                             backgroundColor: colors.bubbleOther,

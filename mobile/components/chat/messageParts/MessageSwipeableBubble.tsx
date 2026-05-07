@@ -5,6 +5,7 @@ import Swipeable, { SwipeableMethods } from 'react-native-gesture-handler/Reanim
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getInitials } from '@/utils/initials';
+import { getAvatarUrl } from '@/utils/avatar';
 import MessageFooter from './MessageFooter';
 
 type MessageSwipeableBubbleProps = {
@@ -18,6 +19,7 @@ type MessageSwipeableBubbleProps = {
   isLastInGroup?: boolean;
   isThreadLast?: boolean;
   isOutgoing: boolean;
+  contactAvatarFallback?: string;
   bubbleBg: string;
   animatedBorderStyle: any;
   children: React.ReactNode;
@@ -25,6 +27,7 @@ type MessageSwipeableBubbleProps = {
   colors: any;
   timeColor: string;
   highlightRowStyle?: any;
+  onRetry?: (message: any) => void;
 };
 
 export default function MessageSwipeableBubble({
@@ -38,6 +41,7 @@ export default function MessageSwipeableBubble({
   isLastInGroup,
   isThreadLast,
   isOutgoing,
+  contactAvatarFallback,
   bubbleBg,
   animatedBorderStyle,
   children,
@@ -45,6 +49,7 @@ export default function MessageSwipeableBubble({
   colors,
   timeColor,
   highlightRowStyle,
+  onRetry,
 }: MessageSwipeableBubbleProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
 
@@ -122,6 +127,8 @@ export default function MessageSwipeableBubble({
     ],
   }));
 
+  const avatarUri = message.contactAvatar || (contactAvatarFallback ? getAvatarUrl(contactAvatarFallback) || undefined : undefined);
+
   return (
     <RNAnimated.View style={[{ position: 'relative', paddingVertical: 8 }, highlightRowStyle]}>
       {!message.fromMe && (
@@ -130,14 +137,14 @@ export default function MessageSwipeableBubble({
             <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ opacity: isLastInGroup ? 1 : 0 }}>
               <Reanimated.View 
                 style={[
-                  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceVariant, overflow: 'hidden' },
+                  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint, overflow: 'hidden' },
                   avatarAnimatedStyle
                 ]}
               >
-                {message.contactAvatar ? (
-                  <Image source={{ uri: message.contactAvatar }} style={{ width: 40, height: 40 }} />
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={{ width: 40, height: 40 }} />
                 ) : (
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>{getInitials(message.contactName)}</Text>
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>{getInitials(message.contactName)}</Text>
                 )}
               </Reanimated.View>
             </TouchableOpacity>
@@ -194,6 +201,7 @@ export default function MessageSwipeableBubble({
                 isThreadLast={isThreadLast}
                 colors={colors}
                 timeColor={timeColor}
+                onRetry={onRetry}
               />
             </View>
           </Pressable>

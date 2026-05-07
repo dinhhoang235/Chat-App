@@ -5,18 +5,17 @@ import { useTheme } from '@/context/themeContext';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/authContext';
 import { Header, ProfileBioModal } from '@/components';
+import { ChatAvatar } from '@/components/avatars';
 import { getInitials } from '@/utils/initials';
 import { getAvatarUrl } from '@/utils/avatar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { userAPI } from '@/services/user';
 import { checkFriendshipStatus, sendFriendRequest, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest, User } from '@/services/friendship';
+import { socketService } from '@/services/socket';
 
 
 // Constants
 const AVATAR_SIZE = 92;
-const AVATAR_RADIUS = AVATAR_SIZE / 2;
-const AVATAR_IMAGE_SIZE = 86;
-const AVATAR_IMAGE_RADIUS = AVATAR_IMAGE_SIZE / 2;
 const COVER_IMAGE_HEIGHT = 220;
 const HEADER_HEIGHT = 56;
 const HEADER_ELEVATION = 6;
@@ -102,6 +101,29 @@ export default function UserProfile() {
       }
     }, [id, user, isMeRoute, loadUserProfile])
   );
+
+  React.useEffect(() => {
+    if (isMeRoute || !profile?.id) return;
+
+    const handleStatusChanged = (data: { userId: number; status: string; lastSeen?: number }) => {
+      if (data.userId !== Number(profile.id)) return;
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: data.status,
+              lastSeen: data.lastSeen ?? null,
+            }
+          : prev,
+      );
+    };
+
+    socketService.on('user_status_changed', handleStatusChanged);
+    return () => {
+      socketService.off('user_status_changed', handleStatusChanged);
+    };
+  }, [isMeRoute, profile?.id]);
 
   // Separate effect to refresh friendship status on focus
   useFocusEffect(
@@ -268,21 +290,16 @@ export default function UserProfile() {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => avatarUrl && setImageViewerUri(avatarUrl)}
-            style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_RADIUS, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: colors.background, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: HEADER_ELEVATION }}
+            style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: HEADER_ELEVATION }}
           >
-            {avatarUrl ? (
-              <Image
-                source={{ uri: avatarUrl }}
-                style={{ width: AVATAR_IMAGE_SIZE, height: AVATAR_IMAGE_SIZE, borderRadius: AVATAR_IMAGE_RADIUS }}
-              />
-            ) : (
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 26 }}>{initials}</Text>
-            )}
-
-            {/* small online dot */}
-            {profile?.online ? (
-              <View style={{ position: 'absolute', right: -6, top: 8, backgroundColor: '#10B981', width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.background }} />
-            ) : null}
+            <ChatAvatar
+              avatar={avatarUrl}
+              name={profile?.fullName || initials}
+              online={!isMeRoute && profile?.status === 'online'}
+              size={AVATAR_SIZE}
+              tintColor={colors.tint}
+              borderColor={colors.background}
+            />
           </TouchableOpacity>
         </View>
 

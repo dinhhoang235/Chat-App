@@ -21,6 +21,7 @@ export const connectRedis = async () => {
 const MESSAGE_CACHE_KEY_PREFIX = "chat:messages:";
 const USER_STATUS_KEY_PREFIX = "user:status:";
 const CACHE_LIMIT = 200; // OPTIMIZATION #5: Increased from 50 to 200 messages per conversation for better offline access and faster 2nd+ open
+const ONLINE_STATUS_TTL_SECONDS = 75;
 
 /**
  * Set user online status in Redis
@@ -32,8 +33,12 @@ export const setUserStatus = async (
   try {
     const key = `${USER_STATUS_KEY_PREFIX}${userId}`;
     if (status === "online") {
-      // Store structured JSON to be explicit
-      await redisClient.set(key, JSON.stringify({ status: "online" }));
+      // Store structured JSON to be explicit and expire stale online state automatically
+      await redisClient.setEx(
+        key,
+        ONLINE_STATUS_TTL_SECONDS,
+        JSON.stringify({ status: "online" }),
+      );
     } else {
       // Store structured JSON with lastSeen when going offline
       await redisClient.set(

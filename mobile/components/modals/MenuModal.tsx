@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions, Image, Platform, StatusBar } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
-import { GroupAvatar } from '@/components/avatars';
+import { GroupAvatar, ChatAvatar } from '@/components/avatars';
 import { getInitials } from '@/utils/initials';
 
 export type MenuItem = { key: string; label: string; icon: string; destructive?: boolean };
@@ -16,6 +16,7 @@ type Message = {
   initials?: string;
   color?: string;
   avatar?: string;
+  status?: string;
   isGroup?: boolean;
   groupAvatars?: string[];
   avatars?: string[];
@@ -69,10 +70,15 @@ export default function MenuModal({ visible, menuPos, onClose, onAction, items, 
                   membersCount={message.membersCount}
                   size={48}
                 />
-              ) : message.avatar ? (
-                <Image source={{ uri: message.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
               ) : (
-                <Text style={{ color: '#fff', fontWeight: '700' }}>{message.initials ?? getInitials(message.name)}</Text>
+                <ChatAvatar
+                  avatar={message.avatar}
+                  name={message.name}
+                  online={message.status === 'online'}
+                  size={48}
+                  tintColor={message.color || '#6B7280'}
+                  borderColor={rowBg}
+                />
               )}
             </View>
 

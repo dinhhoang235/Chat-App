@@ -31,12 +31,19 @@ export const setupSocket = (io: Server) => {
 
   io.on("connection", async (socket: AuthenticatedSocket) => {
     console.log(`User connected: ${socket.user?.userId}`);
+    let presenceHeartbeat: NodeJS.Timeout | null = null;
 
     if (socket.user) {
       const userId = Number(socket.user.userId);
       socket.join(`user:${userId}`);
       setUserStatus(userId, "online");
       io.emit("user_status_changed", { userId, status: "online" });
+
+      presenceHeartbeat = setInterval(() => {
+        setUserStatus(userId, "online").catch((err) => {
+          console.error("Failed to refresh user status heartbeat:", err);
+        });
+      }, 30000);
 
       // OPTIMIZATION #6: Cache user profile once on connection instead of querying DB on every typing event
       try {
@@ -75,6 +82,10 @@ export const setupSocket = (io: Server) => {
 
     socket.on("disconnect", async () => {
       console.log(`User disconnected: ${socket.user?.userId}`);
+      if (presenceHeartbeat) {
+        clearInterval(presenceHeartbeat);
+        presenceHeartbeat = null;
+      }
       if (socket.user) {
         const userId = Number(socket.user.userId);
         const lastSeen = Date.now();

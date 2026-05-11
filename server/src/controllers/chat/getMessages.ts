@@ -2,18 +2,7 @@ import { Response } from "express";
 import { Server } from "socket.io";
 import prisma from "../../db.js";
 import { AuthRequest } from "../../middleware/auth.js";
-import { getCachedMessages, bulkCacheMessages } from "../../utils/redis.js";
-
-type ChatParticipantWithUser = {
-  userId: number;
-  lastReadAt: Date;
-  mutedUntil: Date | null;
-  user: {
-    id: number;
-    fullName: string;
-    avatar: string | null;
-  };
-};
+import { bulkCacheMessages } from "../../utils/redis.js";
 
 type MessageWithSender = {
   id: number;
@@ -75,31 +64,25 @@ export const getMessages =
       let fromCache = false;
 
       // 1. Try to get from Cache if it's the first page (no cursor)
+      // NOTE: We disable cache if we want accurate per-user deletion filtering,
+      // or we can filter cached messages. For simplicity and correctness with per-user deletion, 
+      // let's fetch from DB if we don't have a sophisticated cache strategy for deletions.
+      /*
       if (!cursor) {
-        const cached = await getCachedMessages(convId, take);
-        // Only serve from cache if it satisfies the full request or we can be sure it's the end (but we can't easily)
-        // So we only use cache if it has at least 'take' items OR if we want to be more relaxed.
-        // Let's go with: if we have at least 'take' items, use cache.
-        if (cached && cached.length >= take) {
-          const filteredCached = participant.deletedAt
-            ? cached.filter(
-                (m: any) =>
-                  new Date(m.createdAt) > (participant.deletedAt as Date),
-              )
-            : cached;
-
-          if (filteredCached.length > 0) {
-            messages = filteredCached;
-            fromCache = true;
-          }
-        }
+        ...
       }
+      */
       if (!messages) {
         messages = await prisma.message.findMany({
           where: {
             conversationId: convId,
             createdAt: {
               gt: participant.deletedAt || new Date(0),
+            },
+            deletedBy: {
+              none: {
+                userId: userId,
+              },
             },
           },
           take: take,

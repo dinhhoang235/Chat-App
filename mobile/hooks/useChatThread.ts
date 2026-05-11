@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useTheme } from "@/context/themeContext";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
@@ -19,6 +19,8 @@ import { useChatThreadRuntime } from "./useChatThread/useChatThreadRuntime";
 import { useChatThreadGroupCall } from "./useChatThread/useChatThreadGroupCall";
 import { buildProcessedMessages, mapThreadMessage } from "@/utils/chatThread";
 import { chatThreadCache } from "@/utils/chatThreadCache";
+import { chatApi } from "@/services/chat";
+import { error } from "@/utils/logger";
 
 type UseChatThreadOptions = {
   openGroupVideoCallModal?: () => void;
@@ -290,6 +292,30 @@ export function useChatThread(options?: UseChatThreadOptions) {
       setConversationId,
     });
 
+  const deleteMessage = useCallback(
+    async (messageId: number, mode: 'unsend' | 'deleteForMe') => {
+      if (!conversationId) return;
+      try {
+        await chatApi.deleteMessage(conversationId, messageId, mode);
+        if (mode === 'deleteForMe') {
+          // Hide locally immediately and update in-memory cache
+          setMessages((prev) => {
+            const next = prev.filter((m) => m.id !== messageId);
+            // Sync chatThreadCache so message doesn't flash back on re-entry
+            chatThreadCache.setMessages(conversationId, next);
+            return next;
+          });
+        }
+        // For 'unsend', the socket event (message_revoked) handles the UI update
+        // and also persists the updated cache via the socket handler.
+      } catch (err) {
+        error("Delete message error:", err);
+        throw err;
+      }
+    },
+    [conversationId, setMessages],
+  );
+
   return {
     colors,
     params,
@@ -365,5 +391,6 @@ export function useChatThread(options?: UseChatThreadOptions) {
     startVideoCallToTarget,
     startGroupVideoCall,
     handleGroupVideoHeaderPress,
+    deleteMessage,
   };
 }

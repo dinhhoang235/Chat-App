@@ -12,6 +12,8 @@ import {
 } from "@/utils/conversationListCache";
 import { useConversationSelection } from "@/hooks/useConversations/useConversationSelection";
 import { useConversationActions } from "@/hooks/useConversations/useConversationActions";
+import { revokeMessageInCache } from "@/hooks/useChatThread/useChatThreadRuntime";
+import { chatThreadCache } from "@/utils/chatThreadCache";
 
 export function useConversations() {
   const { colors } = useTheme();
@@ -151,13 +153,36 @@ export function useConversations() {
       );
     };
 
+    const handleMessageRevoked = (data: any) => {
+      // Update both caches immediately so when user navigates into the chat
+      // the correct revoked state is shown without a flash.
+      if (data.conversationId) {
+        const convId = data.conversationId.toString();
+        // 1. Update runtime's messageCacheMemory + AsyncStorage
+        revokeMessageInCache(convId, data.messageId);
+        // 2. Update chatThreadCache (used as initialMessages on navigation)
+        const cached = chatThreadCache.getMessages(convId);
+        if (cached.length > 0) {
+          const updated = cached.map((m: any) =>
+            m.id === data.messageId
+              ? { ...m, type: 'revoked', content: 'Tin nhắn đã được thu hồi', isRevoked: true }
+              : m,
+          );
+          chatThreadCache.setMessages(convId, updated);
+        }
+      }
+      fetchConversations();
+    };
+
     socketService.on("conversation_updated", handleUpdate);
     socketService.on("new_message", handleNewMessage);
+    socketService.on("message_revoked", handleMessageRevoked);
     socketService.on("user_status_changed", handleStatusChanged);
 
     return () => {
       socketService.off("conversation_updated", handleUpdate);
       socketService.off("new_message", handleNewMessage);
+      socketService.off("message_revoked", handleMessageRevoked);
       socketService.off("user_status_changed", handleStatusChanged);
     };
   }, [fetchConversations, isFocused, user]);

@@ -1,12 +1,14 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal } from '@/components';
+import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 import { useGroupCallAction } from '@/hooks/useGroupCallAction';
 import { useCall } from '@/context/callContext';
 import { socketService } from '@/services/socket';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 
 export default function ChatThread() {
   const DEFAULT_COMPOSER_HEIGHT = 74;
@@ -15,6 +17,11 @@ export default function ChatThread() {
   const [micVoiceFlowActive, setMicVoiceFlowActive] = React.useState(false);
   const [groupVideoCallVisible, setGroupVideoCallVisible] = React.useState(false);
   const [composerHeight, setComposerHeight] = React.useState(DEFAULT_COMPOSER_HEIGHT);
+  
+  const [messageMenuVisible, setMessageMenuVisible] = React.useState(false);
+  const [messageMenuPos, setMessageMenuPos] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [selectedMessage, setSelectedMessage] = React.useState<any>(null);
+  const [deleteSheetVisible, setDeleteSheetVisible] = React.useState(false);
   const {
     colors,
     params,
@@ -81,7 +88,8 @@ export default function ChatThread() {
     startVideoCall,
     startGroupVideoCall,
     handleGroupVideoHeaderPress,
-    allMedia
+    allMedia,
+    deleteMessage
   } = useChatThread({
     openGroupVideoCallModal: React.useCallback(() => {
       setGroupVideoCallVisible(true);
@@ -209,6 +217,11 @@ export default function ChatThread() {
         onCallAction={handleCallAction}
         isGroupThread={isGroup}
         onRetry={handleRetryMessage}
+        onLongPress={(msg, x, y, w, h) => {
+          setSelectedMessage(msg);
+          setMessageMenuPos({ x, y, w, h });
+          setMessageMenuVisible(true);
+        }}
       />
     );
   }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage]);
@@ -584,6 +597,77 @@ export default function ChatThread() {
                 setMicTextMode(false);
               } else if (key === 'send_text') {
                 setMicTextMode(true);
+              }
+            }}
+          />
+          
+          <MessageMenuModal
+            visible={messageMenuVisible}
+            menuPos={messageMenuPos}
+            message={selectedMessage}
+            isOutgoing={!!selectedMessage?.fromMe}
+            onClose={() => setMessageMenuVisible(false)}
+            onAction={(action) => {
+              if (action.startsWith('react_')) {
+                const emoji = action.replace('react_', '');
+                console.log('React with', emoji, 'to message', selectedMessage?.id);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                // TODO: implement reaction logic
+                return;
+              }
+              
+              switch (action) {
+                case 'reply':
+                  setReplyingTo(selectedMessage);
+                  break;
+                case 'copy':
+                  Clipboard.setStringAsync(selectedMessage?.text || selectedMessage?.content || '');
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  break;
+                case 'forward':
+                  // TODO: implement forward
+                  break;
+                case 'delete':
+                  setDeleteSheetVisible(true);
+                  break;
+                case 'pin':
+                  // TODO: implement pin
+                  break;
+              }
+            }}
+            items={[
+              { key: 'reply', label: 'Trả lời', icon: 'reply' },
+              { key: 'copy', label: 'Sao chép', icon: 'content-copy' },
+              { key: 'pin', label: 'Ghim', icon: 'push-pin' },
+              ...(selectedMessage?.fromMe ? [{ key: 'delete', label: 'Thu hồi', icon: 'delete', destructive: true }] : []),
+            ]}
+          >
+            {selectedMessage && (
+              <MessageBubble
+                message={selectedMessage}
+                isLastInGroup={true}
+                isThreadLast={false}
+                contactAvatarFallback={!isGroup ? (targetUser?.avatar || (params.avatar as string | undefined)) : undefined}
+                isGroupThread={isGroup}
+                // Pass dummy props to avoid interactions
+                onPress={() => {}}
+                onLongPress={() => {}}
+                simple={true}
+              />
+            )}
+          </MessageMenuModal>
+
+          <DeleteMessageSheet
+            visible={deleteSheetVisible}
+            onClose={() => setDeleteSheetVisible(false)}
+            onDeleteForMe={() => {
+              if (selectedMessage) {
+                deleteMessage(selectedMessage.id, 'deleteForMe');
+              }
+            }}
+            onUnsend={() => {
+              if (selectedMessage) {
+                deleteMessage(selectedMessage.id, 'unsend');
               }
             }}
           />

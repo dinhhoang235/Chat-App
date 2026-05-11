@@ -96,4 +96,6 @@ export const chatApi = {
     apiClient.post(`/chats/${id}/unread`),
   searchMessages: (id: string | number, query: string) =>
     apiClient.get(`/chats/${id}/search`, { params: { q: query } }),
+  deleteMessage: (conversationId: string | number, messageId: string | number, mode: 'unsend' | 'deleteForMe') =>
+    apiClient.delete(`/chats/${conversationId}/messages/${messageId}`, { data: { mode } }),
 };

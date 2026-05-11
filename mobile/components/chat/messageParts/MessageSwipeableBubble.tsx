@@ -28,6 +28,8 @@ type MessageSwipeableBubbleProps = {
   timeColor: string;
   highlightRowStyle?: any;
   onRetry?: (message: any) => void;
+  onLongPress?: (x: number, y: number, w: number, h: number) => void;
+  simple?: boolean;
 };
 
 export default function MessageSwipeableBubble({
@@ -50,8 +52,11 @@ export default function MessageSwipeableBubble({
   timeColor,
   highlightRowStyle,
   onRetry,
+  onLongPress,
+  simple,
 }: MessageSwipeableBubbleProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
+  const bubbleRef = useRef<View>(null);
 
   const swipeTranslation = useSharedValue(0);
 
@@ -129,6 +134,30 @@ export default function MessageSwipeableBubble({
 
   const avatarUri = message.contactAvatar || (contactAvatarFallback ? getAvatarUrl(contactAvatarFallback) || undefined : undefined);
 
+  if (simple) {
+    return (
+      <View
+        style={[
+          {
+            backgroundColor:
+              message.type === 'image' || message.type === 'image_group' || message.type === 'video'
+                ? 'transparent'
+                : message.type === 'call' && (JSON.parse(message.content || '{}').status === 'missed' && !message.fromMe)
+                ? 'rgba(255, 59, 48, 0.1)'
+                : bubbleBg,
+            borderWidth: message.type === 'image' || message.type === 'image_group' || message.type === 'video' ? 0 : 1.2,
+            padding: message.type === 'image' || message.type === 'image_group' || message.type === 'video' ? 0 : message.type === 'call' ? 14 : 12,
+            borderRadius: 18,
+          },
+          message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video' ? animatedBorderStyle : {},
+        ]}
+      >
+        {replyBlock}
+        {children}
+      </View>
+    );
+  }
+
   return (
     <RNAnimated.View style={[{ position: 'relative', paddingVertical: 8 }, highlightRowStyle]}>
       {!message.fromMe && (
@@ -154,7 +183,7 @@ export default function MessageSwipeableBubble({
       <View style={{ flexDirection: 'row', justifyContent: isOutgoing ? 'flex-end' : 'flex-start', paddingHorizontal: 16 }}>
         <Swipeable
           ref={swipeableRef}
-          enabled={message.type !== 'call'}
+          enabled={message.type !== 'call' && !message.isRevoked}
           leftThreshold={isOutgoing ? 1000 : 50}
           rightThreshold={!isOutgoing ? 1000 : 50}
           overshootLeft={!isOutgoing}
@@ -169,12 +198,20 @@ export default function MessageSwipeableBubble({
         >
           <Pressable 
             onPress={onPress}
+            onLongPress={() => {
+              if (message.isRevoked) return;
+              bubbleRef.current?.measureInWindow((x, y, w, h) => {
+                onLongPress?.(x, y, w, h);
+              });
+            }}
+            delayLongPress={200}
             android_disableSound={true}
             style={{ flexDirection: 'row', alignItems: 'flex-start' }}
           >
             {!message.fromMe && <View style={{ width: 40, height: 40 }} />}
             <View style={{ marginLeft: isOutgoing ? 0 : 12, alignItems: isOutgoing ? 'flex-end' : 'flex-start' }}>
               <RNAnimated.View
+                ref={bubbleRef}
                 style={[
                   {
                     backgroundColor:

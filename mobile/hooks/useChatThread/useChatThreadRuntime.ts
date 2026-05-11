@@ -18,6 +18,29 @@ import { log, error } from "@/utils/logger";
 const MESSAGE_CACHE_PREFIX = "chat_messages_cache:";
 const messageCacheMemory = new Map<string, any[]>();
 
+/**
+ * Update a specific message in the module-level cache as revoked.
+ * Called by global socket handlers (e.g. useConversations) when the
+ * chat screen is NOT mounted so the cache stays accurate.
+ */
+export const revokeMessageInCache = (conversationId: string | number, messageId: number) => {
+  const key = conversationId.toString();
+  const cached = messageCacheMemory.get(key);
+  if (cached) {
+    const updated = cached.map((m) =>
+      m.id === messageId
+        ? { ...m, type: 'revoked', content: 'Tin nhắn đã được thu hồi', isRevoked: true }
+        : m,
+    );
+    messageCacheMemory.set(key, updated);
+    // Persist to AsyncStorage so it survives app restarts
+    AsyncStorage.setItem(
+      `${MESSAGE_CACHE_PREFIX}${key}`,
+      JSON.stringify(updated.slice(0, 200)),
+    ).catch(() => {});
+  }
+};
+
 type RuntimeArgs = {
   id: string | null;
   params: any;
@@ -238,21 +261,6 @@ export function useChatThreadRuntime({
     ],
   );
 
-  const markAsReadWithRetryRef = useRef(markAsReadWithRetry);
-  useEffect(() => {
-    markAsReadWithRetryRef.current = markAsReadWithRetry;
-  }, [markAsReadWithRetry]);
-
-  const fetchMessagesRef = useRef(fetchMessages);
-  useEffect(() => {
-    fetchMessagesRef.current = fetchMessages;
-  }, [fetchMessages]);
-
-  const fetchGroupDetailsRef = useRef(fetchGroupDetails);
-  useEffect(() => {
-    fetchGroupDetailsRef.current = fetchGroupDetails;
-  }, [fetchGroupDetails]);
-
   const fetchGroupDetails = useCallback(async () => {
     if (!id || params.isGroup !== "true") return;
     try {
@@ -262,66 +270,6 @@ export function useChatThreadRuntime({
       error("Fetch group details error:", err);
     }
   }, [id, params.isGroup, setGroupDetails]);
-
-  useEffect(() => {
-    fetchGroupDetails();
-  }, [fetchGroupDetails]);
-
-  useEffect(() => {
-    if (params.isGroup !== "true") return;
-
-    const handleUpdate = (data: any) => {
-      if (data.conversationId?.toString() === id?.toString()) {
-        fetchGroupDetails();
-      }
-    };
-
-    socketService.on("conversation_updated", handleUpdate);
-    return () => {
-      socketService.off("conversation_updated", handleUpdate);
-    };
-  }, [id, params.isGroup, fetchGroupDetails]);
-
-  const getTargetUserStatus = useCallback(async () => {
-    if (!targetUserIdState) return;
-    try {
-      const data = await userAPI.getUserById(Number(targetUserIdState));
-      if (data) {
-        setTargetUserStatus({ status: data.status, lastSeen: data.lastSeen });
-        setTargetUser(data);
-      }
-    } catch (err) {
-      error("Fetch target user status error:", err);
-    }
-  }, [targetUserIdState, setTargetUserStatus, setTargetUser]);
-
-  useEffect(() => {
-    if (isFocused && targetUserIdState) {
-      getTargetUserStatus();
-    }
-  }, [isFocused, targetUserIdState, getTargetUserStatus]);
-
-  useEffect(() => {
-    if (!isFocused) return;
-
-    const handleStatusChanged = (data: {
-      userId: number;
-      status: string;
-      lastSeen?: number;
-    }) => {
-      if (targetUserIdState && data.userId === Number(targetUserIdState)) {
-        setTargetUserStatus({
-          status: data.status,
-          lastSeen: data.lastSeen || null,
-        });
-      }
-    };
-
-    socketService.on("user_status_changed", handleStatusChanged);
-    return () => {
-      socketService.off("user_status_changed", handleStatusChanged);
-    };
-  }, [isFocused, targetUserIdState, setTargetUserStatus]);
 
   const fetchMessages = useCallback(
     async (isLoadMore = false) => {
@@ -385,6 +333,81 @@ export function useChatThreadRuntime({
     ],
   );
 
+  const markAsReadWithRetryRef = useRef(markAsReadWithRetry);
+  useEffect(() => {
+    markAsReadWithRetryRef.current = markAsReadWithRetry;
+  }, [markAsReadWithRetry]);
+
+  const fetchMessagesRef = useRef(fetchMessages);
+  useEffect(() => {
+    fetchMessagesRef.current = fetchMessages;
+  }, [fetchMessages]);
+
+  const fetchGroupDetailsRef = useRef(fetchGroupDetails);
+  useEffect(() => {
+    fetchGroupDetailsRef.current = fetchGroupDetails;
+  }, [fetchGroupDetails]);
+
+  useEffect(() => {
+    fetchGroupDetails();
+  }, [fetchGroupDetails]);
+
+  useEffect(() => {
+    if (params.isGroup !== "true") return;
+
+    const handleUpdate = (data: any) => {
+      if (data.conversationId?.toString() === id?.toString()) {
+        fetchGroupDetails();
+      }
+    };
+
+    socketService.on("conversation_updated", handleUpdate);
+    return () => {
+      socketService.off("conversation_updated", handleUpdate);
+    };
+  }, [id, params.isGroup, fetchGroupDetails]);
+
+  const getTargetUserStatus = useCallback(async () => {
+    if (!targetUserIdState) return;
+    try {
+      const data = await userAPI.getUserById(Number(targetUserIdState));
+      if (data) {
+        setTargetUserStatus({ status: data.status, lastSeen: data.lastSeen });
+        setTargetUser(data);
+      }
+    } catch (err) {
+      error("Fetch target user status error:", err);
+    }
+  }, [targetUserIdState, setTargetUserStatus, setTargetUser]);
+
+  useEffect(() => {
+    if (isFocused && targetUserIdState) {
+      getTargetUserStatus();
+    }
+  }, [isFocused, targetUserIdState, getTargetUserStatus]);
+
+  useEffect(() => {
+    if (!isFocused) return;
+
+    const handleStatusChanged = (data: {
+      userId: number;
+      status: string;
+      lastSeen?: number;
+    }) => {
+      if (targetUserIdState && data.userId === Number(targetUserIdState)) {
+        setTargetUserStatus({
+          status: data.status,
+          lastSeen: data.lastSeen || null,
+        });
+      }
+    };
+
+    socketService.on("user_status_changed", handleStatusChanged);
+    return () => {
+      socketService.off("user_status_changed", handleStatusChanged);
+    };
+  }, [isFocused, targetUserIdState, setTargetUserStatus]);
+
   useEffect(() => {
     let cancelled = false;
     let timeout: NodeJS.Timeout;
@@ -398,48 +421,49 @@ export function useChatThreadRuntime({
 
       if (!conversationId) return;
 
-      // Only set loading if we truly have nothing to show
+      // Show cached/preloaded messages immediately (no loading spinner needed)
+      // but ALWAYS fetch fresh data from the server in the background so that
+      // revoked / deleted messages are corrected without a flash.
       if (!hasPreloadedMessages) {
         setLoading(true);
+
+        // Defer cache read until after interactions so it doesn't block
+        // navigation/animations. If cache exists we'll still set it, but
+        // we continue to fetch fresh messages in the background.
+        InteractionManager.runAfterInteractions(() => {
+          loadMessagesCache(conversationId)
+            .then((cachedMessages) => {
+              if (
+                !cancelled &&
+                cachedMessages.length > 0 &&
+                messagesRef.current.length === 0
+              ) {
+                setMessages(cachedMessages);
+                setInitialFetchDone(true);
+                setLoading(false);
+                // do not return early; still fetch fresh messages below
+              }
+            })
+            .catch(() => {});
+        });
+
+        // Set aggressive timeout to ensure loading is cleared
+        timeout = setTimeout(() => {
+          if (!cancelled) {
+            setLoading(false);
+            setInitialFetchDone(true);
+          }
+        }, 1500);
       } else {
-        // If we have preloaded messages, mark as done immediately
-        setInitialFetchDone(true);
+        // We already have messages to display — hide spinner immediately.
         setLoading(false);
-        return; // Don't fetch if we have preloaded messages
       }
 
-      // Defer cache read until after interactions so it doesn't block
-      // navigation/animations. If cache exists we'll still set it, but
-      // we continue to fetch fresh messages in the background.
-      InteractionManager.runAfterInteractions(() => {
-        loadMessagesCache(conversationId)
-          .then((cachedMessages) => {
-            if (
-              !cancelled &&
-              cachedMessages.length > 0 &&
-              messagesRef.current.length === 0
-            ) {
-              setMessages(cachedMessages);
-              setInitialFetchDone(true);
-              setLoading(false);
-              // do not return early; still fetch fresh messages below
-            }
-          })
-          .catch(() => {});
-      });
-
-      // Set aggressive timeout to ensure loading is cleared
-      timeout = setTimeout(() => {
-        if (!cancelled) {
-          setLoading(false);
-          setInitialFetchDone(true);
-        }
-      }, 1500);
-
-      // Mark as done so focus effect won't refetch
+      // Mark as done so focus effect won't trigger a redundant refetch
       setInitialFetchDone(true);
 
-      // Always fetch fresh messages from network in the background
+      // Always fetch fresh messages from the network in the background.
+      // This ensures revoked/deleted messages are never stuck in stale cache.
       fetchMessages(false);
     };
 
@@ -640,13 +664,31 @@ export function useChatThreadRuntime({
     };
 
     socketService.on("conversation_updated", handleConversationUpdated);
+    
+    const handleMessageRevoked = (data: { messageId: number, conversationId: number }) => {
+      if (data.conversationId.toString() === conversationId?.toString()) {
+        setMessages((prev) => {
+          const next = prev.map((m) =>
+            m.id === data.messageId
+              ? { ...m, type: 'revoked', content: 'Tin nhắn đã được thu hồi', isRevoked: true }
+              : m
+          );
+          // Immediately persist updated cache so stale messages don't
+          // flash back when the user re-enters this conversation.
+          persistMessagesCache(data.conversationId.toString(), next);
+          return next;
+        });
+      }
+    };
+    socketService.on("message_revoked", handleMessageRevoked);
 
     return () => {
       socketService.off("new_message", handleNewMessage);
       socketService.off("message_seen", handleMessageSeen);
       socketService.off("conversation_updated", handleConversationUpdated);
+      socketService.off("message_revoked", handleMessageRevoked);
     };
-  }, [conversationId, userId, isFocused, isGroup, flatListRef, setMessages]);
+  }, [conversationId, userId, isFocused, isGroup, flatListRef, setMessages, persistMessagesCache]);
 
   useEffect(() => {
     setActiveConversationId(conversationId);

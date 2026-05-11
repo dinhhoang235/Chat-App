@@ -30,7 +30,7 @@ export const getConversations = async (
   }
 
   try {
-    const conversations = await prisma.conversation.findMany({
+    const conversations = (await prisma.conversation.findMany({
       where: {
         participants: {
           some: {
@@ -53,6 +53,13 @@ export const getConversations = async (
           },
         },
         messages: {
+          where: {
+            deletedBy: {
+              none: {
+                userId,
+              },
+            },
+          },
           take: 20,
           orderBy: { createdAt: "desc" },
         },
@@ -60,13 +67,13 @@ export const getConversations = async (
       orderBy: {
         updatedAt: "desc",
       },
-    });
+    })) as any[];
 
     // Manually calculate unread count and add user status for each conversation
     // OPTIMIZATION: Batch fetch all user statuses in ONE Redis call instead of N calls per conversation
     const allUserIds = new Set<number>();
     conversations.forEach((conv) => {
-      conv.participants.forEach((p) => {
+      conv.participants.forEach((p: any) => {
         allUserIds.add(p.userId);
       });
     });

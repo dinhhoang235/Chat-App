@@ -27,9 +27,10 @@ type ChatMessage = {
   images?: any[]; // for image_group
   replyTo?: any;
   progress?: number;
+  isRevoked?: boolean;
 };
 
-function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread, contactAvatarFallback, onRetry }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean, contactAvatarFallback?: string, onRetry?: (message: ChatMessage) => void }) {
+function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread, contactAvatarFallback, onRetry, onLongPress, simple }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean, contactAvatarFallback?: string, onRetry?: (message: ChatMessage) => void, onLongPress?: (message: ChatMessage, x: number, y: number, w: number, h: number) => void, simple?: boolean }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -142,22 +143,37 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
       />
     );
   }
-
-  let contentElement: React.ReactNode = (
-    <MessageContent
-      message={message}
-      screenWidth={screenWidth}
-      colors={colors}
-      allMedia={allMedia}
-      progress={progress}
-      textColor={textColor}
-      highlightQuery={highlightQuery}
-      onVoiceCall={onVoiceCall}
-      onVideoCall={onVideoCall}
-      onCallAction={onCallAction}
-      isGroupThread={isGroupThread}
-    />
-  );
+  let contentElement: React.ReactNode;
+  if (message.isRevoked) {
+    contentElement = (
+      <View style={{ padding: 4 }}>
+        <Text style={{ 
+          color: isOutgoing ? colors.bubbleMeText : colors.textSecondary, 
+          fontStyle: 'italic',
+          fontSize: 14,
+          opacity: 0.8
+        }}>
+          Tin nhắn đã được thu hồi
+        </Text>
+      </View>
+    );
+  } else {
+    contentElement = (
+      <MessageContent
+        message={message}
+        screenWidth={screenWidth}
+        colors={colors}
+        allMedia={allMedia}
+        progress={progress}
+        textColor={textColor}
+        highlightQuery={highlightQuery}
+        onVoiceCall={onVoiceCall}
+        onVideoCall={onVideoCall}
+        onCallAction={onCallAction}
+        isGroupThread={isGroupThread}
+      />
+    );
+  }
 
   // Contact card style
   if (message.type === 'contact') {
@@ -200,6 +216,8 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
       colors={colors}
       timeColor={timeColor}
       onRetry={onRetry}
+      onLongPress={(x, y, w, h) => onLongPress?.(message, x, y, w, h)}
+      simple={simple}
     >
       {contentElement}
     </MessageSwipeableBubble>
@@ -213,6 +231,7 @@ const MessageBubble = memo(MessageBubbleComponent, (prevProps, nextProps) => {
   // Return true if props are equal (skip re-render), false if different (re-render)
   return (
     prevProps.message?.id === nextProps.message?.id &&
+    prevProps.message?.isRevoked === nextProps.message?.isRevoked &&
     prevProps.isHighlighted === nextProps.isHighlighted &&
     prevProps.progress === nextProps.progress &&
     prevProps.highlightQuery === nextProps.highlightQuery &&

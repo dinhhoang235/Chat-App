@@ -33,6 +33,10 @@ export const formatConversationLastMessage = (
 
   const isFromMe = user && lastMsg.senderId === user.id;
 
+  if (lastMsg.isRevoked) {
+    return isFromMe ? "Bạn đã thu hồi một tin nhắn" : "Tin nhắn đã được thu hồi";
+  }
+
   if (lastMsg.type === "image") {
     return isFromMe ? "Bạn: [Hình ảnh]" : "[Hình ảnh]";
   }

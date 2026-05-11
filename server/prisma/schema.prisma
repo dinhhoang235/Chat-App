@@ -34,6 +34,7 @@ model User {
 
   conversations         ConversationParticipant[]
   messages              Message[]
+  messageDeletions      MessageDeletion[]
 
   // expo push token for mobile notifications
   pushToken             String?   
@@ -81,15 +82,29 @@ model Message {
   senderId       Int?
   sender         User?        @relation(fields: [senderId], references: [id], onDelete: Cascade)
   content        String       @db.Text
-  type           String       @default("text") // text, image, sticker, file, system
+  type           String       @default("text") // text, image, sticker, file, system, revoked
   replyToId      Int?
   replyTo        Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
   replies        Message[]    @relation("MessageReplies")
+  isRevoked      Boolean      @default(false)
+  deletedBy      MessageDeletion[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@index([conversationId, type, createdAt])
   @@map("messages")
+}
+
+model MessageDeletion {
+  id        Int      @id @default(autoincrement())
+  messageId Int
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@map("message_deletions")
 }
 
 model SearchHistory {

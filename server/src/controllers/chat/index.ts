@@ -15,3 +15,4 @@ export * from './muteConversation.js';
 export * from './pinConversation.js';
 export * from './markAsUnread.js';
 export * from './searchMessages.js';
+export * from './deleteMessage.js';

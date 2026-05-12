@@ -7,6 +7,7 @@ import MessageVideoBubble from './MessageVideoBubble';
 import MessageImageGroupBubble from './MessageImageGroupBubble';
 import AudioMessageBubble from './AudioMessageBubble';
 import MessageCallBubble from './MessageCallBubble';
+import MessageLocationBubble from './MessageLocationBubble';
 import { resolveMediaUri } from './messageHelpers';
 
 type MessageContentProps = {
@@ -101,6 +102,17 @@ export default function MessageContent({
         onCallAction={onCallAction}
         isGroupThread={isGroupThread}
         colors={colors}
+      />
+    );
+  }
+
+  if (message.type === 'location' || message.type === 'LOCATION') {
+    return (
+      <MessageLocationBubble
+        content={message.content}
+        textColor={textColor}
+        colors={colors}
+        fromMe={message.fromMe}
       />
     );
   }

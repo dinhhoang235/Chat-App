@@ -75,6 +75,8 @@ export default function ChatThread() {
     currentResultIndices,
     statusText,
     handleSend,
+    handleSendLocation,
+    isSendingLocation,
     handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,
@@ -553,13 +555,15 @@ export default function ChatThread() {
               setComposerVisible(false);
             }}
             height={sheetHeight}
+            loadingAction={isSendingLocation ? 'location' : null}
             onAction={(key) => {
-              closeAll();
               if (key === 'document') {
+                closeAll();
                 pickDocument();
               } else if (key === 'location') {
-                // TODO: implement location share
+                handleSendLocation();
               } else if (key === 'gif') {
+                closeAll();
                 // TODO: open GIF picker
               }
             }}

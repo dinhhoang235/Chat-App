@@ -17,6 +17,7 @@ import { useChatThreadState } from "./useChatThread/useChatThreadState";
 import { useChatThreadSearch } from "./useChatThread/useChatThreadSearch";
 import { useChatThreadRuntime } from "./useChatThread/useChatThreadRuntime";
 import { useChatThreadGroupCall } from "./useChatThread/useChatThreadGroupCall";
+import { useChatThreadLocation } from "./useChatThread/useChatThreadLocation";
 import { buildProcessedMessages, mapThreadMessage } from "@/utils/chatThread";
 import { chatThreadCache } from "@/utils/chatThreadCache";
 import { chatApi } from "@/services/chat";
@@ -316,6 +317,19 @@ export function useChatThread(options?: UseChatThreadOptions) {
     [conversationId, setMessages],
   );
 
+  const { handleSendLocation, isSendingLocation } = useChatThreadLocation({
+    flatListRef,
+    replyingTo,
+    setReplyingTo,
+    userId: user?.id,
+    conversationId,
+    isNewConversation,
+    targetUserIdState,
+    setMessages,
+    setCreatingConversation,
+    setConversationId,
+  });
+
   return {
     colors,
     params,
@@ -363,6 +377,8 @@ export function useChatThread(options?: UseChatThreadOptions) {
     animatedContentStyle,
     fetchMessages,
     handleSend,
+    handleSendLocation,
+    isSendingLocation,
     handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,

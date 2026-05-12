@@ -82,7 +82,7 @@ model Message {
   senderId       Int?
   sender         User?        @relation(fields: [senderId], references: [id], onDelete: Cascade)
   content        String       @db.Text
-  type           String       @default("text") // text, image, sticker, file, system, revoked
+  type           MessageType  @default(text)
   replyToId      Int?
   replyTo        Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
   replies        Message[]    @relation("MessageReplies")
@@ -105,6 +105,20 @@ model MessageDeletion {
 
   @@unique([messageId, userId])
   @@map("message_deletions")
+}
+
+enum MessageType {
+  text
+  image
+  video
+  audio
+  file
+  location
+  call
+  sticker
+  system
+  contact
+  image_group
 }
 
 model SearchHistory {

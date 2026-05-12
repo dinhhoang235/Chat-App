@@ -15,7 +15,7 @@ type ChatMessage = {
   content?: string;
   time?: string;
   fromMe?: boolean;
-  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'video' | 'audio' | 'file' | 'image_group' | 'call';
+  type?: 'text' | 'sticker' | 'contact' | 'separator' | 'system' | 'image' | 'video' | 'audio' | 'file' | 'location' | 'image_group' | 'call';
   contactName?: string;
   contactAvatar?: string;
   contactAvatarColor?: string;

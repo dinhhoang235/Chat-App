@@ -119,6 +119,7 @@ enum MessageType {
   system
   contact
   image_group
+  revoked
 }
 
 model SearchHistory {

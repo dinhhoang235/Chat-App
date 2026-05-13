@@ -85,15 +85,52 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 
 ## 🆕 Cập nhật mới nhất
 
-- **Voice Message Support**: Ghi âm, xem trước và gửi tin nhắn giọng nói ngay trong khung chat.
-- **Video Message Support**: Tối ưu gửi và hiển thị video trong cuộc trò chuyện bằng `expo-video`.
-- **Group Call Support**: Triển khai cuộc gọi nhóm voice/video với LiveKit, hiển thị danh sách người tham gia, cho phép tắt mic/camera, và đồng bộ trạng thái giữa các client.
-- **Smart Upload Pipeline**: Nén ảnh/video trước upload, retry khi lỗi mạng và chunk upload cho file lớn.
-- **Multipart Storage**: Upload nhiều phần với thanh tiến trình và tự động abort khi thất bại.
-- **Media Gallery Enhanced**: Trang media hỗ trợ phân loại ảnh/video/file/link theo ngày.
-- **Chat Controls**: Bổ sung ghim chat, tắt thông báo, đánh dấu chưa đọc và tìm kiếm tin nhắn trong chat.
-- **QR Contact Flow**: Chia sẻ profile bằng QR và quét để mở nhanh trang người dùng.
-- **WebRTC Call Support**: Triển khai gọi thoại và gọi video thời gian thực với độ trễ thấp, tích hợp signaling qua Socket.io và hỗ trợ TURN server cho kết nối mạng phức tạp.
+### Messaging & Content
+- **Location Messages** 📍: Gửi vị trí thực tế với preview bản đồ trong cuộc trò chuyện.
+- **Message Deletion**: Hỗ trợ unsend (xóa cho tất cả) và deleteForMe (xóa chỉ cho mình).
+- **GIF Support**: Gửi GIF từ bộ sưu tập hình ảnh hoặc tìm kiếm từ kho lưu trữ.
+- **Voice-to-Text Dictation** 🎤: Chuyển đổi giọng nói thành text với `expo-speech-recognition`.
+- **Message Retry Logic**: Tự động retry khi gửi tin nhắn thất bại.
+- **Voice Message Support**: Ghi âm, xem trước và gửi tin nhắn giọng nói với waveform.
+- **Video Message Support**: Tối ưu gửi và hiển thị video với thumbnail preview.
+- **Image Group Display**: Gửi nhiều ảnh cùng lúc với layout group.
+
+### Call & Real-time
+- **PiP (Picture-in-Picture) Layout**: Nhỏ màn hình gọi video, camera flipping, trạng thái camera người khác.
+- **Microphone Status Management**: Quản lý trạng thái mic trong cuộc gọi nhóm.
+- **Group Call Support**: Cuộc gọi nhóm voice/video với LiveKit, danh sách người tham gia, mic/camera control.
+- **Real-Time Connection Status**: Banner thông báo reconnect, indicator trạng thái mạng.
+- **User Presence Management**: Đồng bộ trạng thái online/offline, typing indicator realtime.
+
+### Chat Management & Performance
+- **Image Dimension Preloading**: Tải sẵn kích thước ảnh (Messenger/Zalo style) để tránh layout shift.
+- **Conversation Caching**: Cache thông minh danh sách cuộc trò chuyện với 3-level priority.
+- **Message Batch Loading**: Tối ưu hiệu suất, batch query tin nhắn, tăng cache size.
+- **Message Seen Receipts**: Hiệu chỉnh logic read receipt.
+
+### User & Account
+- **Account Switching** 🔀: Chuyển đổi giữa nhiều tài khoản với re-authentication.
+- **Account Deletion** 🗑️: Xóa tài khoản đang đăng nhập.
+- **Logout with Token Cleanup**: Đăng xuất, xóa push token từ server.
+- **Secure Token Storage** 🔐: Lưu JWT bằng `expo-secure-store`.
+
+### Profile & Sharing
+- **Friend Request Notifications**: Thông báo push khi có lời mời kết bạn.
+- **QR Profile**: Chia sẻ profile bằng QR, quét để kết nối.
+- **Message Bubbles Enhanced**: Hiệu ứng highlight, bubble styles tối ưu.
+
+### UI/UX Improvements
+- **Message Menu Modal**: Context menu với delete, reply, forward (TODOs: reactions, pin).
+- **Typing Indicators Enhanced**: Hiển thị tên viết tắt (initials) của người đang gõ.
+- **Emoji Picker**: Bộ chọn emoji tích hợp.
+- **In-Thread Search**: Tìm kiếm tin nhắn chi tiết trong chat.
+- **Mute Settings Modal**: Tắt thông báo theo thời gian.
+- **Profile UI Enhancements**: Modal chỉnh sửa profile, bio, display name, presence status.
+
+### Smart Upload Pipeline
+- **Nén ảnh/video trước upload**: Giảm dung lượng truyền.
+- **Retry khi lỗi mạng**: Tự động retry upload.
+- **Chunk upload cho file lớn**: Multipart upload 5MB/chunk, giới hạn ~100MB.
 
 ## 🛠 Công nghệ sử dụng
 
@@ -105,6 +142,8 @@ DiskordMes là ứng dụng nhắn tin thời gian thực đa nền tảng (iOS 
 - **Media & Upload**: Expo Camera, Expo Image Picker, Expo Document Picker, Expo File System, **Expo Audio**, **Expo Video**, Expo Image Manipulator, react-native-compressor
 - **Real-time Communication**: **react-native-webrtc** (kết nối P2P cho voice/video call)
 - **Group Call Engine**: **LiveKit** (`@livekit/react-native-webrtc`) cho room đa người, publish/subcribe track, và tạo phòng nhóm ổn định.
+- **Voice & Speech**: **Expo Speech Recognition** (`expo-speech-recognition`) cho voice-to-text dictation
+- **Security**: **Expo Secure Store** (`expo-secure-store`) cho lưu trữ JWT an toàn
 - **Notifications**: Expo Notifications
 - **Animations**: React Native Reanimated & Gesture Handler
 

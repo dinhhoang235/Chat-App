@@ -179,6 +179,43 @@ Tất cả endpoint storage đều yêu cầu JWT (`authMiddleware`):
 7. **Sắp xếp conversations thông minh:**
    - Hỗ trợ ghim chat (`isPinned`) và tính unread theo mốc `lastReadAt/deletedAt`.
 
+## 🆕 Tính Năng Mới & Cập Nhật
+
+### Messaging & Content
+- **Message Deletion**: Endpoint DELETE `/chats/:conversationId/messages/:messageId` hỗ trợ `mode` query (unsend/deleteForMe), lưu lịch sử xóa trong `MessageDeletion` model.
+- **Location Messages**: Support `MessageType.LOCATION`, lưu trữ GPS coordinates (latitude, longitude) trong tin nhắn.
+- **GIF Support**: Hỗ trợ gửi GIF (image/gif MIME type) như media files thông thường.
+- **Image Groups**: Support `MessageType.IMAGE_GROUP` để gửi nhiều ảnh cùng lúc.
+
+### Call & Video
+- **Microphone Status Sync**: Socket event `microphone_toggle` để đồng bộ trạng thái mic trong group call.
+- **Real-Time Connection Indicator**: Socket event `socket_reconnecting` / `socket_connected` để mobile hiển thị connection status.
+
+### Chat Management
+- **Message Seen Receipts Fix**: Logic read receipt hiệu chỉnh sử dụng `lastReadAt > createdAt` (không >= ) để tránh false positive.
+- **Socket Reconnection**: Auto-reconnect với fresh token qua callback system, proper listener cleanup.
+- **Database Indexing**: Index Message table (conversationId, type, createdAt) để tăng tốc độ query.
+
+### User & Account
+- **Logout Endpoint**: Endpoint POST `/api/users/logout` xóa `pushToken` của user, prevent nhận thông báo sau logout.
+- **Account Deletion**: Support full account deletion API endpoint.
+- **Account Switching**: Backend hỗ trợ multiple sessions, user có thể chuyển account mà không conflict.
+
+### Infrastructure
+- **MariaDB/MySQL Support**: Prisma adapter cho MariaDB (`@prisma/adapter-mariadb`) để tối ưu hiệu suất.
+- **LiveKit Server SDK**: Integration `livekit-server-sdk` v2.15.1 cho group call token generation.
+- **Expo Server SDK**: Integration `expo-server-sdk` v6.1.0 cho push notifications.
+
+### API Enhancements
+- **New Routes:**
+  - `DELETE /api/chats/:conversationId/messages/:messageId` - Message deletion
+  - `POST /api/users/logout` - Logout with token cleanup
+  - `DELETE /api/users/:id` - Account deletion
+  - `GET /api/livekit/token` - Generate LiveKit token cho group call
+- **Enhanced Routes:**
+  - `GET /api/chats/:conversationId/media` - Media gallery with cursor pagination
+  - `GET /api/chats/:conversationId/search` - Message search optimization
+
 ## 🛠️ Quản Trị Hệ Thống
 
 - **MinIO Console:** `http://localhost:9001` (Quản lý file, bucket)

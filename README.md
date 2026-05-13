@@ -15,20 +15,21 @@ Root README này tổng hợp đầy đủ thông tin từ cả hai phần `mobi
 ## Tính Năng Chính
 
 - Đăng ký / đăng nhập và xác thực bằng JWT.
-- Quản lý hồ sơ người dùng: avatar, cover, bio, giới tính, ngày sinh.
-- Kết bạn, gửi/chấp nhận/từ chối/hủy lời mời kết bạn.
-- Chat 1-1 và nhóm: text, hình ảnh, video, audio, file và reply message.
-- Tạo nhóm, thêm/xóa thành viên, rời nhóm, giải tán nhóm.
-- Ghim cuộc trò chuyện, mute thông báo, đánh dấu đã đọc/ chưa đọc.
-- Tìm kiếm tin nhắn theo từ khóa trong từng cuộc trò chuyện.
-- Xem media conversation theo tab: ảnh, video, file, link với phân trang cursor.
-- Gửi voice message trực tiếp trong chat.
-- Upload file lớn lên đến ~100MB bằng MinIO Multipart Upload.
-- Gọi thoại (Voice Call) và gọi video (Video Call) qua WebRTC.
-- Hỗ trợ cuộc gọi nhóm voice/video nhiều người bằng LiveKit.
-- Giao diện gọi chuyên nghiệp: thời gian gọi, mic/camera toggle, PIP và chạy nền.
-- Kết nối nhanh bằng QR profile để share/scan user.
-- Dark Mode/Light Mode, hiệu ứng mượt với Reanimated.
+- Quản lý hồ sơ người dùng: avatar, cover, bio, giới tính, ngày sinh, presence status.
+- **Tài khoản**: chuyển đổi tài khoản, xóa tài khoản, logout với xóa push token.
+- **Kết bạn**: gửi/chấp nhận/từ chối/hủy lời mời kết bạn, thông báo push realtime.
+- **Chat 1-1 và nhóm**: text, hình ảnh, video, audio, file, GIF, location messages và reply.
+- **Message control**: xóa tin nhắn (unsend/deleteForMe), retry tự động, tìm kiếm tin nhắn.
+- **Group management**: tạo nhóm, thêm/xóa thành viên, rời nhóm, giải tán nhóm, phân quyền nhắn tin.
+- **Conversation options**: ghim cuộc trò chuyện, mute thông báo, đánh dấu đã đọc/chưa đọc.
+- **Media gallery**: xem ảnh, video, file, link theo tab với phân trang cursor, image preloading.
+- **Voice features**: ghi âm voice message, voice-to-text dictation 🎤, audio waveform.
+- **File upload**: upload file lớn lên ~100MB bằng MinIO Multipart Upload với nén ảnh/video.
+- **1-1 Voice/Video Call**: gọi thoại và gọi video thời gian thực qua WebRTC P2P.
+- **Group Voice/Video Call**: cuộc gọi nhóm nhiều người bằng LiveKit SFU, PiP layout, mic/camera control.
+- **Real-time features**: typing indicators, user presence (online/offline), trạng thái kết nối.
+- **QR Profile**: chia sẻ profile bằng QR code, quét để kết nối nhanh.
+- **UI Modern**: Dark Mode/Light Mode, hiệu ứng mượt với Reanimated, giao diện đáp ứng NativeWind.
 
 ## Công Nghệ Đã Dùng
 
@@ -289,6 +290,59 @@ npx expo start
 - Quy trình nén luôn xảy ra trước khi quyết định upload single PUT hay multipart upload.
 
 Xem thêm chi tiết chunk upload tại: `CHUNK_UPLOAD_README.md`
+
+## 🆕 Tính Năng Mới Cập Nhật
+
+### Messaging & Content
+- **📍 Location Messages**: Gửi vị trí thực tế với preview bản đồ trong cuộc trò chuyện, hỗ trợ chia sẻ GPS.
+- **❌ Message Deletion**: Hỗ trợ unsend (xóa cho tất cả) và deleteForMe (xóa chỉ cho mình) với tracking lịch sử xóa.
+- **🎬 GIF Support**: Gửi GIF từ bộ sưu tập hình ảnh hoặc tìm kiếm từ kho lưu trữ thiết bị.
+- **🎤 Voice-to-Text Dictation**: Chuyển đổi giọng nói thành text với `expo-speech-recognition` (hỗ trợ chế độ continuous trên Android, auto-restart on silence).
+- **🔄 Message Retry Logic**: Tự động retry khi gửi tin nhắn thất bại do mạng yếu hoặc mất kết nối.
+- **🖼️ Image Group Display**: Gửi nhiều ảnh cùng lúc với layout group, tối ưu không gian hiển thị.
+
+### Call & Real-time
+- **PiP (Picture-in-Picture) Layout**: Nhỏ màn hình gọi video khi cần, hỗ trợ camera flipping và theo dõi trạng thái camera người khác.
+- **Microphone Status Management**: Quản lý trạng thái mic trong cuộc gọi nhóm và video, hiển thị indicator trực quan.
+- **Real-Time Connection Status**: Hiển thị banner thông báo khi Socket.io đang reconnect, với indicator trạng thái mạng.
+
+### Chat Management & Performance
+- **📌 Image Dimension Preloading**: Tải sẵn kích thước ảnh (Messenger/Zalo style) để tránh layout shift khi load hình.
+- **Conversation Caching**: Cache thông minh danh sách cuộc trò chuyện với 3-level priority (preload → AsyncStorage → network).
+- **Message Batch Loading**: Tối ưu hiệu suất bằng cách batch query tin nhắn, tăng cache size và giảm render lag.
+- **Message Seen Receipts**: Hiệu chỉnh logic read receipt sử dụng `lastReadAt > createdAt` để tránh false positive.
+
+### User & Account
+- **🔀 Account Switching**: Chuyển đổi linh hoạt giữa nhiều tài khoản với re-authentication, lưu lịch sử tài khoản.
+- **🗑️ Account Deletion**: Xóa tài khoản đang đăng nhập với xác nhận, hủy toàn bộ dữ liệu người dùng.
+- **Logout with Token Cleanup**: Đăng xuất rõ ràng, tự động xóa push token khỏi server để tránh nhận thông báo sau logout.
+- **🔐 Secure Token Storage**: Lưu trữ JWT bằng `expo-secure-store` (mã hóa an toàn thay vì AsyncStorage).
+
+### Profile & Sharing
+- **Friend Request Notifications**: Thông báo push khi có lời mời kết bạn và khi bị chấp nhận lời mời.
+- **Message Bubbles Enhanced**: Hiệu ứng highlight, bubble styles tối ưu, hỗ trợ contact sharing bubble.
+
+### UI/UX Improvements
+- **Message Menu Modal**: Context menu cho tin nhắn với tùy chọn delete, reply, forward (TODOs: message reactions, message pin).
+- **Typing Indicators Enhanced**: Hiển thị tên viết tắt (initials) của người đang gõ, cập nhật realtime.
+- **Emoji Picker**: Bộ chọn emoji tích hợp sẵn trong composer.
+- **In-Thread Search**: Tìm kiếm tin nhắn chi tiết trong từng cuộc trò chuyện.
+- **Mute Settings Modal**: Tùy chọn tắt thông báo theo thời gian (1h, 8h, 1 ngày, cho đến khi bật lại).
+- **User Presence Management**: Đồng bộ trạng thái online/offline, typing indicator, presence indicator theo thời gian thực.
+- **Profile UI Enhancements**: Modal chỉnh sửa profile, bio, display name, presence status, block settings, reporting.
+- **Conversation Permissions**: Kiểm soát quyền nhắn tin trong nhóm (ai có thể gửi tin nhắn).
+
+### Infrastructure
+- **Socket Reconnection Enhancement**: Tự động reconnect với fresh token, proper listener cleanup để tránh memory leak.
+- **MariaDB/MySQL Support**: Backend hỗ trợ MariaDB qua `@prisma/adapter-mariadb` để tối ưu hiệu suất.
+- **Database Indexing**: Index trên Message table (conversationId, type, createdAt) để tăng tốc độ query.
+
+### Pending Features (TODOs)
+- ⭐ Message Reactions
+- ➡️ Message Forward
+- 📌 Message Pin (per user)
+- 🎨 GIF Picker Integration
+- 🗑️ Account Deletion (Full UI completion)
 
 ## Tài nguyên tham khảo
 

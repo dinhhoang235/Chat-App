@@ -37,11 +37,11 @@ export default function SwitchAccount() {
       if (success) {
         setSwitchModalAccount(null);
         setPasswordInput("");
-        router.replace('/(tabs)/');
+        router.replace('/');
       } else {
         Alert.alert("Lỗi", "Mật khẩu không đúng");
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Lỗi", "Đã xảy ra lỗi khi đăng nhập");
     } finally {
       setLoadingLogin(false);

@@ -41,6 +41,10 @@ export const formatConversationLastMessage = (
     return isFromMe ? "Bạn: [Hình ảnh]" : "[Hình ảnh]";
   }
 
+  if (lastMsg.type === "location") {
+    return isFromMe ? "Bạn: [Vị trí hiện tại]" : "[Vị trí hiện tại]";
+  }
+
   if (lastMsg.type === "video") {
     let durationStr = "";
     try {

@@ -113,6 +113,8 @@ export default function MessageContent({
         textColor={textColor}
         colors={colors}
         fromMe={message.fromMe}
+        senderName={message.sender?.fullName}
+        avatar={message.sender?.avatar}
       />
     );
   }

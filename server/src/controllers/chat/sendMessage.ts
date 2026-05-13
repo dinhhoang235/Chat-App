@@ -10,7 +10,7 @@ import { DIRECT_UPLOAD_MAX_SIZE_BYTES } from "../../constants/upload.js";
 type ParticipantWithPushToken = {
   userId: number;
   user: {
-    pushToken?: string;
+    pushToken: string | null;
   };
   mutedUntil: Date | null;
 };
@@ -179,6 +179,10 @@ export const sendMessage =
           }
         } else if (message.type === "audio") {
           bodyText = "🎤 Ghi âm";
+        } else if (message.type === "location") {
+          bodyText = "📍 Vị trí hiện tại";
+        } else if (message.type === "video") {
+          bodyText = "🎥 Video";
         }
 
         let titleText = message.sender?.fullName || "Tin nhắn mới";

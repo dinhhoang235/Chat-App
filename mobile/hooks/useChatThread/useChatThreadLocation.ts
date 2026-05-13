@@ -68,25 +68,10 @@ export function useChatThreadLocation({
     );
   }, []);
 
-  const handleSendLocation = useCallback(async () => {
-    if (isSendingLocation) return;
-
-    setIsSendingLocation(true);
-    try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== "granted") {
-        showPermissionAlert();
-        return;
-      }
-
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const locationContent = JSON.stringify({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
+  // Internal helper: send given lat/lng (called from handleSendLocation and handleSendLocationData)
+  const _sendCoords = useCallback(
+    async (latitude: number, longitude: number) => {
+      const locationContent = JSON.stringify({ latitude, longitude });
 
       flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
 
@@ -134,7 +119,7 @@ export function useChatThreadLocation({
             }
           }
         } catch (err) {
-          console.error("Error creating conversation on location send:", err);
+          console.log("Error creating conversation on location send:", err);
           setMessages((prev) =>
             prev.map((m) => (m.id === tempId ? { ...m, status: "error" } : m)),
           );
@@ -170,7 +155,7 @@ export function useChatThreadLocation({
         if (settled) return;
         settled = true;
         sendViaRest().catch((err) => {
-          console.error("Send location REST fallback error:", err);
+          console.log("Send location REST fallback error:", err);
           markTempMessageError(tempId);
         });
       }, 5000);
@@ -191,7 +176,7 @@ export function useChatThreadLocation({
 
           if (response?.error) {
             sendViaRest().catch((err) => {
-              console.error("Send location REST fallback error:", err);
+              console.log("Send location REST fallback error:", err);
               markTempMessageError(tempId);
             });
             return;
@@ -205,31 +190,65 @@ export function useChatThreadLocation({
           markTempMessageError(tempId);
         },
       );
+    },
+    [
+      conversationId,
+      flatListRef,
+      isNewConversation,
+      markTempMessageError,
+      replaceTempMessage,
+      replyingTo,
+      setConversationId,
+      setCreatingConversation,
+      setMessages,
+      setReplyingTo,
+      targetUserIdState,
+      userId,
+    ],
+  );
+
+  // Send location by requesting GPS first (original flow - kept for compatibility)
+  const handleSendLocation = useCallback(async () => {
+    if (isSendingLocation) return;
+    setIsSendingLocation(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        showPermissionAlert();
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      await _sendCoords(position.coords.latitude, position.coords.longitude);
     } catch (err) {
-      console.error("Send location error:", err);
-      Alert.alert("Loi", "Khong the lay vi tri hien tai. Vui long thu lai.");
+      console.log("Send location error:", err);
+      Alert.alert("Lỗi", "Không thể lấy vị trí hiện tại. Vui lòng thử lại.");
     } finally {
       setIsSendingLocation(false);
     }
-  }, [
-    conversationId,
-    flatListRef,
-    isNewConversation,
-    isSendingLocation,
-    markTempMessageError,
-    replaceTempMessage,
-    replyingTo,
-    setConversationId,
-    setCreatingConversation,
-    setMessages,
-    setReplyingTo,
-    showPermissionAlert,
-    targetUserIdState,
-    userId,
-  ]);
+  }, [isSendingLocation, showPermissionAlert, _sendCoords]);
+
+  // Send location with pre-fetched coords from LocationPreviewModal
+  const handleSendLocationData = useCallback(
+    async (latitude: number, longitude: number) => {
+      if (isSendingLocation) return;
+      setIsSendingLocation(true);
+      try {
+        await _sendCoords(latitude, longitude);
+      } catch (err) {
+        console.log("Send location data error:", err);
+        Alert.alert("Lỗi", "Không thể gửi vị trí. Vui lòng thử lại.");
+      } finally {
+        setIsSendingLocation(false);
+      }
+    },
+    [isSendingLocation, _sendCoords],
+  );
 
   return {
     handleSendLocation,
+    handleSendLocationData,
     isSendingLocation,
   };
 }

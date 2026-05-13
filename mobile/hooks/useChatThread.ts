@@ -317,7 +317,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     [conversationId, setMessages],
   );
 
-  const { handleSendLocation, isSendingLocation } = useChatThreadLocation({
+  const { handleSendLocation, handleSendLocationData, isSendingLocation } = useChatThreadLocation({
     flatListRef,
     replyingTo,
     setReplyingTo,
@@ -378,6 +378,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     fetchMessages,
     handleSend,
     handleSendLocation,
+    handleSendLocationData,
     isSendingLocation,
     handleRetryMessage,
     sendTextDirect,

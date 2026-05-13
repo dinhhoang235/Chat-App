@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet } from '@/components';
+import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 import { useGroupCallAction } from '@/hooks/useGroupCallAction';
@@ -22,6 +22,7 @@ export default function ChatThread() {
   const [messageMenuPos, setMessageMenuPos] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [selectedMessage, setSelectedMessage] = React.useState<any>(null);
   const [deleteSheetVisible, setDeleteSheetVisible] = React.useState(false);
+  const [locationModalVisible, setLocationModalVisible] = React.useState(false);
   const {
     colors,
     params,
@@ -75,6 +76,8 @@ export default function ChatThread() {
     currentResultIndices,
     statusText,
     handleSend,
+    handleSendLocationData,
+    isSendingLocation,
     handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,
@@ -553,13 +556,17 @@ export default function ChatThread() {
               setComposerVisible(false);
             }}
             height={sheetHeight}
+            loadingAction={isSendingLocation ? 'location' : null}
             onAction={(key) => {
-              closeAll();
               if (key === 'document') {
+                closeAll();
                 pickDocument();
               } else if (key === 'location') {
-                // TODO: implement location share
+                // Đóng actions sheet, mở location preview sheet
+                setComposerVisible(false);
+                setLocationModalVisible(true);
               } else if (key === 'gif') {
+                closeAll();
                 // TODO: open GIF picker
               }
             }}
@@ -656,6 +663,15 @@ export default function ChatThread() {
               />
             )}
           </MessageMenuModal>
+
+          <LocationPreviewModal
+            visible={locationModalVisible}
+            onClose={() => setLocationModalVisible(false)}
+            onConfirm={(lat, lng) => {
+              setLocationModalVisible(false);
+              handleSendLocationData(lat, lng);
+            }}
+          />
 
           <DeleteMessageSheet
             visible={deleteSheetVisible}

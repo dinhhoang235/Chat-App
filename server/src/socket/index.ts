@@ -1,7 +1,7 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import { TokenPayload } from "../utils/jwt.js";
-import { setUserStatus } from "../utils/redis.js";
+import { cacheMessage, setUserStatus } from "../utils/redis.js";
 import prisma from "../db.js";
 import { AuthenticatedSocket } from "./types.js";
 import { registerCallHandlers } from "./callHandlers.js";
@@ -79,6 +79,126 @@ export const setupSocket = (io: Server) => {
     registerTypingHandlers(socket);
     registerCallHandlers(io, socket);
     registerSignalingHandlers(io, socket);
+
+    socket.on("send_message", async (payload: any, callback?: (response: any) => void) => {
+      const userId = socket.user?.userId ? Number(socket.user.userId) : null;
+      const conversationId = Number(payload?.conversationId);
+      const content = payload?.content;
+      const rawType = typeof payload?.type === "string" ? payload.type : "text";
+      const type = rawType === "LOCATION" ? "location" : rawType.toLowerCase();
+
+      if (!userId) {
+        callback?.({ error: "Unauthorized" });
+        return;
+      }
+
+      if (!conversationId || typeof content !== "string") {
+        callback?.({ error: "Invalid message payload" });
+        return;
+      }
+
+      try {
+        const participant = await prisma.conversationParticipant.findUnique({
+          where: {
+            conversationId_userId: {
+              conversationId,
+              userId,
+            },
+          },
+          select: { id: true },
+        });
+
+        if (!participant) {
+          callback?.({ error: "Conversation not found" });
+          return;
+        }
+
+        const message = await prisma.message.create({
+          data: {
+            content,
+            type,
+            conversationId,
+            senderId: userId,
+            replyToId: payload?.replyToId ? Number(payload.replyToId) : undefined,
+          },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+            replyTo: {
+              select: {
+                id: true,
+                content: true,
+                type: true,
+                sender: {
+                  select: {
+                    fullName: true,
+                  },
+                },
+              },
+            },
+            conversation: {
+              select: {
+                id: true,
+                isGroup: true,
+                name: true,
+              },
+            },
+          },
+        });
+
+        await prisma.conversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+
+        await prisma.conversationParticipant.updateMany({
+          where: {
+            conversationId,
+            hiddenAt: { not: null },
+          },
+          data: {
+            hiddenAt: null,
+          },
+        });
+
+        const messagePayload = {
+          ...message,
+          tempId: payload?.tempId,
+        };
+
+        const participants = await prisma.conversationParticipant.findMany({
+          where: { conversationId },
+          select: { userId: true },
+        });
+
+        participants.forEach((p) => {
+          io.to(`user:${p.userId}`).emit("receive_message", messagePayload);
+          io.to(`user:${p.userId}`).emit("conversation_updated", {
+            conversationId: message.conversationId,
+            messageId: message.id,
+            lastMessagePreview: {
+              id: message.id,
+              type: message.type,
+              senderId: message.senderId,
+            },
+          });
+        });
+
+        io.to(`conversation:${conversationId}`).emit("new_message", messagePayload);
+
+        cacheMessage(conversationId, message).catch((err) => console.error(err));
+
+        callback?.({ ok: true, message: messagePayload });
+      } catch (err) {
+        console.error("Socket send_message error:", err);
+        callback?.({ error: "Error sending message" });
+      }
+    });
 
     socket.on("disconnect", async () => {
       console.log(`User disconnected: ${socket.user?.userId}`);

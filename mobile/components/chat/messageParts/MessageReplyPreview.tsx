@@ -65,6 +65,8 @@ export default function MessageReplyPreview({ replyTo, onReplyPress, isOutgoing,
             ? '[Video]'
             : replyTo.type === 'audio'
             ? '[Bản ghi âm]'
+            : replyTo.type === 'location'
+            ? '[Vị trí hiện tại]'
             : '[Tệp]'}
         </Text>
       </View>

@@ -17,6 +17,7 @@ import { useChatThreadState } from "./useChatThread/useChatThreadState";
 import { useChatThreadSearch } from "./useChatThread/useChatThreadSearch";
 import { useChatThreadRuntime } from "./useChatThread/useChatThreadRuntime";
 import { useChatThreadGroupCall } from "./useChatThread/useChatThreadGroupCall";
+import { useChatThreadLocation } from "./useChatThread/useChatThreadLocation";
 import { buildProcessedMessages, mapThreadMessage } from "@/utils/chatThread";
 import { chatThreadCache } from "@/utils/chatThreadCache";
 import { chatApi } from "@/services/chat";
@@ -293,11 +294,11 @@ export function useChatThread(options?: UseChatThreadOptions) {
     });
 
   const deleteMessage = useCallback(
-    async (messageId: number, mode: 'unsend' | 'deleteForMe') => {
+    async (messageId: number, mode: "unsend" | "deleteForMe") => {
       if (!conversationId) return;
       try {
         await chatApi.deleteMessage(conversationId, messageId, mode);
-        if (mode === 'deleteForMe') {
+        if (mode === "deleteForMe") {
           // Hide locally immediately and update in-memory cache
           setMessages((prev) => {
             const next = prev.filter((m) => m.id !== messageId);
@@ -315,6 +316,19 @@ export function useChatThread(options?: UseChatThreadOptions) {
     },
     [conversationId, setMessages],
   );
+
+  const { handleSendLocation, handleSendLocationData, isSendingLocation } = useChatThreadLocation({
+    flatListRef,
+    replyingTo,
+    setReplyingTo,
+    userId: user?.id,
+    conversationId,
+    isNewConversation,
+    targetUserIdState,
+    setMessages,
+    setCreatingConversation,
+    setConversationId,
+  });
 
   return {
     colors,
@@ -363,6 +377,9 @@ export function useChatThread(options?: UseChatThreadOptions) {
     animatedContentStyle,
     fetchMessages,
     handleSend,
+    handleSendLocation,
+    handleSendLocationData,
+    isSendingLocation,
     handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,

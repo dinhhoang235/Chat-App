@@ -306,8 +306,14 @@ export default function NotificationHandler() {
 
       if (message.type === 'text') {
         body = message.content;
-      } else if (message.type === 'image') {
-        body = '[Hình Ảnh]';
+      } else if (message.type === 'image' || message.type === 'image_group') {
+        body = '[Hình ảnh]';
+      } else if (message.type === 'video') {
+        body = '[Video]';
+      } else if (message.type === 'audio') {
+        body = '[Bản ghi âm]';
+      } else if (message.type === 'location') {
+        body = '[Vị trí hiện tại]';
       } else if (message.type === 'file') {
         try {
           const info =

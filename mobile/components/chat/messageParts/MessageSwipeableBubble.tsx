@@ -140,13 +140,13 @@ export default function MessageSwipeableBubble({
         style={[
           {
             backgroundColor:
-              message.type === 'image' || message.type === 'image_group' || message.type === 'video'
+              message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location'
                 ? 'transparent'
                 : message.type === 'call' && (JSON.parse(message.content || '{}').status === 'missed' && !message.fromMe)
                 ? 'rgba(255, 59, 48, 0.1)'
                 : bubbleBg,
-            borderWidth: message.type === 'image' || message.type === 'image_group' || message.type === 'video' ? 0 : 1.2,
-            padding: message.type === 'image' || message.type === 'image_group' || message.type === 'video' ? 0 : message.type === 'call' ? 14 : 12,
+            borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location') ? 0 : 1.2,
+            padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location') ? 0 : message.type === 'call' ? 14 : 12,
             borderRadius: 18,
           },
           message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video' ? animatedBorderStyle : {},
@@ -215,17 +215,17 @@ export default function MessageSwipeableBubble({
                 style={[
                   {
                     backgroundColor:
-                      message.type === 'image' || message.type === 'image_group' || message.type === 'video'
+                      message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location'
                         ? 'transparent'
                         : message.type === 'call' && (JSON.parse(message.content || '{}').status === 'missed' && !message.fromMe)
                         ? 'rgba(255, 59, 48, 0.1)'
                         : bubbleBg,
-                    borderWidth: message.type === 'image' || message.type === 'image_group' || message.type === 'video' ? 0 : 1.2,
-                    padding: message.type === 'image' || message.type === 'image_group' || message.type === 'video' ? 0 : message.type === 'call' ? 14 : 12,
+                    borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location') ? 0 : 1.2,
+                    padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location') ? 0 : message.type === 'call' ? 14 : 12,
                     borderRadius: 18,
                     marginBottom: isLastInGroup ? 0 : -8,
                   },
-                  message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video' ? animatedBorderStyle : {},
+                  (message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video' && message.type !== 'location') ? animatedBorderStyle : {},
                 ]}
               >
                 {replyBlock}

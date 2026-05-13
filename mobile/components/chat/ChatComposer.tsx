@@ -72,7 +72,7 @@ export default function ChatComposer({
               Đang trả lời {replyingTo.contactName || replyingTo.sender?.fullName || 'Người dùng'}
             </Text>
             <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
-              {replyingTo.type === 'image' || replyingTo.type === 'image_group' ? '[Hình ảnh]' : (replyingTo.type === 'video' ? '[Video]' : (replyingTo.type === 'audio' ? '[Bản ghi âm]' : (replyingTo.type === 'text' ? replyingTo.content : '[Tệp]')))}
+              {replyingTo.type === 'image' || replyingTo.type === 'image_group' ? '[Hình ảnh]' : (replyingTo.type === 'video' ? '[Video]' : (replyingTo.type === 'audio' ? '[Bản ghi âm]' : (replyingTo.type === 'location' ? '[Vị trí hiện tại]' : (replyingTo.type === 'text' ? replyingTo.content : '[Tệp]'))))}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal } from '@/components';
+import { Header, GallerySheet, EmojiSheet, GiphySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 import { useGroupCallAction } from '@/hooks/useGroupCallAction';
@@ -23,6 +23,7 @@ export default function ChatThread() {
   const [selectedMessage, setSelectedMessage] = React.useState<any>(null);
   const [deleteSheetVisible, setDeleteSheetVisible] = React.useState(false);
   const [locationModalVisible, setLocationModalVisible] = React.useState(false);
+  const [gifVisible, setGifVisible] = React.useState(false);
   const {
     colors,
     params,
@@ -78,6 +79,8 @@ export default function ChatThread() {
     handleSend,
     handleSendLocationData,
     isSendingLocation,
+    handleSendGif,
+    isSendingGif,
     handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,
@@ -94,6 +97,7 @@ export default function ChatThread() {
     allMedia,
     deleteMessage
   } = useChatThread({
+    gifVisible,
     openGroupVideoCallModal: React.useCallback(() => {
       setGroupVideoCallVisible(true);
     }, []),
@@ -205,7 +209,10 @@ export default function ChatThread() {
         isLastInGroup={isLastInConsecutiveGroup}
         isThreadLast={isThreadLast}
         contactAvatarFallback={!isGroup ? (targetUser?.avatar || (params.avatar as string | undefined)) : undefined}
-        onPress={() => { if (composerVisible) closeAll(); }}
+        onPress={() => {
+          if (composerVisible) closeAll();
+          if (gifVisible) setGifVisible(false);
+        }}
         onAvatarPress={() => {
           if (item.fromMe) return router.push('/profile/me');
           router.push(`/profile/${item.senderId}`);
@@ -227,12 +234,13 @@ export default function ChatThread() {
         }}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage]);
+  }, [processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
     closeAll();
-  }, [micOutsideCloseLocked, closeAll]);
+    if (gifVisible) setGifVisible(false);
+  }, [micOutsideCloseLocked, closeAll, gifVisible]);
 
   const micSheetHeight = micVoiceFlowActive
     ? Math.round(sheetHeight + composerHeight)
@@ -509,7 +517,10 @@ export default function ChatThread() {
                     setComposerVisible={setComposerVisible}
                     colors={colors}
                     insets={insets}
-                    onOpenSheet={openSheet}
+                    onOpenSheet={(type) => {
+                      if (gifVisible) setGifVisible(false);
+                      openSheet(type);
+                    }}
                     micTextMode={micTextMode}
                     imageActive={galleryVisible ? 'gallery' : (emojiVisible ? 'emoji' : (micVisible ? 'mic' : (composerVisible ? 'actions' : false)))}
                     attachments={attachments}
@@ -522,6 +533,7 @@ export default function ChatThread() {
                       if (composerVisible) setComposerVisible(false);
                       if (emojiVisible) setEmojiVisible(false);
                       if (micVisible) setMicVisible(false);
+                      if (gifVisible) setGifVisible(false);
                     }}
                   />
                 </View>
@@ -566,9 +578,23 @@ export default function ChatThread() {
                 setComposerVisible(false);
                 setLocationModalVisible(true);
               } else if (key === 'gif') {
-                closeAll();
-                // TODO: open GIF picker
+                if (galleryVisible) setGalleryVisible(false);
+                if (emojiVisible) setEmojiVisible(false);
+                if (micVisible) setMicVisible(false);
+                setComposerVisible(false);
+                setGifVisible(true);
               }
+            }}
+          />
+
+          <GiphySheet
+            visible={gifVisible}
+            onClose={() => setGifVisible(false)}
+            height={sheetHeight}
+            sending={isSendingGif}
+            onSelectGif={async (gif) => {
+              await handleSendGif(gif);
+              setGifVisible(false);
             }}
           />
 

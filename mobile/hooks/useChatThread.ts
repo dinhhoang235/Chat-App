@@ -294,11 +294,11 @@ export function useChatThread(options?: UseChatThreadOptions) {
     });
 
   const deleteMessage = useCallback(
-    async (messageId: number, mode: 'unsend' | 'deleteForMe') => {
+    async (messageId: number, mode: "unsend" | "deleteForMe") => {
       if (!conversationId) return;
       try {
         await chatApi.deleteMessage(conversationId, messageId, mode);
-        if (mode === 'deleteForMe') {
+        if (mode === "deleteForMe") {
           // Hide locally immediately and update in-memory cache
           setMessages((prev) => {
             const next = prev.filter((m) => m.id !== messageId);

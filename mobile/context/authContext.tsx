@@ -69,12 +69,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await authAPI.login(phone, password);
       if (data.success && data.user && data.accessToken && data.refreshToken) {
-        setIsLoggedIn(true);
-        setUser(data.user);
+        const wasLoggedIn = isLoggedIn;
+        // Disconnect socket BEFORE saving tokens to prevent notifyTokenRefresh
+        // from triggering an extra reconnect cycle during account switch
+        if (wasLoggedIn) {
+          socketService.disconnect();
+        }
         await tokenStorage.saveTokens(data.accessToken, data.refreshToken);
         await tokenStorage.saveUser(data.user);
         await tokenStorage.addSavedAccount(data.user, data.accessToken, data.refreshToken);
         await loadSavedAccounts();
+        // Reconnect socket with the new account's token (already cached by saveTokens)
+        if (wasLoggedIn) {
+          socketService.connect();
+        }
+        setUser(data.user);
+        setIsLoggedIn(true);
         return true;
       }
       return false;

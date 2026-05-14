@@ -37,11 +37,16 @@ export default function SwitchAccount() {
       if (success) {
         setSwitchModalAccount(null);
         setPasswordInput("");
-        router.replace('/(tabs)/');
+        // Wait for native modal fade animation (~300ms) to finish before navigating.
+        // InteractionManager only tracks JS animations, not Android's native Modal animation,
+        // so we use setTimeout to avoid the "child already has a parent" Fabric crash.
+        setTimeout(() => {
+          router.replace('/');
+        }, 350);
       } else {
         Alert.alert("Lỗi", "Mật khẩu không đúng");
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Lỗi", "Đã xảy ra lỗi khi đăng nhập");
     } finally {
       setLoadingLogin(false);

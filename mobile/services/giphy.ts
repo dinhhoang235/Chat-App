@@ -1,6 +1,5 @@
 const GIPHY_API_BASE_URL = "https://api.giphy.com/v1/gifs";
-const GIPHY_API_KEY =
-  process.env.EXPO_PUBLIC_GIPHY_API_KEY || "pMrMgPcPjI5LzE2XA0dlAVRmgMz2R7OW";
+const GIPHY_API_KEY = process.env.EXPO_PUBLIC_GIPHY_API_KEY || "";
 
 export type GiphyGif = {
   id: string;
@@ -102,7 +101,7 @@ async function requestGifs(path: "trending" | "search", params: Record<string, s
 }
 
 export const giphyApi = {
-  trending: (limit = 24) => requestGifs("trending", { limit }),
-  search: (query: string, limit = 24) =>
+  trending: (limit = 50) => requestGifs("trending", { limit }),
+  search: (query: string, limit = 50) =>
     requestGifs("search", { q: query, limit }),
 };

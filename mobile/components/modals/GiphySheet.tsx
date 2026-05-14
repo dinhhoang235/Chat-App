@@ -2,18 +2,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Dimensions,
-  FlatList,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import BottomSheet, { BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import BottomSheet, { BottomSheetTextInput, BottomSheetFlatList } from "@gorhom/bottom-sheet";
 import { Image } from "expo-image";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/context/themeContext";
 import { giphyApi, type GiphyGif } from "@/services/giphy";
 
-const QUICK_TERMS = ["HIHI", "BUOI SANG", "HELLO", "OKE", "ANGRY"];
+
 const GRID_GAP = 6;
 
 type GiphySheetProps = {
@@ -44,8 +43,9 @@ export default function GiphySheet({
   const [loadedIds, setLoadedIds] = useState<Record<string, boolean>>({});
 
   const snapPoints = useMemo(() => {
-    const h = height ?? Math.round(Dimensions.get("window").height * 0.45);
-    return [h];
+    const h1 = height ?? Math.round(Dimensions.get("window").height * 0.4);
+    const h2 = Math.round(Dimensions.get("window").height * 0.90);
+    return [h1, h2];
   }, [height]);
 
   const gridWidth = Dimensions.get("window").width - 24;
@@ -125,17 +125,17 @@ export default function GiphySheet({
       ref={sheetRef}
       index={-1}
       snapPoints={snapPoints}
-      enablePanDownToClose={false}
+      enablePanDownToClose={true}
       enableContentPanningGesture={false}
-      enableHandlePanningGesture={false}
-      handleComponent={null}
+      enableHandlePanningGesture={true}
       onClose={onClose}
       backgroundStyle={{ backgroundColor: colors.surface }}
       enableDynamicSizing={false}
       containerStyle={{ pointerEvents: "box-none" }}
-      keyboardBehavior="fillParent"
+      keyboardBehavior="extend"
       keyboardBlurBehavior="restore"
       android_keyboardInputMode="adjustResize"
+      handleIndicatorStyle={{ backgroundColor: colors.textSecondary, width: 40 }}
     >
       <View style={{ flex: 1, backgroundColor: colors.surface }}>
         <View
@@ -143,7 +143,7 @@ export default function GiphySheet({
             flexDirection: "row",
             alignItems: "center",
             paddingHorizontal: 12,
-            paddingVertical: 10,
+            paddingVertical: 6,
             borderBottomWidth: 1,
             borderBottomColor: colors.border || colors.surfaceVariant,
           }}
@@ -173,24 +173,7 @@ export default function GiphySheet({
           )}
         </View>
 
-        <FlatList
-          horizontal
-          data={QUICK_TERMS}
-          keyExtractor={(item) => item}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => setQuery(item)}
-              style={{ marginRight: 24 }}
-              activeOpacity={0.7}
-            >
-              <Text style={{ color: colors.textSecondary, fontSize: 18, fontWeight: "600" }}>
-                {item}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
+
 
         {loading && gifs.length === 0 ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -201,18 +184,19 @@ export default function GiphySheet({
             <Text style={{ color: colors.textSecondary }}>{errorText}</Text>
           </View>
         ) : (
-          <FlatList
+          <BottomSheetFlatList<GiphyGif>
             data={gifs}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item: GiphyGif) => item.id}
             numColumns={3}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="never"
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
               paddingHorizontal: 12,
-              paddingBottom: 16,
+              paddingBottom: 120,
             }}
             columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
-            renderItem={({ item }) => {
+            renderItem={({ item }: { item: GiphyGif }) => {
               const isSelected = selectedId === item.id;
               return (
                 <TouchableOpacity

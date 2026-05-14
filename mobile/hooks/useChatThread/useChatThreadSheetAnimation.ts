@@ -8,6 +8,7 @@ interface UseChatThreadSheetAnimationParams {
   galleryVisible: boolean;
   emojiVisible: boolean;
   micVisible: boolean;
+  gifVisible?: boolean;
   inputRef: React.RefObject<any>;
 }
 
@@ -16,6 +17,7 @@ export function useChatThreadSheetAnimation({
   galleryVisible,
   emojiVisible,
   micVisible,
+  gifVisible = false,
   inputRef,
 }: UseChatThreadSheetAnimationParams) {
   const safeInsets = useSafeAreaInsets();
@@ -40,7 +42,7 @@ export function useChatThreadSheetAnimation({
     }
 
     const isAnySheetVisible =
-      composerVisible || galleryVisible || emojiVisible || micVisible;
+      composerVisible || galleryVisible || emojiVisible || micVisible || gifVisible;
     if (isAnySheetVisible) {
       // Avoid reading sharedValue.value on JS side (Reanimated strict warning).
       const keyboardLikelyOpen = !!inputRef.current?.isFocused();
@@ -61,6 +63,7 @@ export function useChatThreadSheetAnimation({
     galleryVisible,
     emojiVisible,
     micVisible,
+    gifVisible,
     lastKeyboardHeight,
     sheetHeightSV,
     inputRef,

@@ -25,7 +25,7 @@ const AVATAR_SIZE = 140;
 export default function CallScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { activeCall, callStatus, endCall, setCallStatus, upgradeActiveCallToVideo } = useCall();
+  const { activeCall, callStatus, endCall, setCallStatus, upgradeActiveCallToVideo, minimizeCall } = useCall();
   const { user } = useAuth();
 
   const remoteName = activeCall?.remoteName || '';
@@ -163,6 +163,20 @@ export default function CallScreen() {
       }, 500);
     }
   }, [callStatus, router]);
+
+  // ─── Minimize (back button) ─────────────────────────────────────
+  const handleMinimize = useCallback(() => {
+    minimizeCall();
+    if (router.canGoBack()) {
+      try {
+        router.back();
+      } catch {
+        router.replace('/(tabs)');
+      }
+    } else {
+      router.replace('/(tabs)');
+    }
+  }, [minimizeCall, router]);
 
   // ─── Hang up helper ────────────────────────────────────────────
   const handleHangup = useCallback(() => {
@@ -355,7 +369,7 @@ export default function CallScreen() {
       <Animated.View className="flex-1" style={{ opacity: fadeAnim }}>
         {/* ── Top bar ── */}
         <View className="flex-row items-center justify-between px-4 pb-2" style={{ paddingTop: insets.top + 6 }}>
-          <TouchableOpacity className="w-[44px] h-[44px] items-center justify-center" onPress={handleHangup}>
+          <TouchableOpacity className="w-[44px] h-[44px] items-center justify-center" onPress={handleMinimize}>
             <Ionicons name="chevron-back" size={28} color="#fff" />
           </TouchableOpacity>
           <Text className="text-white text-lg font-bold tracking-[0.3px]">

@@ -26,7 +26,7 @@ import { getInitials } from '@/utils/initials';
 export default function VideoCallScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { activeCall, callStatus, endCall, setCallStatus } = useCall();
+  const { activeCall, callStatus, endCall, setCallStatus, minimizeCall } = useCall();
   const { user } = useAuth();
 
   const [localStreamURL, setLocalStreamURL] = useState<string | null>(null);
@@ -81,6 +81,20 @@ export default function VideoCallScreen() {
       }, 500);
     }
   }, [callStatus, router]);
+
+  // ─── Minimize (back button) ─────────────────────────────────────
+  const handleMinimize = useCallback(() => {
+    minimizeCall();
+    if (router.canGoBack()) {
+      try {
+        router.back();
+      } catch {
+        router.replace('/(tabs)');
+      }
+    } else {
+      router.replace('/(tabs)');
+    }
+  }, [minimizeCall, router]);
 
   // ─── Hang up helper ────────────────────────────────────────────
   const handleHangup = useCallback(() => {
@@ -427,7 +441,7 @@ export default function VideoCallScreen() {
           style={[{ opacity: controlsOpacity, paddingTop: insets.top + 6 }]}
           pointerEvents={controlsVisible ? 'box-none' : 'none'}
         >
-          <TouchableOpacity className="w-[42px] h-[42px] items-center justify-center rounded-full bg-black/25" onPress={handleHangup}>
+          <TouchableOpacity className="w-[42px] h-[42px] items-center justify-center rounded-full bg-black/25" onPress={handleMinimize}>
             <Ionicons name="chevron-back" size={28} color="#fff" />
           </TouchableOpacity>
 

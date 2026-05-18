@@ -665,6 +665,20 @@ export function useChatThreadRuntime({
 
     socketService.on("conversation_updated", handleConversationUpdated);
     
+    const handleMessageEdited = (data: { message: any; conversationId: number }) => {
+      if (data.conversationId.toString() === conversationId?.toString()) {
+        setMessages((prev) => {
+          const next = prev.map((m) =>
+            m.id?.toString() === data.message.id?.toString()
+              ? mapThreadMessage(data.message, userId, { status: m.status === 'sending' ? 'sending' : 'sent', includeSeenBy: true })
+              : m
+          );
+          persistMessagesCache(data.conversationId.toString(), next);
+          return next;
+        });
+      }
+    };
+
     const handleMessageRevoked = (data: { messageId: number, conversationId: number }) => {
       if (data.conversationId.toString() === conversationId?.toString()) {
         setMessages((prev) => {
@@ -680,12 +694,14 @@ export function useChatThreadRuntime({
         });
       }
     };
+    socketService.on("message_edited", handleMessageEdited);
     socketService.on("message_revoked", handleMessageRevoked);
 
     return () => {
       socketService.off("new_message", handleNewMessage);
       socketService.off("message_seen", handleMessageSeen);
       socketService.off("conversation_updated", handleConversationUpdated);
+      socketService.off("message_edited", handleMessageEdited);
       socketService.off("message_revoked", handleMessageRevoked);
     };
   }, [conversationId, userId, isFocused, isGroup, flatListRef, setMessages, persistMessagesCache]);

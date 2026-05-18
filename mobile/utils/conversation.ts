@@ -38,7 +38,20 @@ export const formatConversationLastMessage = (
   }
 
   if (lastMsg.type === "image") {
-    return isFromMe ? "Bạn: [Hình ảnh]" : "[Hình ảnh]";
+    const isGif = (() => {
+      try {
+        const content = parseJson(lastMsg.content);
+        return (
+          content?.mime === "image/gif" ||
+          content?.url?.toLowerCase().endsWith(".gif") ||
+          content?.name?.toLowerCase().endsWith(".gif")
+        );
+      } catch {
+        return false;
+      }
+    })();
+    const label = isGif ? "[GIF]" : "[Hình ảnh]";
+    return isFromMe ? `Bạn: ${label}` : label;
   }
 
   if (lastMsg.type === "location") {
@@ -144,7 +157,7 @@ export const formatConversationLastMessage = (
     } else if (content.mime?.startsWith("audio/")) {
       mediaIcon = `[Tin nhắn thoại]${formatDuration(content.duration)}`;
     } else if (content.mime?.startsWith("image/")) {
-      mediaIcon = "[Hình ảnh]";
+      mediaIcon = content.mime === "image/gif" ? "[Gif]" : "[Hình ảnh]";
     }
   } catch {
     // Ignore parse errors

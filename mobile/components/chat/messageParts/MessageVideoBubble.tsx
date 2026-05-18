@@ -15,9 +15,10 @@ type MessageVideoBubbleProps = {
   colors: any;
   allMedia?: any[];
   progress?: number;
+  onLongPress?: () => void;
 };
 
-export default function MessageVideoBubble({ message, screenWidth, colors, allMedia, progress }: MessageVideoBubbleProps) {
+export default function MessageVideoBubble({ message, screenWidth, colors, allMedia, progress, onLongPress }: MessageVideoBubbleProps) {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [localThumb, setLocalThumb] = useState<string | null>(null);
@@ -82,6 +83,12 @@ export default function MessageVideoBubble({ message, screenWidth, colors, allMe
           setSelectedIndex(idx === -1 ? imagesForViewer.length - 1 : idx);
           setViewerVisible(true);
         }}
+        onLongPress={() => {
+          if (message.isRevoked || message.status === 'sending') return;
+          onLongPress?.();
+        }}
+        delayLongPress={200}
+        android_disableSound={true}
         activeOpacity={0.9}
       >
         <View style={{ borderRadius: 12, overflow: 'hidden', backgroundColor: '#000', width: maxWidth, height }} pointerEvents="none">

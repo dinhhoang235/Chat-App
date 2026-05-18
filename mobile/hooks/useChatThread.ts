@@ -386,6 +386,8 @@ export function useChatThread(options?: UseChatThreadOptions) {
     micVisible,
     setMicVisible,
     messageText,
+    setMessageText,
+    setMessages,
     onTextChange,
     handleEmojiSelect,
     handleBackspace,

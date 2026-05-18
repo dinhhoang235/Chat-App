@@ -1,12 +1,14 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, GiphySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal } from '@/components';
+import { Header, GallerySheet, EmojiSheet, GiphySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 import { useGroupCallAction } from '@/hooks/useGroupCallAction';
 import { useCall } from '@/context/callContext';
+import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
+import { chatThreadCache } from '@/utils/chatThreadCache';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 
@@ -20,9 +22,22 @@ export default function ChatThread() {
   
   const [messageMenuVisible, setMessageMenuVisible] = React.useState(false);
   const [messageMenuPos, setMessageMenuPos] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [showMoreMenuActions, setShowMoreMenuActions] = React.useState(false);
   const [selectedMessage, setSelectedMessage] = React.useState<any>(null);
+  const [editingMessage, setEditingMessage] = React.useState<any>(null);
   const [deleteSheetVisible, setDeleteSheetVisible] = React.useState(false);
   const [locationModalVisible, setLocationModalVisible] = React.useState(false);
+  const [forwardSheetVisible, setForwardSheetVisible] = React.useState(false);
+
+  const canForwardMessage = React.useMemo(() => {
+    if (!selectedMessage || !selectedMessage.id) return false;
+    const isTempMessage = selectedMessage.id?.toString?.().startsWith?.('temp-');
+    return (
+      !isTempMessage &&
+      selectedMessage.status !== 'sending' &&
+      selectedMessage.status !== 'error'
+    );
+  }, [selectedMessage]);
   const [gifVisible, setGifVisible] = React.useState(false);
   const {
     colors,
@@ -57,6 +72,7 @@ export default function ChatThread() {
     micVisible,
     setMicVisible,
     messageText,
+    setMessageText,
     onTextChange,
     handleEmojiSelect,
     handleBackspace,
@@ -67,6 +83,8 @@ export default function ChatThread() {
     addAttachments,
     removeAttachment,
     clearAttachments,
+    conversationId,
+    setMessages,
     targetUserStatus,
     targetUser,
     isGroup,
@@ -139,6 +157,49 @@ export default function ChatThread() {
   );
 
   const handleCallAction = useGroupCallAction(() => setGroupVideoCallVisible(true));
+
+  const handleSaveEdit = React.useCallback(async () => {
+    if (!editingMessage || !conversationId) return;
+    const trimmed = messageText.trim();
+    if (!trimmed) return;
+
+    let previousMessages: any[] = [];
+    const messageIdStr = editingMessage.id?.toString();
+
+    setMessages((prev) => {
+      previousMessages = prev;
+      const next = prev.map((m) =>
+        m.id?.toString() === messageIdStr
+          ? { ...m, content: trimmed, text: trimmed, updatedAt: new Date().toISOString(), edited: true }
+          : m
+      );
+      chatThreadCache.setMessages(conversationId, next);
+      return next;
+    });
+
+    setEditingMessage(null);
+    setMessageText('');
+
+    try {
+      const response = await chatApi.editMessage(Number(conversationId), editingMessage.id, trimmed);
+      const updated = response.data;
+      setMessages((prev) => {
+        const next = prev.map((m) =>
+          m.id?.toString() === updated.id?.toString()
+            ? { ...m, content: updated.content, text: updated.content, updatedAt: updated.updatedAt, edited: true }
+            : m
+        );
+        chatThreadCache.setMessages(conversationId, next);
+        return next;
+      });
+    } catch (err) {
+      console.error('Edit message error:', err);
+      setMessages(previousMessages);
+      chatThreadCache.setMessages(conversationId, previousMessages);
+      setEditingMessage(editingMessage);
+      setMessageText(trimmed);
+    }
+  }, [conversationId, editingMessage, messageText, setMessageText, setMessages]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -230,6 +291,7 @@ export default function ChatThread() {
         onLongPress={(msg, x, y, w, h) => {
           setSelectedMessage(msg);
           setMessageMenuPos({ x, y, w, h });
+          setShowMoreMenuActions(false);
           setMessageMenuVisible(true);
         }}
       />
@@ -404,7 +466,7 @@ export default function ChatThread() {
                   <FlatList
                     ref={flatListRef}
                     data={processedMessages}
-                    extraData={isTyping ? displayTypingAvatar || true : false}
+                    extraData={[messages, isTyping ? displayTypingAvatar || true : false]}
                     inverted
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
@@ -512,6 +574,7 @@ export default function ChatThread() {
                     onTextChange={onTextChange}
                     inputRef={inputRef}
                     handleSend={handleSend}
+                    onSaveEdit={handleSaveEdit}
                     creatingConversation={creatingConversation}
                     composerVisible={composerVisible}
                     setComposerVisible={setComposerVisible}
@@ -534,6 +597,11 @@ export default function ChatThread() {
                       if (emojiVisible) setEmojiVisible(false);
                       if (micVisible) setMicVisible(false);
                       if (gifVisible) setGifVisible(false);
+                    }}
+                    editingMessage={editingMessage}
+                    onCancelEdit={() => {
+                      setEditingMessage(null);
+                      setMessageText('');
                     }}
                   />
                 </View>
@@ -650,6 +718,12 @@ export default function ChatThread() {
               }
               
               switch (action) {
+                case 'more':
+                  setShowMoreMenuActions(true);
+                  break;
+                case 'less':
+                  setShowMoreMenuActions(false);
+                  break;
                 case 'reply':
                   setReplyingTo(selectedMessage);
                   break;
@@ -657,8 +731,18 @@ export default function ChatThread() {
                   Clipboard.setStringAsync(selectedMessage?.text || selectedMessage?.content || '');
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   break;
+                case 'edit':
+                  setEditingMessage(selectedMessage);
+                  setMessageText(selectedMessage?.text || selectedMessage?.content || '');
+                  setReplyingTo(null);
+                  setMessageMenuVisible(false);
+                  setTimeout(() => {
+                    inputRef.current?.focus?.();
+                  }, 0);
+                  break;
                 case 'forward':
-                  // TODO: implement forward
+                  setForwardSheetVisible(true);
+                  setMessageMenuVisible(false);
                   break;
                 case 'delete':
                   setDeleteSheetVisible(true);
@@ -668,11 +752,16 @@ export default function ChatThread() {
                   break;
               }
             }}
-            items={[
-              { key: 'reply', label: 'Trả lời', icon: 'reply' },
+            items={!showMoreMenuActions ? [
+              ...(selectedMessage?.fromMe && selectedMessage?.type === 'text' ? [{ key: 'edit', label: 'Chỉnh sửa', icon: 'edit' }] : []),
+              { key: 'reply', label: 'Trả lời', icon: 'arrow-undo', ionicon: true },
               { key: 'copy', label: 'Sao chép', icon: 'content-copy' },
+              { key: 'more', label: 'Khác', icon: 'more-horiz' },
+            ] : [
+              ...(canForwardMessage ? [{ key: 'forward', label: 'Chuyển tiếp', icon: 'arrow-redo', ionicon: true }] : []),
               { key: 'pin', label: 'Ghim', icon: 'push-pin' },
               ...(selectedMessage?.fromMe ? [{ key: 'delete', label: 'Thu hồi', icon: 'delete', destructive: true }] : []),
+              { key: 'less', label: 'Khác', icon: 'more-horiz' },
             ]}
           >
             {selectedMessage && (
@@ -696,6 +785,36 @@ export default function ChatThread() {
             onConfirm={(lat, lng) => {
               setLocationModalVisible(false);
               handleSendLocationData(lat, lng);
+            }}
+          />
+
+          <ForwardMessageSheet
+            visible={forwardSheetVisible}
+            currentConversationId={conversationId}
+            onClose={() => setForwardSheetVisible(false)}
+            message={selectedMessage}
+            onForward={async (conversationIds) => {
+              if (!selectedMessage || !selectedMessage.id) return;
+
+              const sourceConversationId =
+                selectedMessage.conversationId ?? conversationId;
+
+              if (!sourceConversationId) return;
+
+              try {
+                await chatApi.forwardMessage(
+                  sourceConversationId,
+                  selectedMessage.id,
+                  conversationIds,
+                );
+              } catch (error) {
+                console.error('Forward message failed', {
+                  sourceConversationId,
+                  messageId: selectedMessage.id,
+                  conversationIds,
+                  error,
+                });
+              }
             }}
           />
 

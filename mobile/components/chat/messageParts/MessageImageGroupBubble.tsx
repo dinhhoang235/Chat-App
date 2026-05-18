@@ -10,9 +10,10 @@ type MessageImageGroupBubbleProps = {
   screenWidth: number;
   colors: any;
   allMedia?: any[];
+  onLongPress?: () => void;
 };
 
-export default function MessageImageGroupBubble({ message, screenWidth, colors, allMedia }: MessageImageGroupBubbleProps) {
+export default function MessageImageGroupBubble({ message, screenWidth, colors, allMedia, onLongPress }: MessageImageGroupBubbleProps) {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -84,6 +85,12 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
               setSelectedIndex(viewerIdx);
               setViewerVisible(true);
             }}
+            onLongPress={() => {
+              if (message.isRevoked) return;
+              onLongPress?.();
+            }}
+            delayLongPress={200}
+            android_disableSound={true}
             activeOpacity={0.9}
           >
             <Image

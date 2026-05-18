@@ -1,9 +1,9 @@
 import express from 'express';
 import { authMiddleware } from '../middleware/auth.js';
-import { 
-  getConversations, 
-  getMessages, 
-  sendMessage, 
+import {
+  getConversations,
+  getMessages,
+  sendMessage,
   startConversation,
   markAsRead,
   deleteConversation,
@@ -17,6 +17,8 @@ import {
   muteConversation,
   pinConversation,
   markAsUnread,
+  editMessage,
+  forwardMessage,
   searchMessages,
   deleteMessage
 } from '../controllers/chat/index.js';
@@ -38,6 +40,8 @@ export const chatRoutes = (io: Server) => {
   router.post('/:conversationId/read', markAsRead(io));
   // starting a conversation may also include an initial attachment
   router.post('/start', upload.single('file'), startConversation(io));
+  router.patch('/:conversationId/messages/:messageId', editMessage(io));
+  router.post('/:conversationId/messages/:messageId/forward', forwardMessage(io));
   router.delete('/:conversationId', deleteConversation(io));
   router.delete('/:conversationId/disband', disbandGroup(io));
   router.delete('/:conversationId/leave', leaveGroup(io));

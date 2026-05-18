@@ -53,7 +53,12 @@ export const formatMessageNotification = (message: any) => {
   if (type === 'text') {
     bodyText = content;
   } else if (type === 'image') {
-    bodyText = '📷 Ảnh';
+    let isGif = false;
+    try {
+      const info = typeof content === 'string' ? JSON.parse(content) : content;
+      isGif = info?.mime === 'image/gif' || info?.url?.toLowerCase().endsWith('.gif') || info?.name?.toLowerCase().endsWith('.gif');
+    } catch {}
+    bodyText = isGif ? '[Gif]' : '📷 Ảnh';
   } else if (type === 'file') {
     try {
       const info = typeof content === 'string' ? JSON.parse(content) : content;

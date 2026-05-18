@@ -10,3 +10,4 @@ export { default as TypingDots } from './TypingDots';
 export { default as VideoThumbnail } from './VideoThumbnail';
 export { default as MessageMenuModal } from './MessageMenuModal';
 export { default as DeleteMessageSheet } from './DeleteMessageSheet';
+export { default as ForwardMessageSheet } from './ForwardMessageSheet';

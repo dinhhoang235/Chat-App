@@ -307,7 +307,12 @@ export default function NotificationHandler() {
       if (message.type === 'text') {
         body = message.content;
       } else if (message.type === 'image' || message.type === 'image_group') {
-        body = '[Hình ảnh]';
+        let isGif = false;
+        try {
+          const info = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
+          isGif = info?.mime === 'image/gif' || info?.url?.toLowerCase().endsWith('.gif') || info?.name?.toLowerCase().endsWith('.gif');
+        } catch {}
+        body = isGif ? '[Gif]' : '[Hình ảnh]';
       } else if (message.type === 'video') {
         body = '[Video]';
       } else if (message.type === 'audio') {

@@ -29,6 +29,9 @@ interface ChatComposerProps {
   onFocus?: () => void;
   replyingTo?: any;
   onCancelReply?: () => void;
+  editingMessage?: any;
+  onCancelEdit?: () => void;
+  onSaveEdit?: () => void;
 }
 
 export default function ChatComposer({
@@ -52,9 +55,29 @@ export default function ChatComposer({
   onFocus,
   replyingTo,
   onCancelReply,
+  editingMessage,
+  onCancelEdit,
+  onSaveEdit,
 }: ChatComposerProps) {
   const [imagePressed, setImagePressed] = useState(false);
   const hasAttachments = Boolean(attachments && attachments.length > 0);
+
+  const handlePressSend = () => {
+    if (editingMessage) {
+      onSaveEdit?.();
+      return;
+    }
+    handleSend();
+  };
+
+  const handleSubmitEditing = () => {
+    if (!messageText.trim()) return;
+    if (editingMessage) {
+      onSaveEdit?.();
+      return;
+    }
+    handleSend();
+  };
 
   return (
     <View
@@ -72,7 +95,22 @@ export default function ChatComposer({
               Đang trả lời {replyingTo.contactName || replyingTo.sender?.fullName || 'Người dùng'}
             </Text>
             <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
-              {replyingTo.type === 'image' || replyingTo.type === 'image_group' ? '[Hình ảnh]' : (replyingTo.type === 'video' ? '[Video]' : (replyingTo.type === 'audio' ? '[Bản ghi âm]' : (replyingTo.type === 'location' ? '[Vị trí hiện tại]' : (replyingTo.type === 'text' ? replyingTo.content : '[Tệp]'))))}
+              {(() => {
+                if (replyingTo.type === 'image' || replyingTo.type === 'image_group') {
+                  try {
+                    const info = typeof replyingTo.content === 'string' ? JSON.parse(replyingTo.content) : replyingTo.content;
+                    if (info?.mime === 'image/gif' || info?.url?.toLowerCase().endsWith('.gif') || info?.name?.toLowerCase().endsWith('.gif')) {
+                      return '[Gif]';
+                    }
+                  } catch {}
+                  return '[Hình ảnh]';
+                }
+                if (replyingTo.type === 'video') return '[Video]';
+                if (replyingTo.type === 'audio') return '[Bản ghi âm]';
+                if (replyingTo.type === 'location') return '[Vị trí hiện tại]';
+                if (replyingTo.type === 'text') return replyingTo.content;
+                return '[Tệp]';
+              })()}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -102,6 +140,21 @@ export default function ChatComposer({
               <MaterialIcons name="close" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
+        </View>
+      )}
+      {editingMessage && (
+        <View className="flex-row items-center justify-between px-4 py-2" style={{ borderBottomColor: colors.surfaceVariant, borderBottomWidth: 1, backgroundColor: colors.surfaceVariant }}>
+          <View className="flex-1 mr-2">
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+              Đang sửa tin nhắn
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
+              {editingMessage.text || editingMessage.content || ''}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={onCancelEdit} style={{ padding: 4 }}>
+            <MaterialIcons name="close" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
       )}
       <View
@@ -149,6 +202,9 @@ export default function ChatComposer({
                 onFocus={() => {
                   if (onFocus) onFocus();
                 }}
+                onSubmitEditing={handleSubmitEditing}
+                returnKeyType="send"
+                blurOnSubmit={!messageText.includes('\n')}
                 placeholder="Tin nhắn"
                 placeholderTextColor={colors.textSecondary}
                 editable={!hasAttachments}
@@ -170,7 +226,7 @@ export default function ChatComposer({
         <View className="flex-row items-center">
           {(messageText.trim().length > 0 || hasAttachments) ? (
             <TouchableOpacity
-              onPress={handleSend}
+              onPress={handlePressSend}
               disabled={creatingConversation}
               style={{ padding: 6, opacity: creatingConversation ? 0.5 : 1 }}
             >

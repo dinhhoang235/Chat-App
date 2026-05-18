@@ -6,6 +6,7 @@ export { default as ConfirmModal } from './ConfirmModal';
 export { default as EditDisplayNameModal } from './EditDisplayNameModal';
 export { default as FullscreenImageViewer } from './FullscreenImageViewer';
 export { default as GallerySheet } from './GallerySheet';
+export { default as GiphySheet } from './GiphySheet';
 export { default as GroupVideoCallModal } from './GroupVideoCallModal';
 export { default as ImagePickerModal } from './ImagePickerModal';
 export { default as LeaveGroupSheet } from './LeaveGroupSheet';

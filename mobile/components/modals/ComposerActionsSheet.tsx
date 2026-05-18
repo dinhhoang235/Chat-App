@@ -48,14 +48,14 @@ export default function ComposerActionsSheet({
       ref={sheetRef}
       index={-1}
       snapPoints={snapPoints}
-      enablePanDownToClose={false}
-      enableContentPanningGesture={false}
-      enableHandlePanningGesture={false}
-      handleComponent={null}
+      enablePanDownToClose={true}
+      enableContentPanningGesture={true}
+      enableHandlePanningGesture={true}
       onClose={onClose}
       backgroundStyle={{ backgroundColor: colors.surface }}
       enableDynamicSizing={false}
       containerStyle={{ pointerEvents: 'box-none' }}
+      handleIndicatorStyle={{ backgroundColor: colors.textSecondary, width: 40 }}
     >
       <BottomSheetView>
         <View style={{ paddingHorizontal: 18, paddingTop: 8, paddingBottom: 18 }}>

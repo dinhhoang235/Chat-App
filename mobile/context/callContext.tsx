@@ -27,6 +27,10 @@ interface CallContextType {
   incomingCall: CallInfo | null;
   activeCall: CallInfo | null;
   callStatus: CallStatus;
+  callDuration: number;
+  isMinimized: boolean;
+  minimizeCall: () => void;
+  restoreCall: () => void;
   startCall: (params: {
     conversationId: number | string;
     callType: CallType;
@@ -42,6 +46,7 @@ interface CallContextType {
   endCall: () => void;
   setCallStatus: React.Dispatch<React.SetStateAction<CallStatus>>;
   setIncomingCall: (info: CallInfo | null) => void;
+  upgradeActiveCallToVideo: () => void;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -57,6 +62,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [currentAppState, setCurrentAppState] = useState(AppState.currentState);
   const [callDuration, setCallDuration] = useState(0);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   // Audio player for ringtone
   const ringtonePlayer = useAudioPlayer(require('@/assets/sounds/ringtone.mp3'));
@@ -151,6 +157,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       setActiveCall(null);
       setIncomingCall(null);
       setCallStatus('ended');
+      setIsMinimized(false);
     };
 
     const handleParticipantJoined = (data: any) => {
@@ -300,6 +307,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       };
       setActiveCall(call);
       setCallStatus(useExistingCall ? 'connecting' : 'calling');
+      setIsMinimized(false);
 
       let inviteTargets = initialGroupTargets?.length ? initialGroupTargets : [{ userId: Number(remoteUserId), fullName: remoteName, avatar: remoteAvatar }];
       if (useExistingCall && existingCallInfo?.invitedUserIds?.length) {
@@ -339,6 +347,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setActiveCall(call);
     setIncomingCall(null);
     setCallStatus('connecting');
+    setIsMinimized(false);
 
     const isGroupCall = call.isGroupCall;
     if (isGroupCall) {
@@ -426,7 +435,24 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setActiveCall(null);
     setIncomingCall(null);
     setCallStatus('ended');
+    setIsMinimized(false);
   }, [activeCall, incomingCall]);
+
+  const upgradeActiveCallToVideo = useCallback(() => {
+    setActiveCall((prev) => {
+      if (!prev) return null;
+      return { ...prev, callType: 'video' };
+    });
+    setCallStatus('connecting');
+  }, []);
+
+  const minimizeCall = useCallback(() => {
+    setIsMinimized(true);
+  }, []);
+
+  const restoreCall = useCallback(() => {
+    setIsMinimized(false);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -540,6 +566,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         incomingCall,
         activeCall,
         callStatus,
+        callDuration,
+        isMinimized,
+        minimizeCall,
+        restoreCall,
         startCall,
         acceptCall,
         joinCall,
@@ -548,6 +578,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         endCall,
         setCallStatus,
         setIncomingCall,
+        upgradeActiveCallToVideo,
       }}
     >
       {children}

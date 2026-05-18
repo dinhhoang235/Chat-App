@@ -176,7 +176,7 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
   }
 
   // Contact card style
-  if (message.type === 'contact') {
+  if (message.type === 'contact' && !message.isRevoked) {
     return (
       <MessageContactBubble
         message={message}
@@ -225,19 +225,8 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
 }
 
 // OPTIMIZATION #4: Memoize MessageBubble to prevent re-renders when props haven't changed
-// This is critical for FlatList performance - prevents jank during scrolling
-// Custom comparator: only re-render if message ID, highlighted status, or media changes
-const MessageBubble = memo(MessageBubbleComponent, (prevProps, nextProps) => {
-  // Return true if props are equal (skip re-render), false if different (re-render)
-  return (
-    prevProps.message?.id === nextProps.message?.id &&
-    prevProps.message?.isRevoked === nextProps.message?.isRevoked &&
-    prevProps.isHighlighted === nextProps.isHighlighted &&
-    prevProps.progress === nextProps.progress &&
-    prevProps.highlightQuery === nextProps.highlightQuery &&
-    prevProps.allMedia?.length === nextProps.allMedia?.length
-  );
-});
+// We use default memoization to ensure render updates when the message object itself changes.
+const MessageBubble = memo(MessageBubbleComponent);
 
 export default MessageBubble;
 

@@ -11,9 +11,10 @@ type MessageImageBubbleProps = {
   colors: any;
   allMedia?: any[];
   progress?: number;
+  onLongPress?: () => void;
 };
 
-export default function MessageImageBubble({ message, screenWidth, colors, allMedia, progress }: MessageImageBubbleProps) {
+export default function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, onLongPress }: MessageImageBubbleProps) {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(() => {
@@ -85,6 +86,12 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
           setSelectedIndex(idx === -1 ? imagesForViewer.length - 1 : idx);
           setViewerVisible(true);
         }}
+        onLongPress={() => {
+          if (message.isRevoked || message.status === 'sending') return;
+          onLongPress?.();
+        }}
+        delayLongPress={200}
+        android_disableSound={true}
         activeOpacity={0.9}
       >
         <View style={{ width: imageWidth, height: imageHeight, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.surfaceVariant }}>

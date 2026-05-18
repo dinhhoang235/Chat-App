@@ -18,6 +18,7 @@ import { useChatThreadSearch } from "./useChatThread/useChatThreadSearch";
 import { useChatThreadRuntime } from "./useChatThread/useChatThreadRuntime";
 import { useChatThreadGroupCall } from "./useChatThread/useChatThreadGroupCall";
 import { useChatThreadLocation } from "./useChatThread/useChatThreadLocation";
+import { useChatThreadGif } from "./useChatThread/useChatThreadGif";
 import { buildProcessedMessages, mapThreadMessage } from "@/utils/chatThread";
 import { chatThreadCache } from "@/utils/chatThreadCache";
 import { chatApi } from "@/services/chat";
@@ -25,6 +26,7 @@ import { error } from "@/utils/logger";
 
 type UseChatThreadOptions = {
   openGroupVideoCallModal?: () => void;
+  gifVisible?: boolean;
 };
 
 export function useChatThread(options?: UseChatThreadOptions) {
@@ -257,6 +259,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
       galleryVisible,
       emojiVisible,
       micVisible,
+      gifVisible: options?.gifVisible,
       inputRef,
     });
 
@@ -330,6 +333,19 @@ export function useChatThread(options?: UseChatThreadOptions) {
     setConversationId,
   });
 
+  const { handleSendGif, isSendingGif } = useChatThreadGif({
+    flatListRef,
+    replyingTo,
+    setReplyingTo,
+    userId: user?.id,
+    conversationId,
+    isNewConversation,
+    targetUserIdState,
+    setMessages,
+    setCreatingConversation,
+    setConversationId,
+  });
+
   return {
     colors,
     params,
@@ -370,6 +386,8 @@ export function useChatThread(options?: UseChatThreadOptions) {
     micVisible,
     setMicVisible,
     messageText,
+    setMessageText,
+    setMessages,
     onTextChange,
     handleEmojiSelect,
     handleBackspace,
@@ -380,6 +398,8 @@ export function useChatThread(options?: UseChatThreadOptions) {
     handleSendLocation,
     handleSendLocationData,
     isSendingLocation,
+    handleSendGif,
+    isSendingGif,
     handleRetryMessage,
     sendTextDirect,
     handleSendAttachment,

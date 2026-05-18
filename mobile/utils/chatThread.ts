@@ -47,6 +47,11 @@ export const mapThreadMessage = (
     ...message,
     fromMe: message.senderId ? message.senderId === currentUserId : false,
     time: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    edited:
+      message.updatedAt && message.createdAt
+        ? new Date(message.updatedAt).getTime() > new Date(message.createdAt).getTime()
+        : false,
+    text: message.text || message.content,
     contactName: message.sender?.id ? message.sender.fullName : (message.type === 'system' ? 'Hệ thống' : undefined),
     contactAvatar: message.sender?.avatar ? getAvatarUrl(message.sender.avatar) || undefined : undefined,
     sharedContact: message.type === 'contact' 

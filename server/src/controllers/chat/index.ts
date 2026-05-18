@@ -14,5 +14,7 @@ export * from './getConversationMedia.js';
 export * from './muteConversation.js';
 export * from './pinConversation.js';
 export * from './markAsUnread.js';
+export * from './editMessage.js';
+export * from './forwardMessage.js';
 export * from './searchMessages.js';
 export * from './deleteMessage.js';

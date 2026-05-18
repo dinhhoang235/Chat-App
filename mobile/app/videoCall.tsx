@@ -186,17 +186,42 @@ export default function VideoCallScreen() {
     const init = async () => {
       // 0. Atomic guard against double-init
       if (webrtcService.isInitializing || (webrtcService.currentCallId === activeCall.callId && webrtcService.getLocalStream())) {
+        console.log('[WebRTC Debug] Blocked by atomic guard! isInitializing:', webrtcService.isInitializing, 'currentCallId:', webrtcService.currentCallId, 'hasLocalStream:', !!webrtcService.getLocalStream());
         if (webrtcService.currentCallId === activeCall.callId && webrtcService.getLocalStream()) {
-          console.log('[WebRTC] Re-wiring callbacks for', activeCall.callId);
+          console.log('[WebRTC] Re-wiring callbacks and signaling for', activeCall.callId);
           wireCallbacks();
           const ls = webrtcService.getLocalStream();
           if (mounted && ls) setLocalStreamURL((ls as any).toURL());
+
+          // Re-register socket events and trigger signaling handshake
+          if (activeCall.isOutgoing) {
+            socketService.on('call_accepted', onAccepted);
+          }
+          if (!activeCall.isOutgoing) {
+            socketService.on('webrtc_offer', onOffer);
+            setTimeout(() => {
+              if (mounted) {
+                console.log('[WebRTC] Emitting call_accept after delay (from resume path)');
+                socketService.emit('call_accept', {
+                  callId: activeCall.callId,
+                  callerId: activeCall.remoteUserId,
+                  accepterName: user?.fullName,
+                  accepterAvatar: user?.avatar,
+                });
+              }
+            }, 500);
+          }
         }
         return;
       }
 
       webrtcService.isInitializing = true;
       console.log('[WebRTC] Starting init for', activeCall.callId);
+      console.log('[WebRTC Debug] activeCall:', JSON.stringify(activeCall));
+      console.log('[WebRTC Debug] user:', JSON.stringify(user));
+      
+      // Add 400ms delay to let the OS fully release hardware resource locks from the voice call before acquiring camera
+      await new Promise((resolve) => setTimeout(resolve, 400));
       
       try {
         // 1. Acquire local media
@@ -217,17 +242,24 @@ export default function VideoCallScreen() {
         // 5. Incoming: wait for webrtc_offer → send answer
         if (!activeCall.isOutgoing) {
           socketService.on('webrtc_offer', onOffer);
-          socketService.emit('call_accept', {
-            callId: activeCall.callId,
-            callerId: activeCall.remoteUserId,
-            accepterName: user?.fullName,
-            accepterAvatar: user?.avatar,
-          });
+          setTimeout(() => {
+            if (mounted) {
+              console.log('[WebRTC] Emitting call_accept after delay to ensure caller is ready');
+              socketService.emit('call_accept', {
+                callId: activeCall.callId,
+                callerId: activeCall.remoteUserId,
+                accepterName: user?.fullName,
+                accepterAvatar: user?.avatar,
+              });
+            }
+          }, 500);
         }
       } catch (e: any) {
         console.error('[WebRTC] init:', e);
         Alert.alert('Lỗi', 'Không thể truy cập camera / microphone');
         if (mounted) setCallStatus('ended');
+      } finally {
+        webrtcService.isInitializing = false;
       }
     };
 
@@ -254,10 +286,12 @@ export default function VideoCallScreen() {
     init();
     return () => {
       mounted = false;
+      webrtcService.isInitializing = false;
       socketService.off('call_accepted', onAccepted);
       socketService.off('webrtc_offer', onOffer);
     };
-  }, [activeCall, setCallStatus, user?.fullName, user?.avatar]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCall?.callId, setCallStatus]);
 
   // ─── Controls ──────────────────────────────────────────────────
   const toggleMute = () => {
@@ -420,7 +454,7 @@ export default function VideoCallScreen() {
               <Image source={{ uri: avatarUrl }} className="w-[100px] h-[100px] rounded-[50px] border-2 border-white mb-4" />
             ) : (
               <View className="w-[100px] h-[100px] rounded-[50px] border-2 border-white bg-blue-600 items-center justify-center mb-4">
-                <Ionicons name="person" size={50} color="#fff" />
+                <Text className="text-white text-[38px] font-bold">{getInitials(remoteName)}</Text>
               </View>
             )}
             <Text

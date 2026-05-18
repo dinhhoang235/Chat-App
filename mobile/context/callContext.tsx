@@ -42,6 +42,7 @@ interface CallContextType {
   endCall: () => void;
   setCallStatus: React.Dispatch<React.SetStateAction<CallStatus>>;
   setIncomingCall: (info: CallInfo | null) => void;
+  upgradeActiveCallToVideo: () => void;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -428,6 +429,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     setCallStatus('ended');
   }, [activeCall, incomingCall]);
 
+  const upgradeActiveCallToVideo = useCallback(() => {
+    setActiveCall((prev) => {
+      if (!prev) return null;
+      return { ...prev, callType: 'video' };
+    });
+    setCallStatus('connecting');
+  }, []);
+
   useEffect(() => {
     return () => {
       const call = activeCallRef.current || incomingCallRef.current;
@@ -548,6 +557,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         endCall,
         setCallStatus,
         setIncomingCall,
+        upgradeActiveCallToVideo,
       }}
     >
       {children}

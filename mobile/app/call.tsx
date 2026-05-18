@@ -18,18 +18,28 @@ import { socketService } from '@/services/socket';
 import { getAvatarUrl } from '@/utils/avatar';
 import { getInitials } from '@/utils/initials';
 import { log, error } from '@/utils/logger';
+import SwitchToVideoSheet from '@/components/modals/SwitchToVideoSheet';
 
 const AVATAR_SIZE = 140;
 
 export default function CallScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { activeCall, callStatus, endCall, setCallStatus } = useCall();
+  const { activeCall, callStatus, endCall, setCallStatus, upgradeActiveCallToVideo } = useCall();
   const { user } = useAuth();
+
+  const remoteName = activeCall?.remoteName || '';
+  const avatarUrl = getAvatarUrl(activeCall?.remoteAvatar);
+  const initials = getInitials(remoteName);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [duration, setDuration] = useState(0);
+  const [isSwitchSheetVisible, setIsSwitchSheetVisible] = useState(false);
+  const [isIncomingUpgradeVisible, setIsIncomingUpgradeVisible] = useState(false);
+  const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
+
+  const isTransitioningToVideo = useRef(false);
 
   // Keep stable refs so socket callbacks never see stale values
   const activeCallRef = useRef(activeCall);
@@ -71,9 +81,73 @@ export default function CallScreen() {
     return () => clearInterval(t);
   }, [callStatus]);
 
+  // ─── Video Upgrade Socket Event Listeners ───────────────────────
+  useEffect(() => {
+    const handleRequestUpgrade = ({ callId }: any) => {
+      if (callId !== activeCallRef.current?.callId) return;
+      setIsIncomingUpgradeVisible(true);
+    };
+
+    const handleAcceptUpgrade = () => {
+      setIsUpgradeLoading(false);
+      isTransitioningToVideo.current = true;
+      webrtcService.cleanup();
+      upgradeActiveCallToVideo();
+    };
+
+    const handleRejectUpgrade = () => {
+      setIsUpgradeLoading(false);
+      Alert.alert('Chuyển đổi bị từ chối', `${remoteName} từ chối chuyển sang cuộc gọi video.`);
+    };
+
+    socketService.on('request_video_upgrade', handleRequestUpgrade);
+    socketService.on('accept_video_upgrade', handleAcceptUpgrade);
+    socketService.on('reject_video_upgrade', handleRejectUpgrade);
+
+    return () => {
+      socketService.off('request_video_upgrade', handleRequestUpgrade);
+      socketService.off('accept_video_upgrade', handleAcceptUpgrade);
+      socketService.off('reject_video_upgrade', handleRejectUpgrade);
+    };
+  }, [remoteName, upgradeActiveCallToVideo]);
+
+  // Navigate to Video Call screen ONLY after activeCall state has updated to 'video'
+  useEffect(() => {
+    if (activeCall?.callType === 'video') {
+      log('[CallScreen] Call type updated to video. Replacing screen with videoCall.');
+      router.replace('/videoCall');
+    }
+  }, [activeCall?.callType, router]);
+
+  const handleAcceptIncomingUpgrade = () => {
+    if (!activeCall) return;
+    
+    socketService.emit('accept_video_upgrade', {
+      callId: activeCall.callId,
+      targetUserId: activeCall.remoteUserId,
+    });
+
+    isTransitioningToVideo.current = true;
+    webrtcService.cleanup();
+    upgradeActiveCallToVideo();
+  };
+
+  const handleDeclineIncomingUpgrade = () => {
+    if (!activeCall) return;
+
+    socketService.emit('reject_video_upgrade', {
+      callId: activeCall.callId,
+      targetUserId: activeCall.remoteUserId,
+    });
+  };
+
   // ─── Watch ended status → navigate back ────────────────────────
   useEffect(() => {
     if (callStatus === 'ended') {
+      if (isTransitioningToVideo.current) {
+        log('[CallScreen] Transitioning to video call, skipping cleanup and back-navigation');
+        return;
+      }
       webrtcService.cleanup();
       setTimeout(() => {
         // Safe navigation logic
@@ -138,6 +212,10 @@ export default function CallScreen() {
   // ─── Init WebRTC ───────────────────────────────────────────────
   useEffect(() => {
     if (!activeCall) return;
+    if (isTransitioningToVideo.current) {
+      log('[CallScreen] Transitioning to video, skipping voice WebRTC init');
+      return;
+    }
     let mounted = true;
 
     const onAccepted = async ({ callId }: any) => {
@@ -254,16 +332,13 @@ export default function CallScreen() {
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
   const statusLabel = () => {
+    if (isUpgradeLoading) return 'Đang yêu cầu chuyển video...';
     if (callStatus === 'calling') return 'Đang gọi...';
     if (callStatus === 'connecting') return 'Đang kết nối...';
     if (callStatus === 'active') return fmt(duration);
     if (callStatus === 'ended') return 'Đã kết thúc';
     return '';
   };
-
-  const remoteName = activeCall?.remoteName || '';
-  const avatarUrl = getAvatarUrl(activeCall?.remoteAvatar);
-  const initials = getInitials(remoteName);
 
   if (!activeCall) return null;
 
@@ -286,7 +361,10 @@ export default function CallScreen() {
           <Text className="text-white text-lg font-bold tracking-[0.3px]">
             DiskordMes
           </Text>
-          <TouchableOpacity className="w-[44px] h-[44px] items-center justify-center">
+          <TouchableOpacity 
+            className="w-[44px] h-[44px] items-center justify-center"
+            onPress={() => setIsSwitchSheetVisible(true)}
+          >
             <Ionicons name="videocam" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -363,6 +441,31 @@ export default function CallScreen() {
           </View>
         </View>
       </Animated.View>
+
+      <SwitchToVideoSheet
+        visible={isSwitchSheetVisible}
+        onClose={() => setIsSwitchSheetVisible(false)}
+        onConfirm={() => {
+          if (!activeCall) return;
+          setIsUpgradeLoading(true);
+          socketService.emit('request_video_upgrade', {
+            callId: activeCall.callId,
+            targetUserId: activeCall.remoteUserId,
+          });
+        }}
+      />
+
+      <SwitchToVideoSheet
+        visible={isIncomingUpgradeVisible}
+        mode="incoming"
+        title={`${remoteName} muốn chuyển sang gọi video`}
+        description="Bạn có đồng ý bật camera và chuyển cuộc gọi này sang cuộc gọi video?"
+        confirmLabel="Đồng ý"
+        declineLabel="Từ chối"
+        onClose={() => setIsIncomingUpgradeVisible(false)}
+        onConfirm={handleAcceptIncomingUpgrade}
+        onDecline={handleDeclineIncomingUpgrade}
+      />
     </View>
   );
 }

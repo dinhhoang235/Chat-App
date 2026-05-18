@@ -240,7 +240,7 @@ export const registerCallHandlers = (
             where: { id: Number(targetUserId) },
             select: { pushToken: true },
           })
-          .then((targetUser: { pushToken?: string } | null) => {
+          .then((targetUser) => {
             if (targetUser?.pushToken) {
               sendPushNotifications([targetUser.pushToken], {
                 title: `Cuộc gọi ${callType === "video" ? "video" : "thoại"} đến`,
@@ -504,10 +504,10 @@ export const registerCallHandlers = (
 
     const pushTokens = participants
       .filter(
-        (p: { userId: number; user: { pushToken?: string } }) =>
+        (p) =>
           p.userId !== Number(callInfo.callerId) && p.user.pushToken,
       )
-      .map((p: { user: { pushToken?: string } }) => p.user.pushToken as string);
+      .map((p) => p.user.pushToken as string);
 
     if (pushTokens.length > 0 && isMissed) {
       const notificationPayload = formatMessageNotification(message);
@@ -536,5 +536,42 @@ export const registerCallHandlers = (
       io.to(`user:${targetUserId}`).emit("call_ended", { callId });
       io.to(`user:${userId}`).emit("call_ended", { callId });
     }
+  });
+
+  socket.on("request_video_upgrade", ({ callId, targetUserId }: any) => {
+    console.log(
+      `[Call] Request Video Upgrade: ${socket.user?.userId} → ${targetUserId} (callId: ${callId})`
+    );
+    io.to(`user:${targetUserId}`).emit("request_video_upgrade", {
+      callId,
+      fromUserId: socket.user?.userId,
+    });
+  });
+
+  socket.on("accept_video_upgrade", async ({ callId, targetUserId }: any) => {
+    console.log(
+      `[Call] Accept Video Upgrade: ${socket.user?.userId} → ${targetUserId} (callId: ${callId})`
+    );
+    // Update callType in Redis to video so completion messages say "video"
+    const callInfo = await getCallInfo(callId);
+    if (callInfo) {
+      callInfo.callType = "video";
+      await setCallInfo(callId, callInfo);
+    }
+
+    io.to(`user:${targetUserId}`).emit("accept_video_upgrade", {
+      callId,
+      fromUserId: socket.user?.userId,
+    });
+  });
+
+  socket.on("reject_video_upgrade", ({ callId, targetUserId }: any) => {
+    console.log(
+      `[Call] Reject Video Upgrade: ${socket.user?.userId} → ${targetUserId} (callId: ${callId})`
+    );
+    io.to(`user:${targetUserId}`).emit("reject_video_upgrade", {
+      callId,
+      fromUserId: socket.user?.userId,
+    });
   });
 };

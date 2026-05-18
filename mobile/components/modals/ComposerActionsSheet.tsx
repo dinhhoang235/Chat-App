@@ -10,6 +10,7 @@ const ACTIONS: Action[] = [
   { key: 'location', icon: 'place', label: 'Vị trí', color: '#FB7185' },
   { key: 'document', icon: 'attach-file', label: 'Tài liệu', color: '#6366F1' },
   { key: 'gif', icon: 'gif', label: '@GIF', color: '#34D399' },
+  { key: 'contact', icon: 'contact-mail',label: 'Danh thiếp', color: '#3B82F6' },
 ];
 
 export default function ComposerActionsSheet({
@@ -58,7 +59,7 @@ export default function ComposerActionsSheet({
     >
       <BottomSheetView>
         <View style={{ paddingHorizontal: 18, paddingTop: 8, paddingBottom: 18 }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
             {ACTIONS.map((a) => {
               const isLoading = loadingAction === a.key;
               return (
@@ -66,7 +67,7 @@ export default function ComposerActionsSheet({
                 key={a.key}
                 onPress={() => onAction(a.key)}
                 disabled={isLoading}
-                style={{ width: '25%', alignItems: 'center', paddingVertical: 10 }}
+                style={{ width: '33.33%', alignItems: 'center', paddingVertical: 10 }}
               >
                 <View style={{
                   width: 56,

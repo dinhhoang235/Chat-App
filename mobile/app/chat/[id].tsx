@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal } from '@/components';
+import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ShareContactModal } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 import { useGroupCallAction } from '@/hooks/useGroupCallAction';
 import { useCall } from '@/context/callContext';
 import { socketService } from '@/services/socket';
+import { checkFriendshipStatus, sendFriendRequest } from '@/services/friendship';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 
@@ -23,6 +24,7 @@ export default function ChatThread() {
   const [selectedMessage, setSelectedMessage] = React.useState<any>(null);
   const [deleteSheetVisible, setDeleteSheetVisible] = React.useState(false);
   const [locationModalVisible, setLocationModalVisible] = React.useState(false);
+  const [shareContactModalVisible, setShareContactModalVisible] = React.useState(false);
   const {
     colors,
     params,
@@ -100,6 +102,57 @@ export default function ChatThread() {
   });
   const { activeCall, callStatus } = useCall();
   const [remoteActiveGroupCall, setRemoteActiveGroupCall] = React.useState(false);
+  
+  const [friendshipStatus, setFriendshipStatus] = React.useState<string | null>(null);
+  const [sendingRequest, setSendingRequest] = React.useState(false);
+
+  React.useEffect(() => {
+    let mounted = true;
+    if (isGroup || !targetUserIdState) return;
+
+    const checkStatus = async () => {
+      try {
+        const res = await checkFriendshipStatus(Number(targetUserIdState));
+        if (!mounted) return;
+        
+        let mappedStatus = 'NONE';
+        const s = res;
+        
+        if (s.status === 'request_received') {
+          mappedStatus = 'PENDING_RECEIVED';
+        } else if (s.status === 'request_sent') {
+          mappedStatus = s.requestStatus === 'rejected' ? 'NONE' : 'PENDING_SENT';
+        } else if (['friends', 'accepted', 'friend'].includes(s.status)) {
+          mappedStatus = 'ACCEPTED';
+        } else if (s.status) {
+          mappedStatus = s.status.toUpperCase();
+        }
+        
+        setFriendshipStatus(mappedStatus);
+      } catch (err) {
+        console.log(err);
+      }
+    };
+    
+    checkStatus();
+    return () => { mounted = false; };
+  }, [isGroup, targetUserIdState]);
+
+  const handleSendFriendRequest = async () => {
+    if (!targetUserIdState) return;
+    try {
+      setSendingRequest(true);
+      await sendFriendRequest(Number(targetUserIdState));
+      setFriendshipStatus('PENDING_SENT');
+    } catch (err) {
+      // ignore
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const showFriendBanner = !isGroup && targetUserIdState && (friendshipStatus === 'NONE' || friendshipStatus === 'PENDING_SENT');
+
   // Handle Android hardware back to ensure we return to chat list when opened from Profile
   React.useEffect(() => {
     const onHardwareBack = () => {
@@ -371,6 +424,26 @@ export default function ChatThread() {
             </View>
           )}
 
+          {showFriendBanner && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceVariant, paddingHorizontal: 16, paddingVertical: 12, justifyContent: 'space-between' }}>
+              <Text style={{ color: colors.text, fontSize: 14, flex: 1, marginRight: 8, fontWeight: '500' }}>Chưa kết bạn với người này</Text>
+              <TouchableOpacity 
+                disabled={sendingRequest || friendshipStatus === 'PENDING_SENT'}
+                onPress={handleSendFriendRequest}
+                style={{ 
+                  backgroundColor: friendshipStatus === 'PENDING_SENT' ? colors.border : '#2563EB', 
+                  paddingHorizontal: 16, 
+                  paddingVertical: 8, 
+                  borderRadius: 20 
+                }}
+              >
+                <Text style={{ color: friendshipStatus === 'PENDING_SENT' ? colors.text : '#fff', fontWeight: '600', fontSize: 13 }}>
+                  {sendingRequest ? 'Đang gửi...' : (friendshipStatus === 'PENDING_SENT' ? 'Đã gửi kết bạn' : 'Kết bạn')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {isGroup && id && (
             <GroupVideoCallModal
               visible={groupVideoCallVisible}
@@ -568,6 +641,9 @@ export default function ChatThread() {
               } else if (key === 'gif') {
                 closeAll();
                 // TODO: open GIF picker
+              } else if (key === 'contact') {
+                closeAll();
+                setShareContactModalVisible(true);
               }
             }}
           />
@@ -686,6 +762,12 @@ export default function ChatThread() {
                 deleteMessage(selectedMessage.id, 'unsend');
               }
             }}
+          />
+
+          <ShareContactModal
+            visible={shareContactModalVisible}
+            onClose={() => setShareContactModalVisible(false)}
+            conversationId={id}
           />
 
         </View>

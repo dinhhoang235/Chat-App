@@ -25,3 +25,4 @@ export { default as EmojiSheet } from './EmojiSheet';
 export { default as ScannerModal } from './ScannerModal';
 export { default as LogoutSheet } from './LogoutSheet';
 export { default as LocationPreviewModal } from './LocationPreviewModal';
+export { default as ShareContactModal } from './ShareContactModal';

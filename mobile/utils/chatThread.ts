@@ -49,6 +49,9 @@ export const mapThreadMessage = (
     time: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     contactName: message.sender?.id ? message.sender.fullName : (message.type === 'system' ? 'Hệ thống' : undefined),
     contactAvatar: message.sender?.avatar ? getAvatarUrl(message.sender.avatar) || undefined : undefined,
+    sharedContact: message.type === 'contact' 
+      ? (typeof message.content === 'string' && (message.content.startsWith('{') || message.content.startsWith('[')) ? JSON.parse(message.content) : { fullName: message.content })
+      : undefined,
   };
 
   if (options.includeSeenBy !== false) {

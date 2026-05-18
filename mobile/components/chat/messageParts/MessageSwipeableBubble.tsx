@@ -134,6 +134,17 @@ export default function MessageSwipeableBubble({
 
   const avatarUri = message.contactAvatar || (contactAvatarFallback ? getAvatarUrl(contactAvatarFallback) || undefined : undefined);
 
+  const handleInnerLongPress = () => {
+    if (message.isRevoked) return;
+    bubbleRef.current?.measureInWindow((x, y, w, h) => {
+      onLongPress?.(x, y, w, h);
+    });
+  };
+
+  const renderedChildren = React.isValidElement(children)
+    ? React.cloneElement(children, { onLongPress: handleInnerLongPress })
+    : children;
+
   if (simple) {
     return (
       <View
@@ -229,7 +240,7 @@ export default function MessageSwipeableBubble({
                 ]}
               >
                 {replyBlock}
-                {children}
+                {renderedChildren}
               </RNAnimated.View>
               <MessageFooter
                 message={message}

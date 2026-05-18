@@ -9,7 +9,7 @@ type MessageTextBubbleProps = {
 
 export default function MessageTextBubble({ message, highlightQuery, textColor }: MessageTextBubbleProps) {
   const renderHighlighted = (text?: string) => {
-    const displayText = text || message.content;
+    const displayText = text || message.text || message.content;
     if (!displayText) return null;
     if (!highlightQuery) return <Text style={{ color: textColor }}>{displayText}</Text>;
 

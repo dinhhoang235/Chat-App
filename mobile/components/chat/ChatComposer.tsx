@@ -29,6 +29,9 @@ interface ChatComposerProps {
   onFocus?: () => void;
   replyingTo?: any;
   onCancelReply?: () => void;
+  editingMessage?: any;
+  onCancelEdit?: () => void;
+  onSaveEdit?: () => void;
 }
 
 export default function ChatComposer({
@@ -52,9 +55,29 @@ export default function ChatComposer({
   onFocus,
   replyingTo,
   onCancelReply,
+  editingMessage,
+  onCancelEdit,
+  onSaveEdit,
 }: ChatComposerProps) {
   const [imagePressed, setImagePressed] = useState(false);
   const hasAttachments = Boolean(attachments && attachments.length > 0);
+
+  const handlePressSend = () => {
+    if (editingMessage) {
+      onSaveEdit?.();
+      return;
+    }
+    handleSend();
+  };
+
+  const handleSubmitEditing = () => {
+    if (!messageText.trim()) return;
+    if (editingMessage) {
+      onSaveEdit?.();
+      return;
+    }
+    handleSend();
+  };
 
   return (
     <View
@@ -104,6 +127,21 @@ export default function ChatComposer({
           </View>
         </View>
       )}
+      {editingMessage && (
+        <View className="flex-row items-center justify-between px-4 py-2" style={{ borderBottomColor: colors.surfaceVariant, borderBottomWidth: 1, backgroundColor: colors.surfaceVariant }}>
+          <View className="flex-1 mr-2">
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+              Đang sửa tin nhắn
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
+              {editingMessage.text || editingMessage.content || ''}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={onCancelEdit} style={{ padding: 4 }}>
+            <MaterialIcons name="close" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
       <View
         className="px-4 flex-row items-center"
         style={{
@@ -149,6 +187,9 @@ export default function ChatComposer({
                 onFocus={() => {
                   if (onFocus) onFocus();
                 }}
+                onSubmitEditing={handleSubmitEditing}
+                returnKeyType="send"
+                blurOnSubmit={!messageText.includes('\n')}
                 placeholder="Tin nhắn"
                 placeholderTextColor={colors.textSecondary}
                 editable={!hasAttachments}
@@ -170,7 +211,7 @@ export default function ChatComposer({
         <View className="flex-row items-center">
           {(messageText.trim().length > 0 || hasAttachments) ? (
             <TouchableOpacity
-              onPress={handleSend}
+              onPress={handlePressSend}
               disabled={creatingConversation}
               style={{ padding: 6, opacity: creatingConversation ? 0.5 : 1 }}
             >

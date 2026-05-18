@@ -31,6 +31,9 @@ export default function MessageFooter({ message, isOutgoing, isLastInGroup, isTh
             ) : message.time}
           </Text>
         </Pressable>
+        {message.edited && (
+          <Text style={{ color: timeColor, fontSize: 11, marginTop: 2, opacity: 0.8 }}>Đã chỉnh sửa</Text>
+        )}
         {message.reactions && message.reactions.length > 0 && (
           <View style={{ backgroundColor: colors.surfaceVariant, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
             <Text style={{ fontSize: 12, color: colors.text }}>{message.reactions[0].emoji} {message.reactions[0].count ?? ''}</Text>

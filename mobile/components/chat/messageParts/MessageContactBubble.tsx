@@ -98,9 +98,9 @@ export default function MessageContactBubble({
 
   return (
     <View className={`flex-row ${message.fromMe ? 'justify-end' : 'justify-start'} px-4 my-2`}>
-        <View style={{ width: 288, backgroundColor: colors.tint, borderRadius: 12, overflow: 'hidden' }}>
+        <View style={{ width: 288, backgroundColor: colors.tint, borderRadius: 12, overflow: 'hidden', borderWidth: 1.5, borderColor: colors.tint }}>
           <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.8} style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', marginRight: 12, overflow: 'hidden' }}>
+            <View style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', marginRight: 12, overflow: 'hidden', borderWidth: 1.5, borderColor: '#fff' }}>
               {avatar ? (
                 <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} />
               ) : (

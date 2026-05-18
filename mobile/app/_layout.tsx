@@ -1,20 +1,53 @@
-import React, { useEffect } from "react";
-import { Stack, useRouter } from "expo-router";
+import React, { useEffect, useRef } from "react";
+import { Stack, useRouter, usePathname } from "expo-router";
 import "../global.css";
-import { View } from "react-native";
+import { Animated, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
 import { AntDesign, Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { NotificationHandler } from '@/components/';
-import { IncomingCallModal } from '@/components/call';
+import { IncomingCallModal, ActiveCallBar } from '@/components/call';
+import { BAR_CONTENT_HEIGHT } from '@/components/call/ActiveCallBar';
 import { AuthProvider, useAuth } from "@/context/authContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "@/context/themeContext";
 import { SelectionProvider } from "@/context/selectionContext";
 import { SearchProvider } from "@/context/searchContext";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { CallProvider } from "@/context/callContext";
+import { CallProvider, useCall } from "@/context/callContext";
+
+const CALL_SCREENS = ['/call', '/videoCall', '/groupCall'];
+
+/**
+ * Pushes AppStack down by BAR_CONTENT_HEIGHT when the call bar is visible.
+ * The bar is absolute-positioned so it overlays the status-bar area.
+ * Screens keep their own insets.top handling → no double-counting.
+ */
+function AppStackWrapper() {
+  const { activeCall, callStatus } = useCall();
+  const pathname = usePathname();
+  const marginAnim = useRef(new Animated.Value(0)).current;
+
+  const isOnCallScreen = CALL_SCREENS.some((s) => pathname.startsWith(s));
+  const hasActiveCall =
+    !!activeCall && ['calling', 'connecting', 'active', 'incoming'].includes(callStatus);
+  const barVisible = hasActiveCall && !isOnCallScreen;
+
+  useEffect(() => {
+    Animated.timing(marginAnim, {
+      toValue: barVisible ? BAR_CONTENT_HEIGHT : 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [barVisible, marginAnim]);
+
+  return (
+    <Animated.View style={{ flex: 1, marginTop: marginAnim }}>
+      <AppStack />
+    </Animated.View>
+  );
+}
 
 function ThemeRoot() {
   const { scheme, colors } = useTheme();
@@ -37,17 +70,18 @@ function ThemeRoot() {
           style={scheme === "dark" ? "light" : "dark"}
           backgroundColor={colors.header}
         />
-
         <SafeAreaProvider>
           <KeyboardProvider>
             <SelectionProvider>
               <AuthProvider>
                 <CallProvider>
                   <SearchProvider>
-                    {/* invisible component handles permissions and socket notifications */}
                     <NotificationHandler />
                     <IncomingCallModal />
-                    <AppStack />
+                    {/* Absolute bar overlays status-bar area */}
+                    <ActiveCallBar />
+                    {/* Wrapper animates marginTop = BAR_CONTENT_HEIGHT only */}
+                    <AppStackWrapper />
                   </SearchProvider>
                 </CallProvider>
               </AuthProvider>
@@ -66,7 +100,6 @@ function AppStack() {
 
   useEffect(() => {
     if (!initialized) return;
-
     const target = isLoggedIn ? "/(tabs)" : "/login";
     router.replace(target);
   }, [isLoggedIn, initialized, router]);
@@ -76,12 +109,7 @@ function AppStack() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        animation: "fade",
-      }}
-    />
+    <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
   );
 }
 

@@ -176,7 +176,7 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
   }
 
   // Contact card style
-  if (message.type === 'contact') {
+  if (message.type === 'contact' && !message.isRevoked) {
     return (
       <MessageContactBubble
         message={message}

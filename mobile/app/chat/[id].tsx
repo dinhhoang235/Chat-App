@@ -22,6 +22,7 @@ export default function ChatThread() {
   
   const [messageMenuVisible, setMessageMenuVisible] = React.useState(false);
   const [messageMenuPos, setMessageMenuPos] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [showMoreMenuActions, setShowMoreMenuActions] = React.useState(false);
   const [selectedMessage, setSelectedMessage] = React.useState<any>(null);
   const [editingMessage, setEditingMessage] = React.useState<any>(null);
   const [deleteSheetVisible, setDeleteSheetVisible] = React.useState(false);
@@ -290,6 +291,7 @@ export default function ChatThread() {
         onLongPress={(msg, x, y, w, h) => {
           setSelectedMessage(msg);
           setMessageMenuPos({ x, y, w, h });
+          setShowMoreMenuActions(false);
           setMessageMenuVisible(true);
         }}
       />
@@ -716,6 +718,12 @@ export default function ChatThread() {
               }
               
               switch (action) {
+                case 'more':
+                  setShowMoreMenuActions(true);
+                  break;
+                case 'less':
+                  setShowMoreMenuActions(false);
+                  break;
                 case 'reply':
                   setReplyingTo(selectedMessage);
                   break;
@@ -744,13 +752,16 @@ export default function ChatThread() {
                   break;
               }
             }}
-            items={[
-              { key: 'reply', label: 'Trả lời', icon: 'reply' },
-              { key: 'copy', label: 'Sao chép', icon: 'content-copy' },
-              { key: 'pin', label: 'Ghim', icon: 'push-pin' },
+            items={!showMoreMenuActions ? [
               ...(selectedMessage?.fromMe && selectedMessage?.type === 'text' ? [{ key: 'edit', label: 'Chỉnh sửa', icon: 'edit' }] : []),
-              ...(canForwardMessage ? [{ key: 'forward', label: 'Chuyển tiếp', icon: 'forward' }] : []),
+              { key: 'reply', label: 'Trả lời', icon: 'arrow-undo', ionicon: true },
+              { key: 'copy', label: 'Sao chép', icon: 'content-copy' },
+              { key: 'more', label: 'Khác', icon: 'more-horiz' },
+            ] : [
+              ...(canForwardMessage ? [{ key: 'forward', label: 'Chuyển tiếp', icon: 'arrow-redo', ionicon: true }] : []),
+              { key: 'pin', label: 'Ghim', icon: 'push-pin' },
               ...(selectedMessage?.fromMe ? [{ key: 'delete', label: 'Thu hồi', icon: 'delete', destructive: true }] : []),
+              { key: 'less', label: 'Khác', icon: 'more-horiz' },
             ]}
           >
             {selectedMessage && (
@@ -781,6 +792,7 @@ export default function ChatThread() {
             visible={forwardSheetVisible}
             currentConversationId={conversationId}
             onClose={() => setForwardSheetVisible(false)}
+            message={selectedMessage}
             onForward={async (conversationIds) => {
               if (!selectedMessage || !selectedMessage.id) return;
 

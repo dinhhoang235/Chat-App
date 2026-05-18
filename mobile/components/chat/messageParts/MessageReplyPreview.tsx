@@ -60,7 +60,15 @@ export default function MessageReplyPreview({ replyTo, onReplyPress, isOutgoing,
           {replyTo.type === 'text'
             ? replyTo.content?.replace(/\n/g, ' ')
             : replyTo.type === 'image' || replyTo.type === 'image_group'
-            ? '[Hình ảnh]'
+            ? (() => {
+                try {
+                  const info = typeof replyTo.content === 'string' ? JSON.parse(replyTo.content) : replyTo.content;
+                  if (info?.mime === 'image/gif' || info?.url?.toLowerCase().endsWith('.gif') || info?.name?.toLowerCase().endsWith('.gif')) {
+                    return '[Gif]';
+                  }
+                } catch {}
+                return '[Hình ảnh]';
+              })()
             : replyTo.type === 'video'
             ? '[Video]'
             : replyTo.type === 'audio'

@@ -135,14 +135,14 @@ export default function MessageSwipeableBubble({
   const avatarUri = message.contactAvatar || (contactAvatarFallback ? getAvatarUrl(contactAvatarFallback) || undefined : undefined);
 
   const handleInnerLongPress = () => {
-    if (message.isRevoked) return;
+    if (message.isRevoked || message.type === 'call') return;
     bubbleRef.current?.measureInWindow((x, y, w, h) => {
       onLongPress?.(x, y, w, h);
     });
   };
 
   const renderedChildren = React.isValidElement(children)
-    ? React.cloneElement(children, { onLongPress: handleInnerLongPress })
+    ? React.cloneElement(children as React.ReactElement<any>, { onLongPress: handleInnerLongPress })
     : children;
 
   if (simple) {
@@ -210,7 +210,7 @@ export default function MessageSwipeableBubble({
           <Pressable 
             onPress={onPress}
             onLongPress={() => {
-              if (message.isRevoked) return;
+              if (message.isRevoked || message.type === 'call') return;
               bubbleRef.current?.measureInWindow((x, y, w, h) => {
                 onLongPress?.(x, y, w, h);
               });
@@ -221,6 +221,9 @@ export default function MessageSwipeableBubble({
           >
             {!message.fromMe && <View style={{ width: 40, height: 40 }} />}
             <View style={{ marginLeft: isOutgoing ? 0 : 12, alignItems: isOutgoing ? 'flex-end' : 'flex-start' }}>
+              {message.edited && (
+                <Text style={{ color: colors.tint, fontSize: 12, fontWeight: '500', marginBottom: 2 }}>Đã chỉnh sửa</Text>
+              )}
               <RNAnimated.View
                 ref={bubbleRef}
                 style={[

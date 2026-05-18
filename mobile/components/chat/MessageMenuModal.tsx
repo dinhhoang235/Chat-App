@@ -27,6 +27,8 @@ export default function MessageMenuModal({ visible, menuPos, onClose, onAction, 
   const overlayColor = scheme === 'dark' ? 'rgba(0,0,0,0.90)' : 'rgba(255,255,255,0.90)';
   const menuBg = colors.surface;
   
+  
+
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const scaleAnim = React.useRef(new Animated.Value(0.95)).current;
   const contentTranslateY = React.useRef(new Animated.Value(0)).current;
@@ -172,31 +174,37 @@ export default function MessageMenuModal({ visible, menuPos, onClose, onAction, 
             }}
           >
             {items.map((it, idx) => (
-              <TouchableOpacity
-                key={it.key}
-                onPress={() => {
-                  onAction(it.key);
-                  onClose();
-                }}
-                activeOpacity={0.7}
-                style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  paddingVertical: 10, 
-                  paddingHorizontal: 14,
-                  borderBottomWidth: idx === items.length - 1 ? 0 : 0.5,
-                  borderBottomColor: colors.border
-                }}
-              >
-                <Text style={{ flex: 1, color: it.destructive ? colors.danger : colors.text, fontSize: 15, fontWeight: '500' }}>
-                  {it.label}
-                </Text>
-                {it.ionicon ? (
-                   <Ionicons name={it.icon as any} size={18} color={it.destructive ? colors.danger : colors.textSecondary} />
-                ) : (
-                  <MaterialIcons name={it.icon as any} size={18} color={it.destructive ? colors.danger : colors.textSecondary} />
+              <React.Fragment key={it.key}>
+                {(it.key === 'more' || it.key === 'less') && (
+                  <View style={{ height: 6, backgroundColor: scheme === 'dark' ? '#2c2c2c' : '#f0f2f5' }} />
                 )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    onAction(it.key);
+                    if (it.key !== 'more' && it.key !== 'less') {
+                      onClose();
+                    }
+                  }}
+                  activeOpacity={0.7}
+                  style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    paddingVertical: 10, 
+                    paddingHorizontal: 14,
+                    borderBottomWidth: (idx === items.length - 1 || items[idx + 1]?.key === 'more' || items[idx + 1]?.key === 'less') ? 0 : 0.5,
+                    borderBottomColor: colors.border
+                  }}
+                >
+                  <Text style={{ flex: 1, color: it.destructive ? colors.danger : colors.text, fontSize: 15, fontWeight: '500' }}>
+                    {it.label}
+                  </Text>
+                  {it.ionicon ? (
+                     <Ionicons name={it.icon as any} size={18} color={it.destructive ? colors.danger : colors.textSecondary} />
+                  ) : (
+                    <MaterialIcons name={it.icon as any} size={18} color={it.destructive ? colors.danger : colors.textSecondary} />
+                  )}
+                </TouchableOpacity>
+              </React.Fragment>
             ))}
           </View>
         </Animated.View>

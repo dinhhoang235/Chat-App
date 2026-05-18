@@ -95,7 +95,22 @@ export default function ChatComposer({
               Đang trả lời {replyingTo.contactName || replyingTo.sender?.fullName || 'Người dùng'}
             </Text>
             <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
-              {replyingTo.type === 'image' || replyingTo.type === 'image_group' ? '[Hình ảnh]' : (replyingTo.type === 'video' ? '[Video]' : (replyingTo.type === 'audio' ? '[Bản ghi âm]' : (replyingTo.type === 'location' ? '[Vị trí hiện tại]' : (replyingTo.type === 'text' ? replyingTo.content : '[Tệp]'))))}
+              {(() => {
+                if (replyingTo.type === 'image' || replyingTo.type === 'image_group') {
+                  try {
+                    const info = typeof replyingTo.content === 'string' ? JSON.parse(replyingTo.content) : replyingTo.content;
+                    if (info?.mime === 'image/gif' || info?.url?.toLowerCase().endsWith('.gif') || info?.name?.toLowerCase().endsWith('.gif')) {
+                      return '[Gif]';
+                    }
+                  } catch {}
+                  return '[Hình ảnh]';
+                }
+                if (replyingTo.type === 'video') return '[Video]';
+                if (replyingTo.type === 'audio') return '[Bản ghi âm]';
+                if (replyingTo.type === 'location') return '[Vị trí hiện tại]';
+                if (replyingTo.type === 'text') return replyingTo.content;
+                return '[Tệp]';
+              })()}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>

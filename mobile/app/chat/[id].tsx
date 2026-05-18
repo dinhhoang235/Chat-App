@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ShareContactModal } from '@/components';
+import {Header,GallerySheet,EmojiSheet,GiphySheet,TypingDots,ChatAvatar,GroupAvatar,InThreadSearch,MessageBubble,ComposerActionsSheet,ComposerMicSheet,ChatComposer,GroupVideoCallModal,MessageMenuModal,DeleteMessageSheet,LocationPreviewModal,ShareContactModal,ForwardMessageSheet} from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 import { useGroupCallAction } from '@/hooks/useGroupCallAction';
 import { useCall } from '@/context/callContext';
 import { socketService } from '@/services/socket';
 import { checkFriendshipStatus, sendFriendRequest } from '@/services/friendship';
+import { chatThreadCache } from '@/utils/chatThreadCache';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 
@@ -25,6 +26,22 @@ export default function ChatThread() {
   const [deleteSheetVisible, setDeleteSheetVisible] = React.useState(false);
   const [locationModalVisible, setLocationModalVisible] = React.useState(false);
   const [shareContactModalVisible, setShareContactModalVisible] = React.useState(false);
+
+  const [forwardSheetVisible, setForwardSheetVisible] = React.useState(false);
+
+const canForwardMessage = React.useMemo(() => {
+  if (!selectedMessage || !selectedMessage.id) return false;
+
+  const isTempMessage = selectedMessage.id?.toString?.().startsWith?.('temp-');
+
+  return (
+    !isTempMessage &&
+    selectedMessage.status !== 'sending' &&
+    selectedMessage.status !== 'error'
+  );
+}, [selectedMessage]);
+
+  const [gifVisible, setGifVisible] = React.useState(false);
   const {
     colors,
     params,
@@ -631,20 +648,26 @@ export default function ChatThread() {
             height={sheetHeight}
             loadingAction={isSendingLocation ? 'location' : null}
             onAction={(key) => {
-              if (key === 'document') {
-                closeAll();
-                pickDocument();
-              } else if (key === 'location') {
-                // Đóng actions sheet, mở location preview sheet
-                setComposerVisible(false);
-                setLocationModalVisible(true);
-              } else if (key === 'gif') {
-                closeAll();
-                // TODO: open GIF picker
-              } else if (key === 'contact') {
-                closeAll();
-                setShareContactModalVisible(true);
-              }
+            if (key === 'document') {
+            closeAll();
+            pickDocument();
+
+} else if (key === 'location') {
+  setComposerVisible(false);
+  setLocationModalVisible(true);
+
+} else if (key === 'gif') {
+  if (galleryVisible) setGalleryVisible(false);
+  if (emojiVisible) setEmojiVisible(false);
+  if (micVisible) setMicVisible(false);
+
+  setComposerVisible(false);
+  setGifVisible(true);
+
+} else if (key === 'contact') {
+  closeAll();
+  setShareContactModalVisible(true);
+}
             }}
           />
 

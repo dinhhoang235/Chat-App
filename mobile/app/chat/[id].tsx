@@ -648,26 +648,23 @@ const canForwardMessage = React.useMemo(() => {
             height={sheetHeight}
             loadingAction={isSendingLocation ? 'location' : null}
             onAction={(key) => {
-            if (key === 'document') {
-            closeAll();
-            pickDocument();
+              if (key === 'document') {
+                closeAll();
+                pickDocument();
+              } else if (key === 'location') {
+                setComposerVisible(false);
+                setLocationModalVisible(true);
+              } else if (key === 'gif') {
+                if (galleryVisible) setGalleryVisible(false);
+                if (emojiVisible) setEmojiVisible(false);
+                if (micVisible) setMicVisible(false);
 
-} else if (key === 'location') {
-  setComposerVisible(false);
-  setLocationModalVisible(true);
-
-} else if (key === 'gif') {
-  if (galleryVisible) setGalleryVisible(false);
-  if (emojiVisible) setEmojiVisible(false);
-  if (micVisible) setMicVisible(false);
-
-  setComposerVisible(false);
-  setGifVisible(true);
-
-} else if (key === 'contact') {
-  closeAll();
-  setShareContactModalVisible(true);
-}
+                setComposerVisible(false);
+                setGifVisible(true);
+              } else if (key === 'contact') {
+                closeAll();
+                setShareContactModalVisible(true);
+              }
             }}
           />
 

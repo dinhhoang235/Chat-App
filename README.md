@@ -348,3 +348,5 @@ Xem thêm chi tiết chunk upload tại: `CHUNK_UPLOAD_README.md`
 
 - [Mobile README](mobile/README.md)
 - [Server README](server/README.md)
+- [Tài liệu hệ thống (Docs)](docs/index.md)
+

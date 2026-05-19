@@ -125,6 +125,16 @@ export const formatConversationLastMessage = (
     }
   }
 
+  if (lastMsg.type === "contact") {
+    try {
+      const content = parseJson(lastMsg.content);
+      const fullName = content?.fullName || "người dùng";
+      return isFromMe ? `Bạn: [Danh thiếp] ${fullName}` : `[Danh thiếp] ${fullName}`;
+    } catch {
+      return isFromMe ? "Bạn: [Danh thiếp]" : "[Danh thiếp]";
+    }
+  }
+
   if (lastMsg.type === "file") {
     let content: any = null;
     try {

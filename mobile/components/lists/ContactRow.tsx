@@ -11,6 +11,7 @@ export interface ContactItem {
   fullName: string;
   phone: string;
   avatar?: string;
+  coverImage?: string;
   bio?: string;
   status?: string;
 }

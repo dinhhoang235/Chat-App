@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Modal, Alert
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
-import { getFriendsList } from '@/services/friendship';
+import { getFriendsList, searchFriendByPhone } from '@/services/friendship';
 import { chatApi } from '@/services/chat';
 import { ContactItem } from '@/components/lists/ContactRow';
 import { getInitials } from '@/utils/initials';
@@ -81,7 +81,7 @@ export default function ShareContactModal({ visible, onClose, conversationId }: 
         if (result && result.id && !filtered.find(f => String(f.id) === String(result.id))) {
           setSearchResults([result]);
         }
-      } catch (err) {
+      } catch {
         // Ignore search errors
       } finally {
         setSearching(false);
@@ -144,7 +144,7 @@ export default function ShareContactModal({ visible, onClose, conversationId }: 
           backgroundColor: colors.background,
         }}
       >
-        <View style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }}>
+        <View style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}>
           {item.avatar ? (
             <Image
               source={{ uri: getAvatarUrl(item.avatar) || undefined }}
@@ -161,7 +161,7 @@ export default function ShareContactModal({ visible, onClose, conversationId }: 
         </View>
 
         <MaterialIcons
-          name={selected ? 'check-box' : 'check-box-outline-blank'}
+          name={selected ? 'check-circle' : 'radio-button-unchecked'}
           size={24}
           color={selected ? colors.tint : colors.textSecondary}
         />

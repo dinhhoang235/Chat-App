@@ -4,6 +4,8 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/context/authContext';
 
 export type MessageMenuItem = { key: string; label: string; icon: string; destructive?: boolean; ionicon?: boolean };
 
@@ -18,11 +20,40 @@ type Props = {
   children?: React.ReactNode; // This will be the message bubble clone
 };
 
-const REACTIONS = ['❤️', '😂', '😮', '😢', '🙏', '👍'];
+const DEFAULT_REACTIONS = ['❤️', '😂', '😮', '😢', '🙏', '👍'];
 
 export default function MessageMenuModal({ visible, menuPos, onClose, onAction, items, message, isOutgoing, children }: Props) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { scheme, colors } = useTheme();
+  const { user } = useAuth();
+  const userId = user?.id;
+  const [recentReactions, setRecentReactions] = React.useState<string[]>(DEFAULT_REACTIONS);
+
+  React.useEffect(() => {
+    const loadRecent = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@recent_reactions');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const merged = Array.from(new Set([...parsed, ...DEFAULT_REACTIONS])).slice(0, 6);
+            setRecentReactions(merged);
+            return;
+          }
+        }
+      } catch {}
+      setRecentReactions(DEFAULT_REACTIONS);
+    };
+    if (visible) {
+      loadRecent();
+    }
+  }, [visible]);
+
+  const userReaction = React.useMemo(() => {
+    if (!message || !message.reactions || !userId) return null;
+    return message.reactions.find((r: any) => r.userId === userId)?.reaction || null;
+  }, [message, userId]);
+
   const insets = useSafeAreaInsets();
   const overlayColor = scheme === 'dark' ? 'rgba(0,0,0,0.90)' : 'rgba(255,255,255,0.90)';
   const menuBg = colors.surface;
@@ -113,18 +144,37 @@ export default function MessageMenuModal({ visible, menuPos, onClose, onAction, 
               zIndex: 1001,
             }}
           >
-            {REACTIONS.map((emoji) => (
-              <TouchableOpacity 
-                key={emoji} 
-                onPress={() => {
-                  onAction(`react_${emoji}`);
-                  onClose();
-                }}
-                style={{ width: 42, height: 42, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Text style={{ fontSize: 28 }}>{emoji}</Text>
-              </TouchableOpacity>
-            ))}
+            {recentReactions.map((emoji) => {
+              const isSelected = userReaction === emoji;
+              return (
+                <TouchableOpacity 
+                  key={emoji} 
+                  onPress={() => {
+                    onAction(`react_${emoji}`);
+                    onClose();
+                  }}
+                  style={{ 
+                    width: 42, 
+                    height: 42, 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    paddingBottom: 4,
+                  }}
+                >
+                  <Text style={{ fontSize: 28, lineHeight: 32 }}>{emoji}</Text>
+                  {isSelected && (
+                    <View style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: 2.5,
+                      backgroundColor: colors.tint,
+                      position: 'absolute',
+                      bottom: 2,
+                    }} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
             <TouchableOpacity 
               onPress={() => {
                 onAction('react_more');

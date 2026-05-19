@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, GiphySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal } from '@/components';
+import { Header, GallerySheet, EmojiSheet, GiphySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal, ReactionSheet, ReactionsDetailSheet } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 import { useGroupCallAction } from '@/hooks/useGroupCallAction';
 import { useCall } from '@/context/callContext';
+import { useAuth } from '@/context/authContext';
 import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
 import { checkFriendshipStatus, sendFriendRequest } from '@/services/friendship';
@@ -31,18 +32,10 @@ export default function ChatThread() {
   const [shareContactModalVisible, setShareContactModalVisible] = React.useState(false);
 
   const [forwardSheetVisible, setForwardSheetVisible] = React.useState(false);
-
-const canForwardMessage = React.useMemo(() => {
-  if (!selectedMessage || !selectedMessage.id) return false;
-
-  const isTempMessage = selectedMessage.id?.toString?.().startsWith?.('temp-');
-
-  return (
-    !isTempMessage &&
-    selectedMessage.status !== 'sending' &&
-    selectedMessage.status !== 'error'
-  );
-}, [selectedMessage]);
+  
+  const { user } = useAuth();
+  const [reactionSheetVisible, setReactionSheetVisible] = React.useState(false);
+  const [reactionsDetailVisible, setReactionsDetailVisible] = React.useState(false);
 
   const [gifVisible, setGifVisible] = React.useState(false);
   const {
@@ -126,6 +119,64 @@ const canForwardMessage = React.useMemo(() => {
       setGroupVideoCallVisible(true);
     }, []),
   });
+
+  const handleReactMessage = React.useCallback(async (message: any, emoji: string) => {
+    if (!conversationId) return;
+    
+    // Optimistic UI updates
+    const currentReaction = message.reactions?.find((r: any) => r.userId === user?.id)?.reaction;
+    let nextReactions = message.reactions ? [...message.reactions] : [];
+    
+    if (currentReaction === emoji) {
+      nextReactions = nextReactions.filter((r: any) => r.userId !== user?.id);
+    } else {
+      nextReactions = nextReactions.filter((r: any) => r.userId !== user?.id);
+      nextReactions.push({
+        reaction: emoji,
+        userId: user?.id,
+        user: {
+          id: user?.id,
+          fullName: user?.fullName || 'Me',
+          avatar: user?.avatar,
+        },
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    setMessages((prev) => {
+      const next = prev.map((m) =>
+        m.id === message.id ? { ...m, reactions: nextReactions } : m
+      );
+      chatThreadCache.setMessages(conversationId, next);
+      return next;
+    });
+
+    try {
+      const reactionToSend = currentReaction === emoji ? null : emoji;
+      await chatApi.reactMessage(conversationId, message.id, reactionToSend);
+    } catch (err) {
+      console.error("Failed to react to message:", err);
+      setMessages((prev) => {
+        const next = prev.map((m) =>
+          m.id === message.id ? { ...m, reactions: message.reactions || [] } : m
+        );
+        chatThreadCache.setMessages(conversationId, next);
+        return next;
+      });
+    }
+  }, [conversationId, user, setMessages]);
+
+  const canForwardMessage = React.useMemo(() => {
+    if (!selectedMessage || !selectedMessage.id) return false;
+
+    const isTempMessage = selectedMessage.id?.toString?.().startsWith?.('temp-');
+
+    return (
+      !isTempMessage &&
+      selectedMessage.status !== 'sending' &&
+      selectedMessage.status !== 'error'
+    );
+  }, [selectedMessage]);
   const { activeCall, callStatus } = useCall();
   const [remoteActiveGroupCall, setRemoteActiveGroupCall] = React.useState(false);
   
@@ -351,9 +402,17 @@ const canForwardMessage = React.useMemo(() => {
           setShowMoreMenuActions(false);
           setMessageMenuVisible(true);
         }}
+        onReactPress={(msg) => {
+          setSelectedMessage(msg);
+          if (msg.reactions && msg.reactions.length > 0) {
+            setReactionsDetailVisible(true);
+          } else {
+            setReactionSheetVisible(true);
+          }
+        }}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage]);
+  }, [processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage, setReactionSheetVisible, setReactionsDetailVisible]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
@@ -791,9 +850,12 @@ const canForwardMessage = React.useMemo(() => {
             onAction={(action) => {
               if (action.startsWith('react_')) {
                 const emoji = action.replace('react_', '');
-                console.log('React with', emoji, 'to message', selectedMessage?.id);
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                // TODO: implement reaction logic
+                if (emoji === 'more') {
+                  setReactionSheetVisible(true);
+                } else {
+                  handleReactMessage(selectedMessage, emoji);
+                }
+                setMessageMenuVisible(false);
                 return;
               }
               
@@ -917,6 +979,30 @@ const canForwardMessage = React.useMemo(() => {
             visible={shareContactModalVisible}
             onClose={() => setShareContactModalVisible(false)}
             conversationId={id}
+          />
+
+          <ReactionSheet
+            visible={reactionSheetVisible}
+            onClose={() => setReactionSheetVisible(false)}
+            onReact={(emoji) => {
+              if (selectedMessage) {
+                handleReactMessage(selectedMessage, emoji);
+              }
+            }}
+            message={selectedMessage}
+            userId={user?.id}
+          />
+
+          <ReactionsDetailSheet
+            visible={reactionsDetailVisible}
+            onClose={() => setReactionsDetailVisible(false)}
+            message={selectedMessage}
+            userId={user?.id}
+            onRemoveReaction={(emoji) => {
+              if (selectedMessage) {
+                handleReactMessage(selectedMessage, emoji);
+              }
+            }}
           />
 
         </View>

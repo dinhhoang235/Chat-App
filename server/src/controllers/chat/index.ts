@@ -18,3 +18,4 @@ export * from './editMessage.js';
 export * from './forwardMessage.js';
 export * from './searchMessages.js';
 export * from './deleteMessage.js';
+export * from './reactMessage.js';

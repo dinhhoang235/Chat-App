@@ -531,10 +531,13 @@ export function useChatThreadRuntime({
 
       log(`[ChatThread] 👁️ Message seen update from user ${seenByUserId}`);
 
-      const userData = seenUser || {
-        id: seenByUserId,
-        fullName: "User",
-        avatar: undefined,
+      const userData = {
+        ...(seenUser || {
+          id: seenByUserId,
+          fullName: "User",
+          avatar: undefined,
+        }),
+        seenAt: seenAt,
       };
 
       setMessages((prev) =>
@@ -544,7 +547,13 @@ export function useChatThreadRuntime({
               (u: any) => u.id === seenByUserId,
             );
             if (!alreadySeen && m.senderId !== seenByUserId) {
-              return { ...m, seenBy: [...(m.seenBy || []), userData] };
+              const nextSeenBy = [...(m.seenBy || []), userData];
+              nextSeenBy.sort(
+                (a: any, b: any) =>
+                  new Date(a.seenAt || 0).getTime() -
+                  new Date(b.seenAt || 0).getTime(),
+              );
+              return { ...m, seenBy: nextSeenBy };
             }
           }
           return m;
@@ -683,7 +692,7 @@ export function useChatThreadRuntime({
       if (data.conversationId.toString() === conversationId?.toString()) {
         setMessages((prev) => {
           const next = prev.map((m) =>
-            m.id === data.messageId
+            m.id?.toString() === data.messageId?.toString()
               ? { ...m, type: 'revoked', content: 'Tin nhắn đã được thu hồi', isRevoked: true }
               : m
           );
@@ -694,8 +703,24 @@ export function useChatThreadRuntime({
         });
       }
     };
+
+    const handleMessageReaction = (data: { messageId: number; conversationId: number; reactions: any[] }) => {
+      if (data.conversationId.toString() === conversationId?.toString()) {
+        setMessages((prev) => {
+          const next = prev.map((m) =>
+            m.id?.toString() === data.messageId?.toString()
+              ? { ...m, reactions: data.reactions }
+              : m
+          );
+          persistMessagesCache(data.conversationId.toString(), next);
+          return next;
+        });
+      }
+    };
+
     socketService.on("message_edited", handleMessageEdited);
     socketService.on("message_revoked", handleMessageRevoked);
+    socketService.on("message_reaction", handleMessageReaction);
 
     return () => {
       socketService.off("new_message", handleNewMessage);
@@ -703,6 +728,7 @@ export function useChatThreadRuntime({
       socketService.off("conversation_updated", handleConversationUpdated);
       socketService.off("message_edited", handleMessageEdited);
       socketService.off("message_revoked", handleMessageRevoked);
+      socketService.off("message_reaction", handleMessageReaction);
     };
   }, [conversationId, userId, isFocused, isGroup, flatListRef, setMessages, persistMessagesCache]);
 

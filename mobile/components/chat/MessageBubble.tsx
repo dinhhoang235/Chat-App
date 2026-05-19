@@ -19,7 +19,7 @@ type ChatMessage = {
   contactName?: string;
   contactAvatar?: string;
   contactAvatarColor?: string;
-  reactions?: { emoji: string; count?: number }[];
+  reactions?: any[];
   seenBy?: { id: number; fullName?: string; avatar?: string }[];
   isLastInGroup?: boolean;
   status?: 'sending' | 'sent' | 'error';
@@ -30,7 +30,7 @@ type ChatMessage = {
   isRevoked?: boolean;
 };
 
-function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread, contactAvatarFallback, onRetry, onLongPress, simple }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean, contactAvatarFallback?: string, onRetry?: (message: ChatMessage) => void, onLongPress?: (message: ChatMessage, x: number, y: number, w: number, h: number) => void, simple?: boolean }) {
+function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread, contactAvatarFallback, onRetry, onLongPress, onReactPress, simple }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean, contactAvatarFallback?: string, onRetry?: (message: ChatMessage) => void, onLongPress?: (message: ChatMessage, x: number, y: number, w: number, h: number) => void, onReactPress?: (message: ChatMessage) => void, simple?: boolean }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -157,6 +157,15 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
         </Text>
       </View>
     );
+  } else if (message.type === 'contact') {
+    contentElement = (
+      <MessageContactBubble
+        message={message}
+        onPress={onPress}
+        onAvatarPress={onAvatarPress}
+        colors={colors}
+      />
+    );
   } else {
     contentElement = (
       <MessageContent
@@ -171,18 +180,6 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
         onVideoCall={onVideoCall}
         onCallAction={onCallAction}
         isGroupThread={isGroupThread}
-      />
-    );
-  }
-
-  // Contact card style
-  if (message.type === 'contact' && !message.isRevoked) {
-    return (
-      <MessageContactBubble
-        message={message}
-        onPress={onPress}
-        onAvatarPress={onAvatarPress}
-        colors={colors}
       />
     );
   }
@@ -217,6 +214,7 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
       timeColor={timeColor}
       onRetry={onRetry}
       onLongPress={(x, y, w, h) => onLongPress?.(message, x, y, w, h)}
+      onQuickReactPress={() => onReactPress?.(message)}
       simple={simple}
     >
       {contentElement}

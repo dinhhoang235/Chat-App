@@ -102,4 +102,6 @@ export const chatApi = {
     apiClient.post(`/chats/${conversationId}/messages/${messageId}/forward`, { targetConversationIds }),
   deleteMessage: (conversationId: string | number, messageId: string | number, mode: 'unsend' | 'deleteForMe') =>
     apiClient.delete(`/chats/${conversationId}/messages/${messageId}`, { data: { mode } }),
+  reactMessage: (conversationId: string | number, messageId: string | number, reaction: string | null) =>
+    apiClient.post(`/chats/${conversationId}/messages/${messageId}/react`, { reaction }),
 };

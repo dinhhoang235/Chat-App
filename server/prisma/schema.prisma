@@ -35,6 +35,7 @@ model User {
   conversations    ConversationParticipant[]
   messages         Message[]
   messageDeletions MessageDeletion[]
+  reactions        MessageReaction[]
 
   // expo push token for mobile notifications
   pushToken String?
@@ -88,11 +89,26 @@ model Message {
   replies        Message[]         @relation("MessageReplies")
   isRevoked      Boolean           @default(false)
   deletedBy      MessageDeletion[]
+  reactions      MessageReaction[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
   @@index([conversationId, type, createdAt])
   @@map("messages")
+}
+
+model MessageReaction {
+  id        Int      @id @default(autoincrement())
+  messageId Int
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reaction  String // e.g. "❤️", "👍", "😆", "😮", "😢", "😡"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([messageId, userId])
+  @@map("message_reactions")
 }
 
 model MessageDeletion {

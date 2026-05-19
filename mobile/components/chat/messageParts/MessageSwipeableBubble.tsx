@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, Pressable, Animated as RNAnimated } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, Animated as RNAnimated, Platform } from 'react-native';
 import Reanimated, { Extrapolation, interpolate, SharedValue, useAnimatedStyle, useSharedValue, useAnimatedReaction } from 'react-native-reanimated';
 import Swipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { Image } from 'expo-image';
@@ -29,6 +29,7 @@ type MessageSwipeableBubbleProps = {
   highlightRowStyle?: any;
   onRetry?: (message: any) => void;
   onLongPress?: (x: number, y: number, w: number, h: number) => void;
+  onQuickReactPress?: () => void;
   simple?: boolean;
 };
 
@@ -53,6 +54,7 @@ export default function MessageSwipeableBubble({
   highlightRowStyle,
   onRetry,
   onLongPress,
+  onQuickReactPress,
   simple,
 }: MessageSwipeableBubbleProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
@@ -151,16 +153,16 @@ export default function MessageSwipeableBubble({
         style={[
           {
             backgroundColor:
-              message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location'
+              message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact'
                 ? 'transparent'
                 : message.type === 'call' && (JSON.parse(message.content || '{}').status === 'missed' && !message.fromMe)
                 ? 'rgba(255, 59, 48, 0.1)'
                 : bubbleBg,
-            borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location') ? 0 : 1.2,
-            padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location') ? 0 : message.type === 'call' ? 14 : 12,
+            borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : 1.2,
+            padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : message.type === 'call' ? 14 : 12,
             borderRadius: 18,
           },
-          message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video' ? animatedBorderStyle : {},
+          message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video' && message.type !== 'location' && message.type !== 'contact' ? animatedBorderStyle : {},
         ]}
       >
         {replyBlock}
@@ -224,27 +226,109 @@ export default function MessageSwipeableBubble({
               {message.edited && (
                 <Text style={{ color: colors.tint, fontSize: 12, fontWeight: '500', marginBottom: 2 }}>Đã chỉnh sửa</Text>
               )}
-              <RNAnimated.View
-                ref={bubbleRef}
-                style={[
-                  {
-                    backgroundColor:
-                      message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location'
-                        ? 'transparent'
-                        : message.type === 'call' && (JSON.parse(message.content || '{}').status === 'missed' && !message.fromMe)
-                        ? 'rgba(255, 59, 48, 0.1)'
-                        : bubbleBg,
-                    borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location') ? 0 : 1.2,
-                    padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location') ? 0 : message.type === 'call' ? 14 : 12,
-                    borderRadius: 18,
-                    marginBottom: isLastInGroup ? 0 : -8,
-                  },
-                  (message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video' && message.type !== 'location') ? animatedBorderStyle : {},
-                ]}
-              >
-                {replyBlock}
-                {renderedChildren}
-              </RNAnimated.View>
+              <View style={{ position: 'relative', alignItems: isOutgoing ? 'flex-end' : 'flex-start', zIndex: 10 }}>
+                <RNAnimated.View
+                  ref={bubbleRef}
+                  style={[
+                    {
+                      backgroundColor:
+                        message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact'
+                          ? 'transparent'
+                          : message.type === 'call' && (JSON.parse(message.content || '{}').status === 'missed' && !message.fromMe)
+                          ? 'rgba(255, 59, 48, 0.1)'
+                          : bubbleBg,
+                      borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : 1.2,
+                      padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : message.type === 'call' ? 14 : 12,
+                      borderRadius: 18,
+                      marginBottom: (message.reactions && message.reactions.length > 0) || (isThreadLast && !message.isRevoked && message.type !== 'call' && message.type !== 'separator' && message.type !== 'system' && !message.fromMe) ? 8 : (isLastInGroup ? 0 : -8),
+                    },
+                    (message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video' && message.type !== 'location' && message.type !== 'contact') ? animatedBorderStyle : {},
+                  ]}
+                >
+                  {replyBlock}
+                  {renderedChildren}
+                </RNAnimated.View>
+
+                {(() => {
+                  const hasReactions = message.reactions && message.reactions.length > 0;
+                  const showQuickReact = isThreadLast && !message.isRevoked && message.type !== 'call' && message.type !== 'separator' && message.type !== 'system' && !message.fromMe && !hasReactions;
+
+                  if (!hasReactions && !showQuickReact) return null;
+
+                  const sortedReactions = hasReactions
+                    ? [...message.reactions].sort((a: any, b: any) => {
+                        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.id || Date.now());
+                        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.id || Date.now());
+                        return timeA - timeB;
+                      })
+                    : [];
+
+                  const uniqueReactions = hasReactions 
+                    ? Array.from(new Set(sortedReactions.map((r: any) => r.reaction))) as string[]
+                    : [];
+
+                  return (
+                    <TouchableOpacity 
+                      onPress={onQuickReactPress}
+                      activeOpacity={0.8}
+                      style={hasReactions ? {
+                        position: 'absolute',
+                        bottom: -7,
+                        right: isOutgoing ? undefined : 4,
+                        left: isOutgoing ? 4 : undefined,
+                        height: 22,
+                        borderRadius: 11,
+                        paddingHorizontal: 6,
+                        backgroundColor: colors.surface,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1.2,
+                        borderColor: colors.border,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 1.5,
+                        elevation: 3,
+                        zIndex: 100,
+                        gap: 2,
+                      } : { 
+                        position: 'absolute',
+                        bottom: -5,
+                        right: isOutgoing ? undefined : 4,
+                        left: isOutgoing ? 4 : undefined,
+                        width: 26,
+                        height: 26,
+                        borderRadius: 13,
+                        backgroundColor: colors.surface,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1.5,
+                        borderColor: colors.border,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 2,
+                        elevation: 4,
+                        zIndex: 100,
+                      }}
+                    >
+                      {hasReactions ? (
+                        <>
+                          <Text style={{ fontSize: 13, textAlign: 'center', marginTop: Platform.OS === 'ios' ? 0 : -1 }}>
+                            {uniqueReactions.slice(0, 3).join('')}
+                          </Text>
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginLeft: 2 }}>
+                            {message.reactions.length}
+                          </Text>
+                        </>
+                      ) : (
+                        <MaterialIcons name="add-reaction" size={16} color={colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })()}
+              </View>
               <MessageFooter
                 message={message}
                 isOutgoing={isOutgoing}

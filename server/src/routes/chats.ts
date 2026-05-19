@@ -20,7 +20,8 @@ import {
   editMessage,
   forwardMessage,
   searchMessages,
-  deleteMessage
+  deleteMessage,
+  reactMessage
 } from '../controllers/chat/index.js';
 import { upload } from '../middleware/upload.js';
 import { Server } from 'socket.io';
@@ -54,6 +55,7 @@ export const chatRoutes = (io: Server) => {
   router.post('/:conversationId/unread', markAsUnread(io));
   router.get('/:conversationId/search', searchMessages);
   router.delete('/:conversationId/messages/:messageId', deleteMessage(io));
+  router.post('/:conversationId/messages/:messageId/react', reactMessage(io));
 
   return router;
 };

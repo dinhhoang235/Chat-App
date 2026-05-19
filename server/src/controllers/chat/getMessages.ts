@@ -15,6 +15,7 @@ type MessageWithSender = {
     fullName: string;
     avatar: string | null;
   } | null;
+  reactions?: any[];
 };
 
 export const getMessages =
@@ -109,6 +110,17 @@ export const getMessages =
                 },
               },
             },
+            reactions: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
           },
         });
       }
@@ -152,17 +164,26 @@ export const getMessages =
                   ? participant.user.avatar
                   : participant.user.avatar
                 : null,
+              seenAt: participant.lastReadAt,
             });
           }
         }
       }
 
-      // Map messages to include seenBy info using pre-computed map
-      const messagesWithSeen = messages.map((msg: MessageWithSender) => ({
-        ...msg,
-        seenBy: seenByMap.get(msg.id) || [],
-        fromMe: msg.senderId === userId,
-      }));
+      // Map messages to include seenBy info using pre-computed map and sort seenBy ascending
+      const messagesWithSeen = messages.map((msg: MessageWithSender) => {
+        const seenList = seenByMap.get(msg.id) || [];
+        seenList.sort(
+          (a, b) =>
+            new Date(a.seenAt || 0).getTime() -
+            new Date(b.seenAt || 0).getTime(),
+        );
+        return {
+          ...msg,
+          seenBy: seenList,
+          fromMe: msg.senderId === userId,
+        };
+      });
 
       // 2. Cache first page if we just fetched it from DB (store raw messages, not computed seenBy)
       if (!cursor && !fromCache) {

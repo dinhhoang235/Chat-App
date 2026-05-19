@@ -60,6 +60,18 @@ export const getConversations = async (
               },
             },
           },
+          include: {
+            reactions: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                  },
+                },
+              },
+            },
+          },
           take: 20,
           orderBy: { createdAt: "desc" },
         },
@@ -155,7 +167,13 @@ export const getConversations = async (
                           ? p.user.avatar
                           : p.user.avatar
                         : null,
+                      seenAt: p.lastReadAt,
                     }))
+                    .sort(
+                      (a: any, b: any) =>
+                        new Date(a.seenAt || 0).getTime() -
+                        new Date(b.seenAt || 0).getTime(),
+                    )
                 : [];
               return { ...msg, seenBy, fromMe: msg.senderId === userId };
             }),

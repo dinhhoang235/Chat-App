@@ -33,6 +33,23 @@ export const formatConversationLastMessage = (
 
   const isFromMe = user && lastMsg.senderId === user.id;
 
+  if (lastMsg.reactions && lastMsg.reactions.length > 0) {
+    const latestReaction = lastMsg.reactions[lastMsg.reactions.length - 1];
+    const isReactorMe = user && latestReaction.userId === user.id;
+    const isMessageSenderMe = user && lastMsg.senderId === user.id;
+    const shouldShowReaction = !isReactorMe && (!conv?.isGroup || isMessageSenderMe);
+
+    if (shouldShowReaction) {
+      const emoji = latestReaction.reaction;
+      if (conv?.isGroup) {
+        const reactorName = latestReaction.user?.fullName || 'Ai đó';
+        return `${reactorName} đã bày tỏ cảm xúc ${emoji} về tin nhắn bạn`;
+      } else {
+        return `Đã bày tỏ cảm xúc ${emoji} về tin nhắn bạn`;
+      }
+    }
+  }
+
   if (lastMsg.isRevoked) {
     return isFromMe ? "Bạn đã thu hồi một tin nhắn" : "Tin nhắn đã được thu hồi";
   }

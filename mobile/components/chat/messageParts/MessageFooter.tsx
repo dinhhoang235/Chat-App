@@ -32,29 +32,31 @@ export default function MessageFooter({ message, isOutgoing, isLastInGroup, isTh
           </Text>
         </Pressable>
 
-        {message.reactions && message.reactions.length > 0 && (
-          <View style={{ backgroundColor: colors.surfaceVariant, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-            <Text style={{ fontSize: 12, color: colors.text }}>{message.reactions[0].emoji} {message.reactions[0].count ?? ''}</Text>
-          </View>
-        )}
       </View>
 
       {isOutgoing && isThreadLast && message.seenBy && message.seenBy.length > 0 && (
         <View style={{ flexDirection: 'row', marginTop: -12, justifyContent: 'flex-end', paddingBottom: 4 }}>
-          {message.seenBy.map((u: any, idx: number) => (
-            <View
-              key={u.id}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-                backgroundColor: colors.surfaceVariant,
-                marginLeft: idx > 0 ? -8 : 0,
-                borderWidth: 1.5,
-                borderColor: colors.background,
-                overflow: 'hidden',
-              }}
-            >
+          {[...message.seenBy]
+            .sort((a: any, b: any) => {
+              const timeA = a.seenAt ? new Date(a.seenAt).getTime() : 0;
+              const timeB = b.seenAt ? new Date(b.seenAt).getTime() : 0;
+              if (timeA !== timeB) return timeA - timeB;
+              return a.id - b.id;
+            })
+            .map((u: any, idx: number) => (
+              <View
+                key={u.id}
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: colors.surfaceVariant,
+                  marginLeft: idx > 0 ? -8 : 0,
+                  borderWidth: 1.5,
+                  borderColor: colors.background,
+                  overflow: 'hidden',
+                }}
+              >
               {u.avatar ? (
                 <Image
                   source={{ uri: getAvatarUrl(u.avatar) || undefined }}

@@ -21,48 +21,63 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant API as App Server
   participant Q as Queue
   participant W as Worker
   participant F as FCM/APNs
   participant D as Device
 
-  API->>Q: Nạp Push Job (enqueue)
-  W->>Q: Kéo Job về (dequeue)
-  Q-->>W: Dữ liệu Payload
-  W->>F: Gửi Push (send)
+  Note over API,Q: 1. Enqueue push job
+  API->>+Q: Nạp Push Job (enqueue)
+
+  Note over W,Q: 2. Dequeue job
+  W->>+Q: Kéo Job về (dequeue)
+  Q-->>-W: Dữ liệu Payload
+
+  Note over W,F: 3. Send push
+  W->>+F: Gửi Push (send)
   F-->>D: Phân phối tới điện thoại (deliver)
-  F-->>W: Kết quả trả về (response)
+  F-->>-W: Kết quả trả về (response)
 ```
 
 7.1 Chi tiết luồng kiểm tra trạng thái Online và gửi Push
 ```mermaid
 sequenceDiagram
+  autonumber
   participant Event as App/Socket (Internal)
   participant R as Redis (Presence)
   participant DB as Database
   participant Q as Queue (BullMQ/RabbitMQ)
 
-  Event->>R: MGET presence:user:<ids>
-  R-->>Event: [online, offline, ...]
+  Note over Event,R: 1. Check presence
+  Event->>+R: MGET presence:user:<ids>
+  R-->>-Event: [online, offline, ...]
   loop for offline users
-    Event->>DB: Fetch device_tokens
-    DB-->>Event: tokens
-    Event->>Q: Nạp job push (payload, tokens)
+    Note over Event,DB: 2. Fetch device tokens
+    Event->>+DB: Fetch device_tokens
+    DB-->>-Event: tokens
+    Note over Event,Q: 3. Enqueue push job
+    Event->>+Q: Nạp job push (payload, tokens)
+    Q-->>-Event: queued
   end
 ```
 
 7.2 Cơ chế Retry và Cleanup Token rác (Worker)
 ```mermaid
 sequenceDiagram
+  autonumber
   participant W as Worker
   participant F as FCM/APNs
   participant DB as Database
 
-  W->>F: Gửi Push notification
-  F-->>W: Response (Mixed: OK, Unregistered)
+  Note over W,F: 1. Send push
+  W->>+F: Gửi Push notification
+  F-->>-W: Response (Mixed: OK, Unregistered)
   alt Invalid Token / Unregistered
-    W->>DB: DELETE FROM device_tokens WHERE token
+    Note over W,DB: 2. Cleanup invalid token
+    W->>+DB: DELETE FROM device_tokens WHERE token
+    DB-->>-W: ok
   else Timeout / Server Error
     Note over W: Throw Error để Queue tự động Retry (với backoff)
   end

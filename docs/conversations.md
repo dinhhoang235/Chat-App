@@ -23,21 +23,24 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as Conversations API
   participant R as Redis
   participant DB as Database
 
-  C->>API: GET /conversations
-  API->>R: GET convs:user:<id>
+  Note over C,API: 1. Fetch conversations
+  C->>+API: GET /conversations
+  API->>+R: GET convs:user:<id>
   alt hit
-    R-->>API: cached
-    API-->>C: 200 {cached}
+    R-->>-API: cached
+    API-->>-C: 200 {cached}
   else
-    API->>DB: SELECT conversations WHERE participant
-    DB-->>API: rows
-    API->>R: SET convs:user:<id>
-    API-->>C: 200 {rows}
+    API->>+DB: SELECT conversations WHERE participant
+    DB-->>-API: rows
+    API->>+R: SET convs:user:<id>
+    R-->>-API: ok
+    API-->>-C: 200 {rows}
   end
 ```
 
@@ -46,41 +49,51 @@ sequenceDiagram
 7.1.1 Create group conversation with avatar upload:
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as Conversations API
   participant Min as MinIO
   participant DB as Database
 
-  C->>API: POST /conversations {type:group, name}
-  API->>DB: INSERT conversation
+  Note over C,API: 1. Create group conversation
+  C->>+API: POST /conversations {type:group, name}
+  API->>+DB: INSERT conversation
+  DB-->>-API: conversation
   alt avatar provided
-    C->>API: POST /api/storage/upload-url
-    API->>Min: presign
+    Note over C,API: 2. Upload avatar
+    C->>+API: POST /api/storage/upload-url
+    API->>+Min: presign
+    Min-->>-API: uploadUrl
+    API-->>-C: uploadUrl
     C->>Min: PUT upload
-    C->>API: POST /conversations/:id/avatar/complete
-    API->>DB: UPDATE conversation.avatar_url
+    C->>+API: POST /conversations/:id/avatar/complete
+    API->>+DB: UPDATE conversation.avatar_url
+    DB-->>-API: ok
   end
-  API-->>C: 201 {conversation}
+  API-->>-C: 201 {conversation}
 ```
 
 7.1.2 Pagination + cursor hydration (detailed):
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as Conversations API
   participant R as Redis
   participant DB as Database
 
-  C->>API: GET /conversations?cursor=abc
-  API->>R: GET convs:user:<id>:cursor:abc
+  Note over C,API: 1. Fetch paginated conversations
+  C->>+API: GET /conversations?cursor=abc
+  API->>+R: GET convs:user:<id>:cursor:abc
   alt cache hit
-    R-->>API: cachedPage
-    API-->>C: 200 {cachedPage}
+    R-->>-API: cachedPage
+    API-->>-C: 200 {cachedPage}
   else
-    API->>DB: SELECT ... LIMIT
-    DB-->>API: rows
-    API->>R: SET convs:user:<id>:cursor:abc
-    API-->>C: 200 {rows}
+    API->>+DB: SELECT ... LIMIT
+    DB-->>-API: rows
+    API->>+R: SET convs:user:<id>:cursor:abc
+    R-->>-API: ok
+    API-->>-C: 200 {rows}
   end
 ```
 

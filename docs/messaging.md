@@ -22,22 +22,43 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
-  participant C as Client(Sender)
+  autonumber
+  participant U as Client(Sender)
   participant S as Socket Server
   participant DB as Database
+  participant Users as User Rooms
   participant Conv as Conversation Room
-  participant P as PushWorker
+  participant R as Client(Recipient)
+  participant Cache as Redis Cache
 
-  C->>S: message.send {conversationId, content, tempId}
-  S->>DB: validate, INSERT message, UPDATE conversation
-  DB-->>S: message record
-  S->>Conv: emit new_message
+  Note over U,S: 1. Send message
+  U->>+S: send_message {conversationId, content, tempId}
+  S->>+DB: validate membership
+  DB-->>S: ok
+  S->>DB: INSERT message
+  S->>DB: UPDATE conversation.updatedAt
+  S->>DB: UPDATE participants.hiddenAt=null
+  DB-->>-S: message record
+
+  Note over S,Users: 2. Fan-out events
+  S->>+Users: emit receive_message
+  S->>Users: emit conversation_updated
+  S->>+Conv: emit new_message
+
   alt recipient online
-    Conv-->>Recipient: new_message
-  else
-    S->>P: enqueue push
+    Users-->>R: receive_message
+    Conv-->>R: new_message
+  else recipient offline
+    Note over Users,R: no active socket in rooms
   end
-  S-->>C: message.sent {serverId, tempId}
+  deactivate Users
+  deactivate Conv
+
+  Note over S,Cache: 3. Cache message
+  S->>Cache: cacheMessage(conversationId, message)
+
+  Note over U,S: 4. Ack to sender
+  S-->>-U: callback { ok: true, message }
 ```
   
 7.4 Detailed sub-flows (split for complexity)
@@ -45,52 +66,77 @@ sequenceDiagram
 7.4.1. WS send with attachment via presigned flow (client uploads media first):
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as App Server
   participant Min as MinIO
   participant WS as Socket
   participant DB as Database
+  participant Conv as Conversation Room
 
-  C->>API: POST /api/storage/upload-url {fileName}
-  API->>Min: getPresignedUrl
-  API-->>C: { uploadUrl, finalUrl }
+  Note over C,API: 1. Request presigned upload
+  C->>+API: POST /api/storage/upload-url {fileName}
+  API->>+Min: getPresignedUrl
+  Min-->>-API: { uploadUrl, finalUrl }
+  API-->>-C: { uploadUrl, finalUrl }
+
+  Note over C,Min: 2. Upload file to storage
   C->>Min: PUT uploadUrl (file)
-  C->>WS: message.send { conversationId, content: { mediaRef: finalUrl }, tempId }
-  WS->>DB: INSERT message { attachments: [finalUrl] }
-  WS->>Conv: emit new_message
-  WS-->>C: message.sent {serverId}
+
+  Note over C,WS: 3. Send message with media reference
+  C->>+WS: message.send { conversationId, content: { mediaRef: finalUrl }, tempId }
+  WS->>+DB: INSERT message { attachments: [finalUrl] }
+  DB-->>-WS: message record
+  WS->>+Conv: emit new_message
+  Conv-->>-WS: emitted
+  WS-->>-C: message.sent {serverId}
 ```
 
 7.4.2. Server-side multipart complete -> notify:
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as App Server
   participant Min as MinIO
   participant DB as Database
+  participant WS as Socket
 
-  C->>API: POST /api/storage/complete-multipart {objectName, uploadId, parts}
-  API->>Min: completeMultipartUpload
-  Min-->>API: success
-  API->>DB: INSERT media record
-  API->>WS: io.to(conversation).emit('new_message', message)
-  API-->>C: 200 {finalUrl}
+  Note over C,API: 1. Complete multipart upload
+  C->>+API: POST /api/storage/complete-multipart {objectName, uploadId, parts}
+  API->>+Min: completeMultipartUpload
+  Min-->>-API: success
+
+  Note over API,DB: 2. Persist media
+  API->>+DB: INSERT media record
+  DB-->>-API: ok
+
+  Note over API,WS: 3. Notify via socket
+  API->>+WS: io.to(conversation).emit('new_message', message)
+  WS-->>-API: emitted
+  API-->>-C: 200 {finalUrl}
 ```
 
 7.4.3. Offline delivery -> push flow (worker details):
 ```mermaid
 sequenceDiagram
+  autonumber
   participant WS as Socket
-  participant DB as Database
   participant P as PushWorker
   participant F as FCM/APNs
+  participant DB as Database
 
-  WS->>P: enqueue push job { targets, payload }
-  P->>F: send push
-  F-->>P: result (ok/invalid)
+  Note over WS,P: 1. Enqueue push
+  WS->>+P: enqueue push job { targets, payload }
+
+  Note over P,F: 2. Send push
+  P->>+F: send push
+  F-->>-P: result (ok/invalid)
+
   alt invalid token
     P->>DB: mark device_token stale
   end
+  deactivate P
 ```
 
 8. API Design / Events

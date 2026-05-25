@@ -22,28 +22,40 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Recipient
   participant WS as Socket Server
   participant DB as Database
   participant S as Sender
 
-  C->>WS: message.read {messageId}
-  WS->>DB: INSERT/UPDATE message_reads
-  DB-->>WS: ok
+  Note over C,WS: 1. Send read event
+  C->>+WS: message.read {messageId}
+
+  Note over WS,DB: 2. Persist read markers
+  WS->>+DB: INSERT/UPDATE message_reads
+  DB-->>-WS: ok
+
+  Note over WS,S: 3. Notify sender
   WS->>S: message.read event
 ```
 -
 7.1 Batch / reconnect flow (detailed):
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant WS as Socket
   participant DB as Database
   participant S as Sender
 
-  C-->>WS: on reconnect send message.read.batch {conversationId, lastReadMessageId}
-  WS->>DB: UPDATE unread_count and INSERT message_reads
-  DB-->>WS: ok
+  Note over C,WS: 1. Send batch on reconnect
+  C-->>+WS: message.read.batch {conversationId, lastReadMessageId}
+
+  Note over WS,DB: 2. Update read markers
+  WS->>+DB: UPDATE unread_count and INSERT message_reads
+  DB-->>-WS: ok
+
+  Note over WS,S: 3. Notify sender
   WS->>S: emit message.read.bulk {conversationId, lastReadMessageId}
 ```
 

@@ -27,19 +27,22 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as Search API
   participant DB as Database
 
-  Note over C, DB: Luồng Tìm Kiếm & Lưu lịch sử
-  C->>API: GET /users/search?q=hoang
-  API->>DB: SELECT users WHERE username ILIKE '%hoang%'
-  DB-->>API: Danh sách user
-  API-->>C: 200 { users }
+  Note over C,API: 1. Search users
+  C->>+API: GET /users/search?q=hoang
+  API->>+DB: SELECT users WHERE username ILIKE '%hoang%'
+  DB-->>-API: Danh sách user
+  API-->>-C: 200 { users }
   
-  C->>API: POST /users/search-history { targetUserId }
-  API->>DB: INSERT/UPDATE search_history
-  API-->>C: 201 Created
+  Note over C,API: 2. Save search history
+  C->>+API: POST /users/search-history { targetUserId }
+  API->>+DB: INSERT/UPDATE search_history
+  DB-->>-API: ok
+  API-->>-C: 201 Created
 ```
 
 8. API Design / Events

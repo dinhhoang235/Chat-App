@@ -22,15 +22,17 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as Profile API
   participant S as Storage
   participant DB as Database
 
-  C->>API: PUT /users/me {name,bio}
-  API->>DB: UPDATE users
-  DB-->>API: ok
-  API-->>C: 200 {user}
+  Note over C,API: 1. Update profile
+  C->>+API: PUT /users/me {name,bio}
+  API->>+DB: UPDATE users
+  DB-->>-API: ok
+  API-->>-C: 200 {user}
 ```
 
 8. API Design

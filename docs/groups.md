@@ -22,13 +22,16 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as Groups API
   participant DB as Database
 
-  C->>API: POST /groups {name, members}
-  API->>DB: INSERT conversation(type=group) + participants
-  API-->>C: 201 {group}
+  Note over C,API: 1. Create group
+  C->>+API: POST /groups {name, members}
+  API->>+DB: INSERT conversation(type=group) + participants
+  DB-->>-API: ok
+  API-->>-C: 201 {group}
 ```
 
 8. API Design

@@ -23,14 +23,16 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as Contacts API
   participant DB as Database
 
-  C->>API: POST /contacts {targetUserId}
-  API->>DB: INSERT contact relation
-  DB-->>API: ok
-  API-->>C: 201 {contact}
+  Note over C,API: 1. Create contact
+  C->>+API: POST /contacts {targetUserId}
+  API->>+DB: INSERT contact relation
+  DB-->>-API: ok
+  API-->>-C: 201 {contact}
 ```
 
 8. API Design

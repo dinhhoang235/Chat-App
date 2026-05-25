@@ -27,19 +27,27 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant A as Auth API
   participant DB as Database
   participant R as Redis
 
-  C->>A: POST /auth/login {email,password}
-  A->>R: check rate-limit
-  R-->>A: ok
-  A->>DB: SELECT user WHERE email
+  Note over C,A: 1. Login request
+  C->>+A: POST /auth/login {email,password}
+
+  Note over A,R: 2. Rate-limit
+  A->>+R: check rate-limit
+  R-->>-A: ok
+
+  Note over A,DB: 3. Verify and issue tokens
+  A->>+DB: SELECT user WHERE email
   DB-->>A: user row
   A->>A: verify password
   A->>DB: INSERT refresh_token
-  A-->>C: 200 {accessToken, refreshToken, user}
+  DB-->>-A: ok
+
+  A-->>-C: 200 {accessToken, refreshToken, user}
 ```
 
 8. API Design

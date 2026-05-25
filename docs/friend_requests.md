@@ -23,14 +23,19 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant S as Sender
   participant API as FriendReq API
   participant DB as Database
   participant R as Recipient
 
-  S->>API: POST /friend-requests {target}
-  API->>DB: INSERT friend_request
-  API-->>S: 201 {request}
+  Note over S,API: 1. Create request
+  S->>+API: POST /friend-requests {target}
+  API->>+DB: INSERT friend_request
+  DB-->>-API: ok
+  API-->>-S: 201 {request}
+
+  Note over API,R: 2. Notify recipient
   API->>R: push/notify incoming_request
 ```
 

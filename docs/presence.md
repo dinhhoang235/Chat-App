@@ -24,30 +24,37 @@
 7. Sequence Diagram
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant WS as Socket Server
   participant R as Redis
+  participant O as Others
 
+  Note over C,WS: 1. Presence update
   C->>WS: presence.update {status:online}
-  WS->>R: SET presence:user:<id> EX 60
-  WS->>others: user_status_changed
+  WS->>+R: SET presence:user:<id> EX 60
+  R-->>-WS: ok
+  WS->>O: user_status_changed
 
+  Note over C,WS: 2. Typing events
   C->>WS: typing.start {conversationId}
-  WS->>others: user_typing_start
+  WS->>O: user_typing_start
   C->>WS: typing.stop
-  WS->>others: user_typing_stop
+  WS->>O: user_typing_stop
 ```
 
 7.1 Chi tiết luồng Heartbeat & TTL expiration
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant WS as Socket Server
   participant R as Redis
   
   loop Every 30s
     C->>WS: presence.heartbeat
-    WS->>R: EXPIRE presence:user:<id> 60
+    WS->>+R: EXPIRE presence:user:<id> 60
+    R-->>-WS: ok
   end
   
   Note over C, WS: Client loses connection
@@ -60,15 +67,21 @@ sequenceDiagram
 7.2 Chi tiết luồng Typing throttle (Chống spam)
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant WS as Socket Server
   participant O as Others
   
+  Note over C,WS: 1. First typing event
   C->>WS: typing.start
   WS->>O: user_typing_start
   Note over WS: Set typing_lock (1s) trong Redis/Memory
+
+  Note over C,WS: 2. Throttled event
   C->>WS: typing.start (0.5s later)
   Note over WS: Blocked by lock (Drop request)
+
+  Note over C,WS: 3. Allowed event
   C->>WS: typing.start (1.5s later)
   WS->>O: user_typing_start
 ```

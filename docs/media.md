@@ -23,88 +23,192 @@
 7. Sequence Diagrams
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as App Server
   participant Min as MinIO
   participant DB as Database
 
+  Note over C,API: 1. Request presigned upload
   C->>API: POST /api/storage/upload-url {fileName}
+  activate API
   API->>Min: presign
+  activate Min
+  Min-->>API: {uploadUrl, finalUrl}
+  deactivate Min
   API-->>C: {uploadUrl, finalUrl}
+  deactivate API
+
+  Note over C,Min: 2. Upload file
   C->>Min: PUT uploadUrl (file)
+  activate Min
+  Min-->>C: 200 OK
+  deactivate Min
+
+  Note over C,API: 3. Complete and persist
   C->>API: POST /media/complete {finalUrl, meta}
+  activate API
   API->>DB: INSERT media
+  activate DB
+  DB-->>API: ok
+  deactivate DB
+  API-->>C: 201 {media}
+  deactivate API
 ```
 
 7.1 Host-aware presign rewrite (Nginx proxy) — client sees public host URL
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as App Server
   participant Min as MinIO
   participant N as Nginx
 
+  Note over C,API: 1. Request presigned upload
   C->>API: POST /api/storage/upload-url {fileName}
+  activate API
   API->>Min: presignedUrl(bucket, object)
+  activate Min
   Min-->>API: internalUrl
+  deactivate Min
   API->>API: rewrite URL host -> request.get('host')
   API-->>C: { uploadUrl (host-aware) }
+  deactivate API
+
+  Note over C,N: 2. Upload via proxy
   C->>N: PUT uploadUrl (Nginx proxies to MinIO)
+  activate N
   N->>Min: PUT object
+  activate Min
+  Min-->>N: 200 OK
+  deactivate Min
+  N-->>C: 200 OK
+  deactivate N
 ```
 
 7.2 Multipart part signing details
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as App Server
   participant Min as MinIO
 
+  Note over C,API: 1. Init multipart
   C->>API: POST /api/storage/init-multipart {fileName}
+  activate API
   API->>Min: initiateMultipartUpload -> uploadId
+  activate Min
+  Min-->>API: uploadId
+  deactivate Min
   API-->>C: { uploadId, objectName }
+  deactivate API
+
+  Note over C,API: 2. Get part URL
   C->>API: POST /api/storage/get-multipart-url {partNumber}
+  activate API
   API->>Min: presignedUrl(part)
+  activate Min
+  Min-->>API: uploadUrl
+  deactivate Min
   API-->>C: { uploadUrl }
+  deactivate API
+
+  Note over C,Min: 3. Upload part
   C->>Min: PUT uploadUrl (part)
+  activate Min
   Min-->>C: etag
+  deactivate Min
+
+  Note over C,API: 4. Complete multipart
   C->>API: POST /api/storage/complete-multipart {parts}
+  activate API
   API->>Min: completeMultipartUpload
+  activate Min
+  Min-->>API: ok
+  deactivate Min
+  API-->>C: 200 {finalUrl}
+  deactivate API
 ```
 
 7.3 Server-side direct upload handling (streaming to MinIO)
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as App Server
   participant Min as MinIO
+  participant DB as Database
+  participant Socket as Socket Server
 
+  Note over C,API: 1. Upload multipart to API
   C->>API: POST /conversations/:id/messages (multipart)
+  activate API
   API->>Min: putObject(stream)
+  activate Min
   Min-->>API: url
+  deactivate Min
   API->>DB: INSERT message with attachment
+  activate DB
+  DB-->>API: ok
+  deactivate DB
   API->>Socket: emit new_message
+  activate Socket
+  Socket-->>API: emitted
+  deactivate Socket
+  API-->>C: 201 {message}
+  deactivate API
 ```
 
 7.4 Multipart end-to-end (client loop example)
 ```mermaid
 sequenceDiagram
+  autonumber
   participant C as Client
   participant API as App Server
   participant Min as MinIO
 
+  Note over C,API: 1. Init multipart
   C->>API: POST /api/storage/init-multipart {fileName}
+  activate API
   API->>Min: initiate multipart -> uploadId
+  activate Min
+  Min-->>API: uploadId
+  deactivate Min
   API-->>C: {uploadId, objectName}
+  deactivate API
+
   loop parts
+    Note over C,API: 2. Presign part
     C->>API: POST /api/storage/get-multipart-url {partNumber}
+    activate API
     API->>Min: presign part
+    activate Min
+    Min-->>API: uploadUrl
+    deactivate Min
     API-->>C: {uploadUrl}
+    deactivate API
+    Note over C,Min: 3. Upload part
     C->>Min: PUT uploadUrl (part)
+    activate Min
+    Min-->>C: etag
+    deactivate Min
   end
+
+  Note over C,API: 4. Complete multipart
   C->>API: POST /api/storage/complete-multipart {parts}
+  activate API
   API->>Min: completeMultipart
+  activate Min
+  Min-->>API: ok
+  deactivate Min
   API->>DB: INSERT media
+  activate DB
+  DB-->>API: ok
+  deactivate DB
+  API-->>C: 201 {media}
+  deactivate API
 ```
 
 8. API Design

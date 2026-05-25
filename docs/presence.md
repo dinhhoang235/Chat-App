@@ -32,15 +32,23 @@ sequenceDiagram
 
   Note over C,WS: 1. Presence update
   C->>WS: presence.update {status:online}
-  WS->>+R: SET presence:user:<id> EX 60
-  R-->>-WS: ok
+  activate WS
+  WS->>R: SET presence:user:<id> EX 60
+  activate R
+  R-->>WS: ok
+  deactivate R
   WS->>O: user_status_changed
+  deactivate WS
 
   Note over C,WS: 2. Typing events
   C->>WS: typing.start {conversationId}
+  activate WS
   WS->>O: user_typing_start
+  deactivate WS
   C->>WS: typing.stop
+  activate WS
   WS->>O: user_typing_stop
+  deactivate WS
 ```
 
 7.1 Chi tiết luồng Heartbeat & TTL expiration
@@ -53,8 +61,12 @@ sequenceDiagram
   
   loop Every 30s
     C->>WS: presence.heartbeat
-    WS->>+R: EXPIRE presence:user:<id> 60
-    R-->>-WS: ok
+    activate WS
+    WS->>R: EXPIRE presence:user:<id> 60
+    activate R
+    R-->>WS: ok
+    deactivate R
+    deactivate WS
   end
   
   Note over C, WS: Client loses connection
@@ -74,16 +86,23 @@ sequenceDiagram
   
   Note over C,WS: 1. First typing event
   C->>WS: typing.start
+  activate WS
   WS->>O: user_typing_start
+  deactivate WS
   Note over WS: Set typing_lock (1s) trong Redis/Memory
 
   Note over C,WS: 2. Throttled event
   C->>WS: typing.start (0.5s later)
+  activate WS
   Note over WS: Blocked by lock (Drop request)
+  deactivate WS
 
   Note over C,WS: 3. Allowed event
   C->>WS: typing.start (1.5s later)
+  activate WS
   WS->>O: user_typing_start
+  deactivate WS
+```
 ```
 
 8. API Design / Events

@@ -14,11 +14,23 @@
 
 5. Output
 - Chuỗi trả về bao gồm `uploadUrl` (presigned host) kèm `finalUrl`, hoặc trả thẳng `finalUrl` sau khi upload `complete`; trả về metadata của tài nguyên media.
+  - **uploadUrl (Presigned URL):** Đường dẫn tạm thời chứa token xác thực có thời hạn để Client thực hiện phương thức `PUT` đẩy trực tiếp file lên MinIO.
+  - **finalUrl (Public URL):** Đường dẫn tĩnh cố định qua proxy Nginx (dạng `/storage/bucket/path/to/file`) dùng để lưu trữ vào Database và hiển thị/tải file ở phía Client (chỉ đọc).
 
 6. Flow xử lý (chi tiết)
-- Presigned single PUT: client yêu cầu presign -> PUT lên storage -> client thông báo hoàn tất -> server kiểm tra và tạo media record.
-- Multipart: init -> lấy presigned URL cho từng part -> client PUT các part -> complete -> server gọi completeMultipart và tạo media record.
-- Server-side upload: client upload lên API -> server stream tới MinIO -> tạo media record.
+- **Presigned single PUT (Tải lên file đơn qua link presigned):**
+  1. Client yêu cầu cấp link upload (`POST /api/storage/upload-url` kèm `fileName`, `fileType`).
+  2. Server phản hồi kèm `uploadUrl` (dùng để upload file) và `finalUrl` (dùng để đọc file sau này).
+  3. Client thực hiện gửi HTTP `PUT` chứa file trực tiếp lên `uploadUrl` của MinIO.
+  4. Khi tải lên thành công, Client gọi API báo hoàn thành (`POST /media/complete` kèm `finalUrl`) để Server kiểm tra và tạo bản ghi lưu trữ vào Database.
+- **Multipart Upload (Tải lên phân đoạn đối với file lớn):**
+  1. Client gửi yêu cầu khởi tạo phân đoạn (`POST /api/storage/init-multipart`) để nhận `uploadId` và `objectName`.
+  2. Với mỗi phần nhỏ của file, Client gửi yêu cầu lấy link upload cho phân đoạn tương ứng (`POST /api/storage/get-multipart-url`), sau đó thực hiện `PUT` dữ liệu phần đó lên `uploadUrl` được cấp.
+  3. Khi đã upload toàn bộ các phân đoạn, Client gọi API hoàn tất (`POST /api/storage/complete-multipart`). Server yêu cầu MinIO ghép nối các phân đoạn trên storage, tạo bản ghi lưu trữ vào DB và trả về `finalUrl` cho Client.
+- **Server-side direct upload (Tải lên trực tiếp thông qua App Server):**
+  1. Client gửi request multipart/form-data trực tiếp lên App Server (ví dụ: gửi tin nhắn kèm media).
+  2. App Server tiếp nhận và thực hiện stream trực tiếp luồng dữ liệu của file sang MinIO.
+  3. Sau khi lưu file thành công, Server tạo bản ghi media vào Database và trả về `finalUrl` (hoặc record message đã được cập nhật đính kèm) cho Client.
 
 7. Sequence Diagrams
 ```mermaid

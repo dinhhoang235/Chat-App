@@ -30,15 +30,18 @@ sequenceDiagram
 
   Note over API,Q: 1. Enqueue push job
   API->>+Q: Nạp Push Job (enqueue)
+  Q-->>-API: Xác nhận (jobId)
 
   Note over W,Q: 2. Dequeue job
   W->>+Q: Kéo Job về (dequeue)
   Q-->>-W: Dữ liệu Payload
+  activate W
 
   Note over W,F: 3. Send push
   W->>+F: Gửi Push (send)
-  F-->>D: Phân phối tới điện thoại (deliver)
   F-->>-W: Kết quả trả về (response)
+  deactivate W
+  F->>D: Phân phối tới điện thoại (deliver)
 ```
 
 7.1 Chi tiết luồng kiểm tra trạng thái Online và gửi Push

@@ -34,14 +34,15 @@ sequenceDiagram
   API->>+R: GET convs:user:<id>
   alt hit
     R-->>-API: cached
-    API-->>-C: 200 {cached}
+    API-->>C: 200 {cached}
   else
     API->>+DB: SELECT conversations WHERE participant
     DB-->>-API: rows
     API->>+R: SET convs:user:<id>
     R-->>-API: ok
-    API-->>-C: 200 {rows}
+    API-->>C: 200 {rows}
   end
+  deactivate API
 ```
 
 7.1 Additional detailed flows
@@ -69,6 +70,7 @@ sequenceDiagram
     C->>+API: POST /conversations/:id/avatar/complete
     API->>+DB: UPDATE conversation.avatar_url
     DB-->>-API: ok
+    API-->>-C: ok
   end
   API-->>-C: 201 {conversation}
 ```
@@ -87,14 +89,15 @@ sequenceDiagram
   API->>+R: GET convs:user:<id>:cursor:abc
   alt cache hit
     R-->>-API: cachedPage
-    API-->>-C: 200 {cachedPage}
+    API-->>C: 200 {cachedPage}
   else
     API->>+DB: SELECT ... LIMIT
     DB-->>-API: rows
     API->>+R: SET convs:user:<id>:cursor:abc
     R-->>-API: ok
-    API-->>-C: 200 {rows}
+    API-->>C: 200 {rows}
   end
+  deactivate API
 ```
 
 8. API Design

@@ -68,13 +68,12 @@ sequenceDiagram
   Note over Callee: Hộp thoại (Prompt) hỏi nâng cấp Video
   alt callee accepts
     Callee-->>S: accept_video_upgrade
-    deactivate Callee
     S-->>Caller: accept_video_upgrade
   else callee rejects
     Callee-->>S: reject_video_upgrade
-    deactivate Callee
     S-->>Caller: reject_video_upgrade
   end
+  deactivate Callee
   deactivate S
 
   Note over Caller,Callee: Chuyển màn hình VideoCallScreen & Update local tracks

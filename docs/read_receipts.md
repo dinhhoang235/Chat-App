@@ -29,14 +29,22 @@ sequenceDiagram
   participant S as Sender
 
   Note over C,WS: 1. Send read event
+  activate WS
   C->>+WS: message.read {messageId}
+  deactivate WS
 
   Note over WS,DB: 2. Persist read markers
+  activate WS
   WS->>+DB: INSERT/UPDATE message_reads
+  activate DB
   DB-->>-WS: ok
+  deactivate DB
+  deactivate WS
 
   Note over WS,S: 3. Notify sender
+  activate WS
   WS->>S: message.read event
+  deactivate WS
 ```
 -
 7.1 Batch / reconnect flow (detailed):
@@ -49,14 +57,22 @@ sequenceDiagram
   participant S as Sender
 
   Note over C,WS: 1. Send batch on reconnect
+  activate WS
   C-->>+WS: message.read.batch {conversationId, lastReadMessageId}
+  deactivate WS
 
   Note over WS,DB: 2. Update read markers
+  activate WS
   WS->>+DB: UPDATE unread_count and INSERT message_reads
+  activate DB
   DB-->>-WS: ok
+  deactivate DB
+  deactivate WS
 
   Note over WS,S: 3. Notify sender
+  activate WS
   WS->>S: emit message.read.bulk {conversationId, lastReadMessageId}
+  deactivate WS
 ```
 
 7.2 Ordering & idempotency notes

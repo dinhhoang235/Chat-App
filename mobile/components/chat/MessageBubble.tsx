@@ -7,6 +7,7 @@ import MessageContactBubble from './messageParts/MessageContactBubble';
 import MessageReplyPreview from './messageParts/MessageReplyPreview';
 import MessageCallBubble from './messageParts/MessageCallBubble';
 import MessageSwipeableBubble from './messageParts/MessageSwipeableBubble';
+import { setMessageSize } from '@/utils/messageSizeCache';
 
 
 type ChatMessage = {
@@ -214,6 +215,10 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
       timeColor={timeColor}
       onRetry={onRetry}
       onLongPress={(x, y, w, h) => onLongPress?.(message, x, y, w, h)}
+      onMeasure={(id, h) => {
+        // store measured height for use in overrideItemLayout
+        setMessageSize(message.id || id, h);
+      }}
       onQuickReactPress={() => onReactPress?.(message)}
       simple={simple}
     >

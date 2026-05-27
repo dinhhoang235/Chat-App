@@ -1,6 +1,6 @@
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl } from "@/utils/avatar";
 
-const ATTACHMENT_TYPES = new Set(['file', 'image', 'video', 'audio']);
+const ATTACHMENT_TYPES = new Set(["file", "image", "video", "audio"]);
 
 const isAttachmentType = (type: string | undefined) => {
   return !!type && ATTACHMENT_TYPES.has(type);
@@ -27,10 +27,17 @@ export const parseFileInfo = (item: any) => {
   }
 
   try {
-    const info = typeof item.content === 'string' ? JSON.parse(item.content) : item.content;
+    const info =
+      typeof item.content === "string"
+        ? JSON.parse(item.content)
+        : item.content;
     return info;
   } catch {
-    if (item.type === 'image' || item.type === 'video' || item.type === 'audio') {
+    if (
+      item.type === "image" ||
+      item.type === "video" ||
+      item.type === "audio"
+    ) {
       return { url: item.content };
     }
   }
@@ -41,22 +48,36 @@ export const parseFileInfo = (item: any) => {
 export const mapThreadMessage = (
   message: any,
   currentUserId?: number,
-  options: { status?: string; includeSeenBy?: boolean } = {}
+  options: { status?: string; includeSeenBy?: boolean } = {},
 ) => {
   const mapped: any = {
     ...message,
     fromMe: message.senderId ? message.senderId === currentUserId : false,
-    time: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    time: new Date(message.createdAt).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
     edited:
       message.updatedAt && message.createdAt
-        ? new Date(message.updatedAt).getTime() > new Date(message.createdAt).getTime()
+        ? new Date(message.updatedAt).getTime() >
+          new Date(message.createdAt).getTime()
         : false,
     text: message.text || message.content,
-    contactName: message.sender?.id ? message.sender.fullName : (message.type === 'system' ? 'Hệ thống' : undefined),
-    contactAvatar: message.sender?.avatar ? getAvatarUrl(message.sender.avatar) || undefined : undefined,
-    sharedContact: message.type === 'contact' 
-      ? (typeof message.content === 'string' && (message.content.startsWith('{') || message.content.startsWith('[')) ? JSON.parse(message.content) : { fullName: message.content })
+    contactName: message.sender?.id
+      ? message.sender.fullName
+      : message.type === "system"
+        ? "Hệ thống"
+        : undefined,
+    contactAvatar: message.sender?.avatar
+      ? getAvatarUrl(message.sender.avatar) || undefined
       : undefined,
+    sharedContact:
+      message.type === "contact"
+        ? typeof message.content === "string" &&
+          (message.content.startsWith("{") || message.content.startsWith("["))
+          ? JSON.parse(message.content)
+          : { fullName: message.content }
+        : undefined,
   };
 
   if (options.includeSeenBy !== false) {
@@ -80,9 +101,16 @@ export const mapThreadMedia = (media: any[], currentUserId?: number) => {
 
     if (!fileInfo && isAttachmentType(item.type)) {
       try {
-        fileInfo = typeof item.content === 'string' ? JSON.parse(item.content) : item.content;
+        fileInfo =
+          typeof item.content === "string"
+            ? JSON.parse(item.content)
+            : item.content;
       } catch {
-        if (item.type === 'image' || item.type === 'video' || item.type === 'audio') {
+        if (
+          item.type === "image" ||
+          item.type === "video" ||
+          item.type === "audio"
+        ) {
           fileInfo = { url: item.content };
         }
       }
@@ -92,7 +120,9 @@ export const mapThreadMedia = (media: any[], currentUserId?: number) => {
       ...item,
       fromMe: item.senderId ? item.senderId === currentUserId : false,
       contactName: item.sender?.id ? item.sender.fullName : undefined,
-      contactAvatar: item.sender?.avatar ? getAvatarUrl(item.sender.avatar) || undefined : undefined,
+      contactAvatar: item.sender?.avatar
+        ? getAvatarUrl(item.sender.avatar) || undefined
+        : undefined,
       fileInfo,
     };
   });
@@ -114,8 +144,8 @@ const getSeparatorText = (dateStr: string) => {
     d1.getMonth() === d2.getMonth() &&
     d1.getFullYear() === d2.getFullYear();
 
-  const hours = d.getHours().toString().padStart(2, '0');
-  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const hours = d.getHours().toString().padStart(2, "0");
+  const minutes = d.getMinutes().toString().padStart(2, "0");
   const time = `${hours}:${minutes}`;
 
   if (isSameDay(d, today)) {
@@ -138,17 +168,21 @@ export const buildProcessedMessages = (messages: any[]) => {
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
 
-    if (msg.type === 'image' && msg.status !== 'sending') {
+    if (msg.type === "image" && msg.status !== "sending") {
       const groupImages = [msg];
       let j = i + 1;
 
       while (
         j < messages.length &&
-        messages[j].type === 'image' &&
+        messages[j].type === "image" &&
         messages[j].senderId === msg.senderId &&
-        messages[j].status !== 'sending' &&
-        messages[j].createdAt && msg.createdAt &&
-        Math.abs(new Date(messages[j].createdAt).getTime() - new Date(msg.createdAt).getTime()) < 60000
+        messages[j].status !== "sending" &&
+        messages[j].createdAt &&
+        msg.createdAt &&
+        Math.abs(
+          new Date(messages[j].createdAt).getTime() -
+            new Date(msg.createdAt).getTime(),
+        ) < 60000
       ) {
         groupImages.push(messages[j]);
         j++;
@@ -157,7 +191,11 @@ export const buildProcessedMessages = (messages: any[]) => {
       if (groupImages.length > 1) {
         grouped.push({
           ...msg,
-          type: 'image_group' as any,
+          id:
+            msg.id != null && msg.id.toString() !== ""
+              ? msg.id
+              : `auto-${Math.round(new Date(msg.createdAt).getTime())}-${i}`,
+          type: "image_group" as any,
           images: [...groupImages].reverse(),
         });
         i = j - 1;
@@ -170,7 +208,14 @@ export const buildProcessedMessages = (messages: any[]) => {
 
   for (let i = 0; i < grouped.length; i++) {
     const msg = grouped[i];
-    withDates.push(msg);
+    // Ensure every processed message has a stable id to avoid unstable keys
+    withDates.push({
+      ...msg,
+      id:
+        msg.id != null && msg.id.toString() !== ""
+          ? msg.id
+          : `auto-${Math.round(new Date(msg.createdAt).getTime())}-${i}`,
+    });
 
     const nextMsg = grouped[i + 1];
     const currentDate = formatDateKey(msg.createdAt);
@@ -179,7 +224,7 @@ export const buildProcessedMessages = (messages: any[]) => {
     if (!nextMsg || currentDate !== nextDate) {
       withDates.push({
         id: `date-${msg.id || i}`,
-        type: 'date_separator',
+        type: "date_separator",
         date: getSeparatorText(msg.createdAt),
         createdAt: msg.createdAt,
       });
@@ -191,14 +236,14 @@ export const buildProcessedMessages = (messages: any[]) => {
 
 export const getThreadStatusText = (
   isGroup: boolean,
-  targetUserStatus: { status: string; lastSeen: number | null } | null
+  targetUserStatus: { status: string; lastSeen: number | null } | null,
 ) => {
   if (isGroup) return null;
   if (!targetUserStatus) return null;
-  if (targetUserStatus.status === 'online') return 'Đang hoạt động';
+  if (targetUserStatus.status === "online") return "Đang hoạt động";
   if (targetUserStatus.lastSeen) {
     const diff = Math.floor((Date.now() - targetUserStatus.lastSeen) / 60000);
-    if (diff < 1) return 'Hoạt động vừa xong';
+    if (diff < 1) return "Hoạt động vừa xong";
     if (diff < 60) return `Hoạt động ${diff} phút trước`;
     const hours = Math.floor(diff / 60);
     if (hours < 24) return `Hoạt động ${hours} giờ trước`;

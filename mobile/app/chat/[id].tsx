@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
+import { getMessageSize, setMessageSize } from '@/utils/messageSizeCache';
+import { View, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform, useWindowDimensions } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import Animated from 'react-native-reanimated';
 import { Header, GallerySheet, EmojiSheet, GiphySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal, ReactionSheet, ReactionsDetailSheet } from '@/components';
 import useSheetControl from '@/hooks/useSheetControl';
@@ -16,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 
 export default function ChatThread() {
   const DEFAULT_COMPOSER_HEIGHT = 74;
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const [micTextMode, setMicTextMode] = React.useState(false);
   const [micOutsideCloseLocked, setMicOutsideCloseLocked] = React.useState(false);
   const [micVoiceFlowActive, setMicVoiceFlowActive] = React.useState(false);
@@ -420,6 +423,307 @@ export default function ChatThread() {
     if (gifVisible) setGifVisible(false);
   }, [micOutsideCloseLocked, closeAll, gifVisible]);
 
+  const getChatItemType = React.useCallback((item: any) => {
+    if (!item) return 'text';
+    if (item.type === 'date_separator') return 'date_separator';
+    if (item.type === 'system' || item.type === 'separator') return 'separator';
+    if (item.type === 'image_group') return 'image_group';
+    if (item.type === 'sticker') return 'sticker';
+    if (item.type === 'image') return 'image';
+    if (item.type === 'video') return 'video';
+    if (item.type === 'audio') return 'audio';
+    if (item.type === 'file') return 'file';
+    if (item.type === 'location') return 'location';
+    if (item.type === 'call') return 'call';
+    if (item.type) return 'text';
+    return 'text';
+  }, []);
+
+  const estimateTextMessageHeight = React.useCallback((item: any) => {
+    const rawText = (item?.text || item?.content || '').toString();
+    if (!rawText) return 96;
+
+    const maxBubbleWidth = windowWidth * 0.75;
+    const horizontalChrome = 40;
+    const textAreaWidth = Math.max(140, maxBubbleWidth - horizontalChrome);
+    const avgCharWidth = 7.2;
+    const charsPerLine = Math.max(16, Math.floor(textAreaWidth / avgCharWidth));
+
+    const wrappedLines = rawText
+      .split('\n')
+      .reduce((total, paragraph) => {
+        const trimmed = paragraph.trimEnd();
+        if (!trimmed) return total + 1;
+        return total + Math.max(1, Math.ceil(trimmed.length / charsPerLine));
+      }, 0);
+
+    const lineCount = Math.max(1, wrappedLines);
+    const replyExtra = item?.replyTo ? 56 : 0;
+    const editedExtra = item?.edited ? 18 : 0;
+    const footerExtra = item?.status === 'sending' || item?.status === 'error' || item?.time ? 22 : 14;
+    const bubblePadding = 24;
+    const textLineHeight = 20;
+
+    return Math.round(replyExtra + editedExtra + footerExtra + bubblePadding + lineCount * textLineHeight);
+  }, [windowWidth]);
+
+  const overrideChatItemLayout = React.useCallback((layout: { size?: number }, item: any) => {
+    if (!item) return;
+
+    // prefer measured sizes when available
+    try {
+      const measured = getMessageSize(item.id);
+      if (measured && measured > 0) {
+        layout.size = measured;
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    const type = getChatItemType(item);
+
+    // compute accurate sizes for media items when fileInfo dimensions exist
+    if ((type === 'image' || type === 'video') && item.fileInfo && item.fileInfo.width && item.fileInfo.height) {
+      try {
+        const maxWidth = windowWidth * 0.75;
+        const maxHeight = windowHeight * 0.48;
+        const aspect = item.fileInfo.width / item.fileInfo.height || 1;
+        let imgH = maxWidth / aspect;
+        if (imgH > maxHeight) {
+          imgH = maxHeight;
+        }
+        // include bubble padding + footer estimate
+        layout.size = Math.round(imgH + 12 + 10);
+        return;
+      } catch {
+        // fall through
+      }
+    }
+
+    if (type === 'image_group' && Array.isArray(item.images) && item.images.length > 0) {
+      // estimate grid height using per-image aspect ratios when available
+      const count = item.images.length;
+      const maxWidth = windowWidth * 0.75;
+      const per = count === 2 ? 2 : Math.min(3, count);
+      const gap = 6;
+      const cellW = Math.floor((maxWidth - gap * (per - 1)) / per);
+      const maxCellHeightCap = Math.round(windowHeight * 0.48);
+      // compute max cell height among images in a row using fileInfo if present
+      let maxCellH = 0;
+      for (let i = 0; i < count; i++) {
+        const img = item.images[i];
+        const w = img?.fileInfo?.width;
+        const h = img?.fileInfo?.height;
+        const aspect = (w && h) ? (w / h) : 1;
+        let cellH = Math.round(cellW / aspect);
+        if (cellH > maxCellHeightCap) cellH = maxCellHeightCap;
+        if (cellH > maxCellH) maxCellH = cellH;
+      }
+      const rows = Math.ceil(count / per);
+      const totalH = rows * maxCellH + (rows - 1) * gap;
+      layout.size = Math.round(totalH + 12 + 10);
+      return;
+    }
+
+    if (type === 'text') {
+      layout.size = estimateTextMessageHeight(item);
+      return;
+    }
+
+    switch (type) {
+      case 'date_separator':
+      case 'separator':
+        layout.size = 40;
+        return;
+      case 'sticker':
+      case 'audio':
+        layout.size = 104;
+        return;
+      case 'location':
+        layout.size = 196;
+        return;
+      case 'file':
+        layout.size = 128;
+        return;
+      case 'call':
+        layout.size = 128;
+        return;
+      case 'image':
+        layout.size = 260;
+        return;
+      case 'video':
+        layout.size = 300;
+        return;
+      case 'image_group':
+        layout.size = 320;
+        return;
+      default:
+        layout.size = 96;
+    }
+  }, [estimateTextMessageHeight, getChatItemType, windowHeight, windowWidth]);
+
+  const visibleItemsRef = React.useRef<any[]>([]);
+
+  const onViewableItemsChanged = React.useCallback(({ viewableItems }: { viewableItems: any[] }) => {
+    visibleItemsRef.current = viewableItems;
+    try {
+      // throttle prefetching from viewable callback
+      const now = Date.now();
+      if (!(onViewableItemsChanged as any)._lastPrefetchAt) (onViewableItemsChanged as any)._lastPrefetchAt = 0;
+      const last = (onViewableItemsChanged as any)._lastPrefetchAt as number;
+      if (now - last < 800) return;
+      (onViewableItemsChanged as any)._lastPrefetchAt = now;
+
+      // collect URIs to prefetch
+      const toPrefetch: string[] = [];
+      for (const v of viewableItems || []) {
+        try {
+          const item = v.item;
+          if (!item) continue;
+          if (item.type === 'image' && item.fileInfo) {
+            const thumb = item.fileInfo.thumbnailUrl || item.fileInfo.thumbnail || item.fileInfo.thumb || item.fileInfo.url;
+            if (thumb) toPrefetch.push(thumb);
+          } else if (item.type === 'image_group' && Array.isArray(item.images)) {
+            for (const img of item.images.slice(0, 6)) {
+              const u = img?.fileInfo?.thumbnailUrl || img?.fileInfo?.thumbnail || img?.fileInfo?.thumb || img?.fileInfo?.url;
+              if (u) toPrefetch.push(u);
+            }
+          }
+        } catch {}
+      }
+
+      if (toPrefetch.length > 0) {
+        import('../../utils/prefetchQueue').then(({ default: prefetchQueue }) => {
+          const seen = new Set<string>();
+          for (let i = 0; i < toPrefetch.length && i < 12; i++) {
+            const uri = toPrefetch[i];
+            if (!uri || seen.has(uri)) continue;
+            seen.add(uri);
+            // enqueue with small stagger
+            setTimeout(() => { try { prefetchQueue.enqueue(uri).catch(()=>{}); } catch {} }, i * 50);
+          }
+        }).catch(() => {});
+      }
+    } catch {}
+  }, []);
+
+  const viewabilityConfig = React.useMemo(() => ({ itemVisiblePercentThreshold: 5, waitForInteraction: false }), []);
+
+  const handleBlankArea = React.useCallback((event: { offsetStart: number; offsetEnd: number; blankArea: number }) => {
+    if (event.blankArea <= 0) return;
+    if (__DEV__) {
+      const visible = (visibleItemsRef.current || []).map((v) => ({ index: v.index, id: v.item?.id, type: getChatItemType(v.item) }));
+      console.debug('[FlashList] blank area', event, 'visibleItems:', visible);
+    }
+  }, [getChatItemType]);
+
+  // Prefill cache with estimated sizes for all processed messages so FlashList
+  // has stable per-item sizes before items actually mount and measure.
+  React.useEffect(() => {
+    if (!processedMessages || processedMessages.length === 0) return;
+
+    try {
+      processedMessages.forEach((item: any, idx: number) => {
+        try {
+          const type = getChatItemType(item);
+          let size = undefined as number | undefined;
+
+          if ((type === 'image' || type === 'video') && item.fileInfo && item.fileInfo.width && item.fileInfo.height) {
+            const maxWidth = windowWidth * 0.75;
+            const maxHeight = windowHeight * 0.48;
+            const aspect = item.fileInfo.width / item.fileInfo.height || 1;
+            let imgH = maxWidth / aspect;
+            if (imgH > maxHeight) imgH = maxHeight;
+            size = Math.round(imgH + 12 + 10);
+          } else if (type === 'image_group' && Array.isArray(item.images) && item.images.length > 0) {
+            const count = item.images.length;
+            const per = count === 2 ? 2 : Math.min(3, count);
+            const gap = 6;
+            const cellW = Math.floor((windowWidth * 0.75 - gap * (per - 1)) / per);
+            const maxCellHeightCap = Math.round(windowHeight * 0.48);
+            let maxCellH = 0;
+            for (let i = 0; i < count; i++) {
+              const img = item.images[i];
+              const w = img?.fileInfo?.width;
+              const h = img?.fileInfo?.height;
+              const aspect = (w && h) ? (w / h) : 1;
+              let cellH = Math.round(cellW / aspect);
+              if (cellH > maxCellHeightCap) cellH = maxCellHeightCap;
+              if (cellH > maxCellH) maxCellH = cellH;
+            }
+            const rows = Math.ceil(count / per);
+            const totalH = rows * maxCellH + (rows - 1) * gap;
+            size = Math.round(totalH + 12 + 10);
+          } else {
+            switch (type) {
+              case 'date_separator':
+              case 'separator':
+                size = 40; break;
+              case 'sticker':
+              case 'audio':
+                size = 104; break;
+              case 'location':
+                size = 196; break;
+              case 'file':
+                size = 128; break;
+              case 'call':
+                size = 128; break;
+              case 'image':
+                size = 260; break;
+              case 'video':
+                size = 300; break;
+              case 'text':
+                size = estimateTextMessageHeight(item); break;
+              default:
+                size = 96; break;
+            }
+          }
+
+          if (size && item.id != null) {
+            setMessageSize(item.id, size);
+          }
+        } catch {
+          // ignore per-item
+        }
+      });
+    } catch {
+      // ignore
+    }
+  }, [estimateTextMessageHeight, processedMessages, windowWidth, windowHeight, getChatItemType]);
+
+  // Prefetch thumbnails and a few full images to improve perceived load times.
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!processedMessages || processedMessages.length === 0) return;
+      const toPrefetch: string[] = [];
+
+      for (const item of processedMessages) {
+        try {
+          if (item.type === 'image' && item.fileInfo) {
+            const thumb = item.fileInfo.thumbnailUrl || item.fileInfo.thumbnail || item.fileInfo.thumb;
+            if (thumb) toPrefetch.push(thumb);
+            else if (item.fileInfo.url) toPrefetch.push(item.fileInfo.url);
+          }
+          if (toPrefetch.length >= 40) break;
+        } catch {}
+      }
+
+      // enqueue downloads to the shared prefetch queue so they write to disk cache
+      const { default: prefetchQueue } = await import('../../utils/prefetchQueue');
+      for (let i = 0; i < toPrefetch.length && mounted; i++) {
+        const uri = toPrefetch[i];
+        // stagger slightly but rely on queue concurrency
+        setTimeout(() => {
+          try {
+            prefetchQueue.enqueue(uri).catch(() => {});
+          } catch {}
+        }, i * 80);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [processedMessages]);
+
   const micSheetHeight = micVoiceFlowActive
     ? Math.round(sheetHeight + composerHeight)
     : sheetHeight;
@@ -599,11 +903,11 @@ export default function ChatThread() {
                   style={{ flex: 1, marginBottom: 2 }}
                   onTouchStart={maybeCloseAll}
                 >
-                  <FlatList
+                  <FlashList
                     ref={flatListRef}
                     data={processedMessages}
-                    extraData={[messages, isTyping ? displayTypingAvatar || true : false]}
                     inverted
+                    showsVerticalScrollIndicator={false} 
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
                     keyExtractor={(i, idx) => {
@@ -617,15 +921,16 @@ export default function ChatThread() {
                       // the backend returns a message with a missing id.
                       return `msg-${idx}`;
                     }}
-                    // Tuned for smoother UI: lower initial render + smaller window
-                    // reduces JS work during navigation/scroll. Increase batching
-                    // period so renders are grouped and less likely to block frames.
-                    initialNumToRender={6}
-                    maxToRenderPerBatch={6}
-                    windowSize={5}
-                    updateCellsBatchingPeriod={50}
-                    removeClippedSubviews={true}
+                    estimatedItemSize={160}
+                    estimatedListSize={{ height: windowHeight, width: windowWidth }}
+                    getItemType={getChatItemType}
+                    overrideItemLayout={overrideChatItemLayout}
+                    drawDistance={Math.round(windowHeight * 8)}
+                    onBlankArea={handleBlankArea}
+                    removeClippedSubviews={false}
                     scrollEventThrottle={16}
+                    onViewableItemsChanged={onViewableItemsChanged}
+                    viewabilityConfig={viewabilityConfig}
                     maintainVisibleContentPosition={{
                       minIndexForVisible: 0,
                       autoscrollToTopThreshold: 10,
@@ -674,7 +979,7 @@ export default function ChatThread() {
                     ListFooterComponent={() => loadingMore ? (
                       <ActivityIndicator style={{ marginVertical: 10 }} color={colors.tint} />
                     ) : null}
-                    onEndReachedThreshold={0.5}
+                    onEndReachedThreshold={0.65}
                     renderItem={renderItem}
                   />
                 </View>

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^14.0.0",
+    "@shopify/flash-list": "^1.8.3",
     "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "^5.2.8",
     "@livekit/react-native": "^2.10.0",

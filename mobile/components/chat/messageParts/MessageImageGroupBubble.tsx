@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { View, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { View, TouchableOpacity, Animated } from 'react-native';
+import { getCachedPath, downloadToCache } from '../../../utils/imageCache';
 import { Image } from 'expo-image';
 import FullscreenImageViewer from '../../modals/FullscreenImageViewer';
 import { getAvatarUrl } from '@/utils/avatar';
@@ -39,6 +40,54 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
   const numCols = 2;
   const remainder = total % numCols;
   const firstRowCols = remainder === 0 ? numCols : remainder;
+  const [localUriMap, setLocalUriMap] = useState<Record<string, string>>({});
+
+  const [loadedMap, setLoadedMap] = useState<Record<string, boolean>>({});
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(shimmer, {
+        toValue: 1,
+        duration: 900,
+        useNativeDriver: true,
+      })
+    ).start();
+    return () => shimmer.stopAnimation();
+  }, [shimmer]);
+
+  // Pre-warm disk cache for group images (one effect at component level)
+  useEffect(() => {
+    let mounted = true;
+    if (!message?.images || message.images.length === 0) return;
+
+    (async () => {
+      try {
+        const initial: Record<string, string> = {};
+        for (const img of message.images) {
+          try {
+            let uri = img.fileInfo?.url || '';
+            if (uri && !uri.startsWith('http')) uri = getAvatarUrl(uri) || uri;
+            if (!uri) continue;
+
+            const cached = await getCachedPath(uri);
+            if (mounted && cached) {
+              initial[uri] = cached;
+              continue;
+            }
+
+            // start background download (don't await serially)
+            downloadToCache(uri).then((p) => {
+              if (mounted && p) setLocalUriMap((s) => ({ ...s, [uri]: p }));
+            }).catch(() => {});
+          } catch {}
+        }
+        if (mounted && Object.keys(initial).length) setLocalUriMap((s) => ({ ...s, ...initial }));
+      } catch {}
+    })();
+
+    return () => { mounted = false; };
+  }, [message.images]);
 
   return (
     <View style={{ width: maxWidth, flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -68,6 +117,10 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
 
         const isRowEnd = (idx < firstRowCols) ? (idx === firstRowCols - 1) : ((idx - firstRowCols + 1) % numCols === 0);
 
+        const isLoaded = !!loadedMap[uri] || false;
+
+        
+
         return (
           <TouchableOpacity
             key={img.id}
@@ -92,12 +145,33 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
             delayLongPress={200}
             android_disableSound={true}
             activeOpacity={0.9}
-          >
+            >
             <Image
-              source={{ uri }}
+              source={{ uri: localUriMap[uri] || uri }}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
+              onLoad={() => setLoadedMap((s) => ({ ...s, [uri]: true }))}
+              onError={() => setLoadedMap((s) => ({ ...s, [uri]: true }))}
             />
+            {!isLoaded && (
+              <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, overflow: 'hidden', backgroundColor: colors.surfaceVariant }}>
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    left: -imgWidth,
+                    top: 0,
+                    bottom: 0,
+                    width: imgWidth * 0.6,
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                    transform: [
+                      {
+                        translateX: shimmer.interpolate({ inputRange: [0, 1], outputRange: [-imgWidth, imgWidth] }),
+                      },
+                    ],
+                  }}
+                />
+              </View>
+            )}
           </TouchableOpacity>
         );
       })}

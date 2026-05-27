@@ -31,6 +31,7 @@ type MessageSwipeableBubbleProps = {
   onLongPress?: (x: number, y: number, w: number, h: number) => void;
   onQuickReactPress?: () => void;
   simple?: boolean;
+  onMeasure?: (id: string | number | null | undefined, height: number) => void;
 };
 
 export default function MessageSwipeableBubble({
@@ -56,6 +57,7 @@ export default function MessageSwipeableBubble({
   onLongPress,
   onQuickReactPress,
   simple,
+  onMeasure,
 }: MessageSwipeableBubbleProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
   const bubbleRef = useRef<View>(null);
@@ -172,7 +174,17 @@ export default function MessageSwipeableBubble({
   }
 
   return (
-    <RNAnimated.View style={[{ position: 'relative', paddingVertical: 8 }, highlightRowStyle]}>
+    <RNAnimated.View
+      onLayout={(e) => {
+        try {
+          const h = e.nativeEvent.layout?.height;
+          if (h && onMeasure) onMeasure(message.id, h);
+        } catch {
+          // ignore
+        }
+      }}
+      style={[{ position: 'relative', paddingVertical: 8 }, highlightRowStyle]}
+    >
       {!message.fromMe && (
         <View style={{ position: 'absolute', left: 0, right: 0, top: 8, bottom: 0, zIndex: 1 }} pointerEvents="box-none">
           <View style={{ flexDirection: 'row', justifyContent: 'flex-start', paddingHorizontal: 16 }}>
@@ -227,7 +239,7 @@ export default function MessageSwipeableBubble({
                 <Text style={{ color: colors.tint, fontSize: 12, fontWeight: '500', marginBottom: 2 }}>Đã chỉnh sửa</Text>
               )}
               <View style={{ position: 'relative', alignItems: isOutgoing ? 'flex-end' : 'flex-start', zIndex: 10 }}>
-                <RNAnimated.View
+                  <RNAnimated.View
                   ref={bubbleRef}
                   style={[
                     {

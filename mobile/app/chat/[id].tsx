@@ -19,6 +19,9 @@ import * as Haptics from 'expo-haptics';
 export default function ChatThread() {
   const DEFAULT_COMPOSER_HEIGHT = 74;
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const thumbnailPrefetchRunRef = React.useRef<string | null>(null);
+  const sizePrefillRunRef = React.useRef<string | null>(null);
+  const mediaPrefetchRunRef = React.useRef<string | null>(null);
   const [micTextMode, setMicTextMode] = React.useState(false);
   const [micOutsideCloseLocked, setMicOutsideCloseLocked] = React.useState(false);
   const [micVoiceFlowActive, setMicVoiceFlowActive] = React.useState(false);
@@ -41,6 +44,20 @@ export default function ChatThread() {
   const [reactionsDetailVisible, setReactionsDetailVisible] = React.useState(false);
 
   const [gifVisible, setGifVisible] = React.useState(false);
+  const scheduleLowPriorityTask = React.useCallback((task: () => void) => {
+    const requestIdle = (globalThis as any).requestIdleCallback;
+    if (typeof requestIdle === 'function') {
+      const handle = requestIdle(task, { timeout: 500 });
+      return () => {
+        try {
+          (globalThis as any).cancelIdleCallback?.(handle);
+        } catch {}
+      };
+    }
+
+    const timeoutId = setTimeout(task, 0);
+    return () => clearTimeout(timeoutId);
+  }, []);
   const {
     colors,
     params,
@@ -122,6 +139,22 @@ export default function ChatThread() {
       setGroupVideoCallVisible(true);
     }, []),
   });
+
+  React.useEffect(() => {
+    if (!__DEV__) return;
+    console.log('[chat-screen] state snapshot', {
+      conversationId,
+      messages: messages.length,
+      processedMessages: processedMessages.length,
+      loading,
+      loadingMore,
+      hasMore,
+    });
+  }, [conversationId, messages.length, processedMessages.length, loading, loadingMore, hasMore]);
+
+  // Run a small prewarm for visible thumbnails in background to improve
+  // perceived load time. Do NOT block rendering; FlashList should mount
+  // immediately to avoid spinner/blank issues.
 
   const handleReactMessage = React.useCallback(async (message: any, emoji: string) => {
     if (!conversationId) return;
@@ -607,6 +640,86 @@ export default function ChatThread() {
     } catch {}
   }, []);
 
+  // Pre-warm visible thumbnails after the first interaction frame so the
+  // chat shell mounts immediately and image hydration happens in the background.
+  React.useEffect(() => {
+    if (!processedMessages || processedMessages.length === 0) {
+      return;
+    }
+    if (thumbnailPrefetchRunRef.current === conversationId) {
+      return;
+    }
+    thumbnailPrefetchRunRef.current = conversationId;
+    const startedAt = globalThis?.performance?.now?.() ?? Date.now();
+    let cancelled = false;
+
+    const cancelSchedule = scheduleLowPriorityTask(() => {
+      void (async () => {
+        try {
+          const toPrefetch: string[] = [];
+          for (const item of processedMessages) {
+            try {
+              if (item.type === 'image' && item.fileInfo) {
+                const thumb = item.fileInfo.thumbnailUrl || item.fileInfo.thumbnail || item.fileInfo.thumb || item.fileInfo.url;
+                if (thumb) toPrefetch.push(thumb);
+              }
+            } catch {}
+            if (toPrefetch.length >= 4) break;
+          }
+
+          if (cancelled || toPrefetch.length === 0) {
+            if (__DEV__) {
+              console.log('[chat-screen] thumbnail prefetch skipped', {
+                conversationId,
+                processedMessages: processedMessages.length,
+                ms: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - startedAt),
+              });
+            }
+            return;
+          }
+
+          if (__DEV__) {
+            console.log('[chat-screen] thumbnail prefetch start', {
+              conversationId,
+              count: toPrefetch.length,
+            });
+          }
+
+          const [{ getCachedPath }, { default: prefetchQueue }] = await Promise.all([
+            import('../../utils/imageCache'),
+            import('../../utils/prefetchQueue'),
+          ]);
+
+          const diskPromises = toPrefetch.map((u) => getCachedPath(u).catch(() => null));
+
+          for (const u of toPrefetch) {
+            try { prefetchQueue.enqueue(u).catch(() => {}); } catch {}
+          }
+
+          await Promise.race([
+            Promise.all(diskPromises),
+            new Promise((res) => setTimeout(res, 80)),
+          ]);
+
+          if (__DEV__) {
+            console.log('[chat-screen] thumbnail prefetch done', {
+              conversationId,
+              count: toPrefetch.length,
+              ms: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - startedAt),
+            });
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    });
+
+    return () => {
+      cancelled = true;
+      cancelSchedule();
+    };
+  }, [conversationId, processedMessages, scheduleLowPriorityTask]);
+
   const viewabilityConfig = React.useMemo(() => ({ itemVisiblePercentThreshold: 5, waitForInteraction: false }), []);
 
   const handleBlankArea = React.useCallback((event: { offsetStart: number; offsetEnd: number; blankArea: number }) => {
@@ -617,85 +730,119 @@ export default function ChatThread() {
     }
   }, [getChatItemType]);
 
-  // Prefill cache with estimated sizes for all processed messages so FlashList
-  // has stable per-item sizes before items actually mount and measure.
+  // Prefill cache with estimated sizes after interactions, and only for a
+  // small visible window. This keeps the first paint responsive.
   React.useEffect(() => {
     if (!processedMessages || processedMessages.length === 0) return;
+    if (sizePrefillRunRef.current === conversationId) return;
+    sizePrefillRunRef.current = conversationId;
 
-    try {
-      processedMessages.forEach((item: any, idx: number) => {
-        try {
-          const type = getChatItemType(item);
-          let size = undefined as number | undefined;
+    const startedAt = globalThis?.performance?.now?.() ?? Date.now();
+    let cancelled = false;
 
-          if ((type === 'image' || type === 'video') && item.fileInfo && item.fileInfo.width && item.fileInfo.height) {
-            const maxWidth = windowWidth * 0.75;
-            const maxHeight = windowHeight * 0.48;
-            const aspect = item.fileInfo.width / item.fileInfo.height || 1;
-            let imgH = maxWidth / aspect;
-            if (imgH > maxHeight) imgH = maxHeight;
-            size = Math.round(imgH + 12 + 10);
-          } else if (type === 'image_group' && Array.isArray(item.images) && item.images.length > 0) {
-            const count = item.images.length;
-            const per = count === 2 ? 2 : Math.min(3, count);
-            const gap = 6;
-            const cellW = Math.floor((windowWidth * 0.75 - gap * (per - 1)) / per);
-            const maxCellHeightCap = Math.round(windowHeight * 0.48);
-            let maxCellH = 0;
-            for (let i = 0; i < count; i++) {
-              const img = item.images[i];
-              const w = img?.fileInfo?.width;
-              const h = img?.fileInfo?.height;
-              const aspect = (w && h) ? (w / h) : 1;
-              let cellH = Math.round(cellW / aspect);
-              if (cellH > maxCellHeightCap) cellH = maxCellHeightCap;
-              if (cellH > maxCellH) maxCellH = cellH;
+    const cancelSchedule = scheduleLowPriorityTask(() => {
+      if (cancelled) return;
+
+      if (__DEV__) {
+        console.log('[chat-screen] size prefill start', {
+          conversationId,
+          processedMessages: processedMessages.length,
+        });
+      }
+
+      try {
+        const prefillItems = processedMessages.slice(0, 60);
+        prefillItems.forEach((item: any) => {
+          try {
+            const type = getChatItemType(item);
+            let size = undefined as number | undefined;
+
+            if ((type === 'image' || type === 'video') && item.fileInfo && item.fileInfo.width && item.fileInfo.height) {
+              const maxWidth = windowWidth * 0.75;
+              const maxHeight = windowHeight * 0.48;
+              const aspect = item.fileInfo.width / item.fileInfo.height || 1;
+              let imgH = maxWidth / aspect;
+              if (imgH > maxHeight) imgH = maxHeight;
+              size = Math.round(imgH + 12 + 10);
+            } else if (type === 'image_group' && Array.isArray(item.images) && item.images.length > 0) {
+              const count = item.images.length;
+              const per = count === 2 ? 2 : Math.min(3, count);
+              const gap = 6;
+              const cellW = Math.floor((windowWidth * 0.75 - gap * (per - 1)) / per);
+              const maxCellHeightCap = Math.round(windowHeight * 0.48);
+              let maxCellH = 0;
+              for (let i = 0; i < count; i++) {
+                const img = item.images[i];
+                const w = img?.fileInfo?.width;
+                const h = img?.fileInfo?.height;
+                const aspect = (w && h) ? (w / h) : 1;
+                let cellH = Math.round(cellW / aspect);
+                if (cellH > maxCellHeightCap) cellH = maxCellHeightCap;
+                if (cellH > maxCellH) maxCellH = cellH;
+              }
+              const rows = Math.ceil(count / per);
+              const totalH = rows * maxCellH + (rows - 1) * gap;
+              size = Math.round(totalH + 12 + 10);
+            } else {
+              switch (type) {
+                case 'date_separator':
+                case 'separator':
+                  size = 40; break;
+                case 'sticker':
+                case 'audio':
+                  size = 104; break;
+                case 'location':
+                  size = 196; break;
+                case 'file':
+                  size = 128; break;
+                case 'call':
+                  size = 128; break;
+                case 'image':
+                  size = 260; break;
+                case 'video':
+                  size = 300; break;
+                case 'text':
+                  size = estimateTextMessageHeight(item); break;
+                default:
+                  size = 96; break;
+              }
             }
-            const rows = Math.ceil(count / per);
-            const totalH = rows * maxCellH + (rows - 1) * gap;
-            size = Math.round(totalH + 12 + 10);
-          } else {
-            switch (type) {
-              case 'date_separator':
-              case 'separator':
-                size = 40; break;
-              case 'sticker':
-              case 'audio':
-                size = 104; break;
-              case 'location':
-                size = 196; break;
-              case 'file':
-                size = 128; break;
-              case 'call':
-                size = 128; break;
-              case 'image':
-                size = 260; break;
-              case 'video':
-                size = 300; break;
-              case 'text':
-                size = estimateTextMessageHeight(item); break;
-              default:
-                size = 96; break;
-            }
-          }
 
-          if (size && item.id != null) {
-            setMessageSize(item.id, size);
+            if (size && item.id != null) {
+              setMessageSize(item.id, size);
+            }
+          } catch {
+            // ignore per-item
           }
-        } catch {
-          // ignore per-item
-        }
-      });
-    } catch {
-      // ignore
-    }
-  }, [estimateTextMessageHeight, processedMessages, windowWidth, windowHeight, getChatItemType]);
+        });
+      } catch {
+        // ignore
+      }
+
+      if (__DEV__) {
+        console.log('[chat-screen] size prefill done', {
+          conversationId,
+          prefilled: Math.min(60, processedMessages.length),
+          ms: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - startedAt),
+        });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cancelSchedule();
+    };
+  }, [conversationId, estimateTextMessageHeight, processedMessages, windowWidth, windowHeight, getChatItemType, scheduleLowPriorityTask]);
 
   // Prefetch thumbnails and a few full images to improve perceived load times.
+  // Keep the list small to avoid triggering too much work on open.
   React.useEffect(() => {
     let mounted = true;
     (async () => {
       if (!processedMessages || processedMessages.length === 0) return;
+      if (mediaPrefetchRunRef.current === conversationId) return;
+      mediaPrefetchRunRef.current = conversationId;
+      const startedAt = globalThis?.performance?.now?.() ?? Date.now();
       const toPrefetch: string[] = [];
 
       for (const item of processedMessages) {
@@ -705,24 +852,37 @@ export default function ChatThread() {
             if (thumb) toPrefetch.push(thumb);
             else if (item.fileInfo.url) toPrefetch.push(item.fileInfo.url);
           }
-          if (toPrefetch.length >= 40) break;
+          if (toPrefetch.length >= 12) break;
         } catch {}
       }
 
       // enqueue downloads to the shared prefetch queue so they write to disk cache
       const { default: prefetchQueue } = await import('../../utils/prefetchQueue');
+      if (__DEV__) {
+        console.log('[chat-screen] media prefetch queue start', {
+          conversationId,
+          count: toPrefetch.length,
+        });
+      }
       for (let i = 0; i < toPrefetch.length && mounted; i++) {
         const uri = toPrefetch[i];
-        // stagger slightly but rely on queue concurrency
+        // stagger slightly but rely on queue concurrency; slower stagger to reduce spikes
         setTimeout(() => {
           try {
             prefetchQueue.enqueue(uri).catch(() => {});
           } catch {}
-        }, i * 80);
+        }, i * 120);
+      }
+      if (__DEV__) {
+        console.log('[chat-screen] media prefetch queue scheduled', {
+          conversationId,
+          count: toPrefetch.length,
+          ms: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - startedAt),
+        });
       }
     })();
     return () => { mounted = false; };
-  }, [processedMessages]);
+  }, [conversationId, processedMessages]);
 
   const micSheetHeight = micVoiceFlowActive
     ? Math.round(sheetHeight + composerHeight)
@@ -904,6 +1064,7 @@ export default function ChatThread() {
                   onTouchStart={maybeCloseAll}
                 >
                   <FlashList
+                    initialNumToRender={8}
                     ref={flatListRef}
                     data={processedMessages}
                     inverted
@@ -925,7 +1086,9 @@ export default function ChatThread() {
                     estimatedListSize={{ height: windowHeight, width: windowWidth }}
                     getItemType={getChatItemType}
                     overrideItemLayout={overrideChatItemLayout}
-                    drawDistance={Math.round(windowHeight * 8)}
+                    // Reduce draw distance to avoid mounting too many items at once
+                    // which can block the JS thread on initial open.
+                    drawDistance={Math.round(windowHeight * 3)}
                     onBlankArea={handleBlankArea}
                     removeClippedSubviews={false}
                     scrollEventThrottle={16}

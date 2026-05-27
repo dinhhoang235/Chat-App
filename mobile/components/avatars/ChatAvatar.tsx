@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Image, Text } from 'react-native';
+import { View, Text } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { getAvatarUrl } from '@/utils/avatar';
 import { getInitials } from '@/utils/initials';
 
@@ -27,10 +28,14 @@ const ChatAvatar = ({
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: tintColor }}>
       {avatarUrl ? (
-        <Image
+        <ExpoImage
           source={{ uri: avatarUrl }}
           key={avatarUrl}
           style={{ width: size, height: size, borderRadius: size / 2 }}
+          cachePolicy="disk"
+          priority="high"
+          contentFit="cover"
+          transition={200}
         />
       ) : (
         <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.4 }}>

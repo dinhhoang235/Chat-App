@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, Animated } from 'react-native';
-import { getCachedPath, downloadToCache } from '../../../utils/imageCache';
+import { getCachedPath, downloadToCache, peekCachedPath } from '../../../utils/imageCache';
 import { Image } from 'expo-image';
 import FullscreenImageViewer from '../../modals/FullscreenImageViewer';
 import { resolveMediaUri } from './messageHelpers';
 import { error } from '@/utils/logger';
+import prefetchQueue from '../../../utils/prefetchQueue';
 
 type MessageImageBubbleProps = {
   message: any;
@@ -75,8 +76,8 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
 
   const [loaded, setLoaded] = useState(false);
   const shimmer = useRef(new Animated.Value(0)).current;
-  const [localThumb, setLocalThumb] = useState<string | null>(null);
-  const [localFull, setLocalFull] = useState<string | null>(null);
+  const [localThumb, setLocalThumb] = useState<string | null>(() => (thumbnailUri ? peekCachedPath(thumbnailUri) : null));
+  const [localFull, setLocalFull] = useState<string | null>(() => (fullImageUri ? peekCachedPath(fullImageUri) : null));
 
   useEffect(() => {
     if (loaded) return;
@@ -98,6 +99,11 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
     (async () => {
       try {
         if (thumbnailUri) {
+          const memoryHit = peekCachedPath(thumbnailUri);
+          if (memoryHit) {
+            if (mounted) setLocalThumb(memoryHit);
+            return;
+          }
           const cached = await getCachedPath(thumbnailUri);
           if (mounted && cached) {
             setLocalThumb(cached);
@@ -112,6 +118,32 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
     })();
     return () => { mounted = false; };
   }, [thumbnailUri]);
+
+  // Hydrate the full image from disk cache as early as possible so images
+  // that were preloaded in the background can show immediately on mount.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (!fullImageUri) return;
+        const memoryHit = peekCachedPath(fullImageUri);
+        if (memoryHit) {
+          if (mounted) setLocalFull(memoryHit);
+          return;
+        }
+        const cached = await getCachedPath(fullImageUri);
+        if (mounted && cached) {
+          setLocalFull(cached);
+          return;
+        }
+
+        prefetchQueue.enqueue(fullImageUri).then((p) => {
+          if (mounted && p) setLocalFull(p);
+        }).catch(() => {});
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, [fullImageUri]);
 
   if (!message.fileInfo || !fullImageUri) {
     return null;

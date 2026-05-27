@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Image } from "react-native";
 import { useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useTheme } from "@/context/themeContext";
@@ -97,6 +98,19 @@ export function useConversations() {
           return b.updatedAt - a.updatedAt;
         });
       setData(mapped);
+
+      // Prefetch avatar images so they appear immediately in the list
+      try {
+        const urls = mapped
+          .map((c: any) => c.avatar)
+          .filter((u: any) => typeof u === "string" && u.length > 0);
+        if (urls.length > 0) {
+          await Promise.all(urls.map((u: string) => Image.prefetch(u)));
+        }
+      } catch (e) {
+        // ignore prefetch errors — doesn't block rendering
+        console.warn("Avatar prefetch failed", e);
+      }
     } catch (err: any) {
       // 401 may occur if auth isn't ready; we already guard but log others
       if (err?.response?.status !== 401) {
@@ -165,7 +179,12 @@ export function useConversations() {
         if (cached.length > 0) {
           const updated = cached.map((m: any) =>
             m.id === data.messageId
-              ? { ...m, type: 'revoked', content: 'Tin nhắn đã được thu hồi', isRevoked: true }
+              ? {
+                  ...m,
+                  type: "revoked",
+                  content: "Tin nhắn đã được thu hồi",
+                  isRevoked: true,
+                }
               : m,
           );
           chatThreadCache.setMessages(convId, updated);

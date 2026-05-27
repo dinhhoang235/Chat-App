@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { View, TouchableOpacity, Animated } from 'react-native';
-import { getCachedPath, downloadToCache } from '../../../utils/imageCache';
+import { getCachedPath, peekCachedPath } from '../../../utils/imageCache';
 import { Image } from 'expo-image';
 import FullscreenImageViewer from '../../modals/FullscreenImageViewer';
 import { getAvatarUrl } from '@/utils/avatar';
 import { resolveMediaUri } from './messageHelpers';
+import prefetchQueue from '../../../utils/prefetchQueue';
 
 type MessageImageGroupBubbleProps = {
   message: any;
@@ -40,7 +41,17 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
   const numCols = 2;
   const remainder = total % numCols;
   const firstRowCols = remainder === 0 ? numCols : remainder;
-  const [localUriMap, setLocalUriMap] = useState<Record<string, string>>({});
+  const [localUriMap, setLocalUriMap] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const img of message.images || []) {
+      let uri = img.fileInfo?.url || '';
+      if (uri && !uri.startsWith('http')) uri = getAvatarUrl(uri) || uri;
+      if (!uri) continue;
+      const cached = peekCachedPath(uri);
+      if (cached) initial[uri] = cached;
+    }
+    return initial;
+  });
 
   const [loadedMap, setLoadedMap] = useState<Record<string, boolean>>({});
   const shimmer = useRef(new Animated.Value(0)).current;
@@ -70,6 +81,12 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
             if (uri && !uri.startsWith('http')) uri = getAvatarUrl(uri) || uri;
             if (!uri) continue;
 
+            const memoryHit = peekCachedPath(uri);
+            if (mounted && memoryHit) {
+              initial[uri] = memoryHit;
+              continue;
+            }
+
             const cached = await getCachedPath(uri);
             if (mounted && cached) {
               initial[uri] = cached;
@@ -77,7 +94,7 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
             }
 
             // start background download (don't await serially)
-            downloadToCache(uri).then((p) => {
+            prefetchQueue.enqueue(uri).then((p) => {
               if (mounted && p) setLocalUriMap((s) => ({ ...s, [uri]: p }));
             }).catch(() => {});
           } catch {}

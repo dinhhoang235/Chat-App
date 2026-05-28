@@ -16,6 +16,19 @@ import { useConversationActions } from "@/hooks/useConversations/useConversation
 import { revokeMessageInCache } from "@/hooks/useChatThread/useChatThreadRuntime";
 import { chatThreadCache } from "@/utils/chatThreadCache";
 
+// Schedule a low-priority task without blocking render. Returns a cancel function.
+const scheduleLowPriorityTask = (task: () => void) => {
+  try {
+    const ric = (globalThis as any).requestIdleCallback;
+    if (typeof ric === "function") {
+      const id = ric(() => task());
+      return () => (globalThis as any).cancelIdleCallback?.(id);
+    }
+  } catch {}
+  const t = setTimeout(task, 50);
+  return () => clearTimeout(t);
+};
+
 export function useConversations() {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -105,7 +118,12 @@ export function useConversations() {
           .map((c: any) => c.avatar)
           .filter((u: any) => typeof u === "string" && u.length > 0);
         if (urls.length > 0) {
-          await Promise.all(urls.map((u: string) => Image.prefetch(u)));
+          // Prefetch avatars in background without blocking the main flow.
+          scheduleLowPriorityTask(() => {
+            Promise.all(urls.map((u: string) => Image.prefetch(u))).catch(
+              () => {},
+            );
+          });
         }
       } catch (e) {
         // ignore prefetch errors — doesn't block rendering

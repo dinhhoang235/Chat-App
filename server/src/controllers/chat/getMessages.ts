@@ -2,7 +2,7 @@ import { Response } from "express";
 import { Server } from "socket.io";
 import prisma from "../../db.js";
 import { AuthRequest } from "../../middleware/auth.js";
-import { bulkCacheMessages } from "../../utils/redis.js";
+import { bulkCacheMessages, getCachedMessages } from "../../utils/redis.js";
 
 type MessageWithSender = {
   id: number;
@@ -42,13 +42,8 @@ export const getMessages =
             userId,
           },
         },
-        include: {
-          user: {
-            select: {
-              fullName: true,
-              avatar: true,
-            },
-          },
+        select: {
+          deletedAt: true,
         },
       });
 
@@ -60,21 +55,10 @@ export const getMessages =
 
       const take = parseInt(limit as string);
       const cursorId = cursor ? parseInt(cursor as string) : undefined;
+      const now = new Date();
 
-      let messages;
-      let fromCache = false;
-
-      // 1. Try to get from Cache if it's the first page (no cursor)
-      // NOTE: We disable cache if we want accurate per-user deletion filtering,
-      // or we can filter cached messages. For simplicity and correctness with per-user deletion, 
-      // let's fetch from DB if we don't have a sophisticated cache strategy for deletions.
-      /*
-      if (!cursor) {
-        ...
-      }
-      */
-      if (!messages) {
-        messages = await prisma.message.findMany({
+      const loadMessagesFromDb = async () => {
+        const messages = await prisma.message.findMany({
           where: {
             conversationId: convId,
             createdAt: {
@@ -89,7 +73,7 @@ export const getMessages =
           take: take,
           skip: cursorId ? 1 : 0,
           cursor: cursorId ? { id: cursorId } : undefined,
-          orderBy: { id: "desc" }, // Use ID for more reliable cursor pagination
+          orderBy: { id: "desc" },
           include: {
             sender: {
               select: {
@@ -123,94 +107,130 @@ export const getMessages =
             },
           },
         });
-      }
 
-      // Get participants to determine who has seen which messages
-      const participants = await prisma.conversationParticipant.findMany({
-        where: { conversationId: convId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              fullName: true,
-              avatar: true,
+        const participants = await prisma.conversationParticipant.findMany({
+          where: { conversationId: convId },
+          select: {
+            userId: true,
+            lastReadAt: true,
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                avatar: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      // OPTIMIZATION #2: Compute seenBy for all messages at once (O(N*M) single pass)
-      // Instead of: messages.map() -> for each message, filter participants (separate operations)
-      // Do: Pre-build seenBy map in one pass through participants for all messages
-      const seenByMap = new Map<number, any[]>();
+        const seenByMap = new Map<number, any[]>();
 
-      for (const participant of participants) {
-        // For each participant, check which messages they've seen
-        for (const msg of messages) {
-          if (
-            msg.senderId &&
-            msg.senderId !== participant.userId &&
-            new Date(participant.lastReadAt).getTime() >
-              new Date(msg.createdAt).getTime()
-          ) {
-            if (!seenByMap.has(msg.id)) {
-              seenByMap.set(msg.id, []);
+        for (const participant of participants) {
+          for (const msg of messages) {
+            if (
+              msg.senderId &&
+              msg.senderId !== participant.userId &&
+              new Date(participant.lastReadAt).getTime() >
+                new Date(msg.createdAt).getTime()
+            ) {
+              if (!seenByMap.has(msg.id)) {
+                seenByMap.set(msg.id, []);
+              }
+              seenByMap.get(msg.id)!.push({
+                id: participant.user.id,
+                fullName: participant.user.fullName,
+                avatar: participant.user.avatar,
+                seenAt: participant.lastReadAt,
+              });
             }
-            seenByMap.get(msg.id)!.push({
-              id: participant.user.id,
-              fullName: participant.user.fullName,
-              avatar: participant.user.avatar
-                ? participant.user.avatar.startsWith("http")
-                  ? participant.user.avatar
-                  : participant.user.avatar
-                : null,
-              seenAt: participant.lastReadAt,
-            });
           }
+        }
+
+        const messagesWithSeen = messages.map((msg: MessageWithSender) => {
+          const seenList = seenByMap.get(msg.id) || [];
+          seenList.sort(
+            (a, b) =>
+              new Date(a.seenAt || 0).getTime() -
+              new Date(b.seenAt || 0).getTime(),
+          );
+          return {
+            ...msg,
+            seenBy: seenList,
+            fromMe: msg.senderId === userId,
+          };
+        });
+
+        if (!cursor) {
+          bulkCacheMessages(convId, messagesWithSeen).catch((e) =>
+            console.error(e),
+          );
+        }
+
+        return messagesWithSeen;
+      };
+
+      if (!cursor) {
+        const cachedMessages = await getCachedMessages(convId, take);
+        if (cachedMessages && cachedMessages.length > 0) {
+          res.json(cachedMessages);
+
+          void loadMessagesFromDb()
+            .then(() => {
+              void prisma.conversationParticipant
+                .update({
+                  where: {
+                    conversationId_userId: {
+                      conversationId: convId,
+                      userId,
+                    },
+                  },
+                  data: { lastReadAt: now },
+                })
+                .then(() => {
+                  io.to(`conversation:${convId}`).emit("message_seen", {
+                    conversationId: convId,
+                    userId,
+                    seenAt: now,
+                  });
+                })
+                .catch((err) => {
+                  console.error("Update lastReadAt error:", err);
+                });
+            })
+            .catch((err) => {
+              console.error("Background refresh error:", err);
+            });
+
+          return;
         }
       }
 
-      // Map messages to include seenBy info using pre-computed map and sort seenBy ascending
-      const messagesWithSeen = messages.map((msg: MessageWithSender) => {
-        const seenList = seenByMap.get(msg.id) || [];
-        seenList.sort(
-          (a, b) =>
-            new Date(a.seenAt || 0).getTime() -
-            new Date(b.seenAt || 0).getTime(),
-        );
-        return {
-          ...msg,
-          seenBy: seenList,
-          fromMe: msg.senderId === userId,
-        };
-      });
+      const messagesWithSeen = await loadMessagesFromDb();
 
-      // 2. Cache first page if we just fetched it from DB (store raw messages, not computed seenBy)
-      if (!cursor && !fromCache) {
-        bulkCacheMessages(convId, messages).catch((e) => console.error(e));
-      }
+      res.json(messagesWithSeen);
 
-      const now = new Date();
-
-      // Update lastReadAt
-      await prisma.conversationParticipant.update({
-        where: {
-          conversationId_userId: {
+      void prisma.conversationParticipant
+        .update({
+          where: {
+            conversationId_userId: {
+              conversationId: convId,
+              userId,
+            },
+          },
+          data: { lastReadAt: now },
+        })
+        .then(() => {
+          io.to(`conversation:${convId}`).emit("message_seen", {
             conversationId: convId,
             userId,
-          },
-        },
-        data: { lastReadAt: now },
-      });
+            seenAt: now,
+          });
+        })
+        .catch((err) => {
+          console.error("Update lastReadAt error:", err);
+        });
 
-      // Notify other participants that this user has seen the messages
-      io.to(`conversation:${convId}`).emit("message_seen", {
-        conversationId: convId,
-        userId,
-        seenAt: now,
-      });
-
-      return res.json(messagesWithSeen);
+      return;
     } catch (err) {
       console.error("Get messages error:", err);
       return res.status(500).json({ message: "Error fetching messages" });

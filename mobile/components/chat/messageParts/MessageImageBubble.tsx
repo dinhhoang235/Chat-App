@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, Animated } from 'react-native';
-import { getCachedPath, downloadToCache, peekCachedPath } from '../../../utils/imageCache';
+import { getCachedPath, peekCachedPath } from '../../../utils/imageCache';
 import { Image } from 'expo-image';
 import FullscreenImageViewer from '../../modals/FullscreenImageViewer';
 import { resolveMediaUri } from './messageHelpers';
@@ -74,10 +74,22 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
     imageWidth = imageHeight * aspectRatio;
   }
 
-  const [loaded, setLoaded] = useState(false);
   const shimmer = useRef(new Animated.Value(0)).current;
   const [localThumb, setLocalThumb] = useState<string | null>(() => (thumbnailUri ? peekCachedPath(thumbnailUri) : null));
   const [localFull, setLocalFull] = useState<string | null>(() => (fullImageUri ? peekCachedPath(fullImageUri) : null));
+  const [loaded, setLoaded] = useState(() => Boolean((fullImageUri && peekCachedPath(fullImageUri)) || (thumbnailUri && peekCachedPath(thumbnailUri))));
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    console.log('[chat-image] mount', {
+      messageId: message?.id,
+      hasThumb: !!thumbnailUri,
+      hasFull: !!fullImageUri,
+      localThumb: !!localThumb,
+      localFull: !!localFull,
+      loaded,
+    });
+  }, [fullImageUri, localFull, localThumb, loaded, message?.id, thumbnailUri]);
 
   useEffect(() => {
     if (loaded) return;
@@ -96,26 +108,43 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
   // Try to use cached thumbnail if available, otherwise start background download
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        if (thumbnailUri) {
-          const memoryHit = peekCachedPath(thumbnailUri);
+    try {
+      if (thumbnailUri) {
+        const memoryHit = peekCachedPath(thumbnailUri);
           if (memoryHit) {
-            if (mounted) setLocalThumb(memoryHit);
-            return;
+          if (__DEV__) {
+            console.log('[chat-image] thumb cache hit', { messageId: message?.id, thumbnailUri });
           }
-          const cached = await getCachedPath(thumbnailUri);
-          if (mounted && cached) {
-            setLocalThumb(cached);
-            return;
-          }
-          // background download thumbnail (don't await)
-          downloadToCache(thumbnailUri).then((p) => {
-            if (mounted && p) setLocalThumb(p);
-          }).catch(() => {});
+          if (mounted) setLocalThumb(memoryHit);
+        } else {
+          // Try a non-blocking disk cache probe, but don't await it to avoid
+          // blocking the render path. If it resolves quickly we'll set the
+          // local thumbnail; otherwise we enqueue the download to the shared
+          // prefetch queue so concurrency is respected and duplicate downloads
+          // are avoided.
+          getCachedPath(thumbnailUri)
+            .then((cached) => {
+              if (mounted && cached) {
+                if (__DEV__) {
+                  console.log('[chat-image] thumb cache resolved', { messageId: message?.id, thumbnailUri });
+                }
+                setLocalThumb(cached);
+              } else {
+                prefetchQueue.enqueue(thumbnailUri)
+                  .then((p) => {
+                    if (mounted && p) setLocalThumb(p);
+                  })
+                  .catch(() => {});
+              }
+            })
+            .catch(() => {
+              prefetchQueue.enqueue(thumbnailUri).then((p) => {
+                if (mounted && p) setLocalThumb(p);
+              }).catch(() => {});
+            });
         }
-      } catch {}
-    })();
+      }
+    } catch {}
     return () => { mounted = false; };
   }, [thumbnailUri]);
 
@@ -123,25 +152,41 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
   // that were preloaded in the background can show immediately on mount.
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        if (!fullImageUri) return;
-        const memoryHit = peekCachedPath(fullImageUri);
-        if (memoryHit) {
-          if (mounted) setLocalFull(memoryHit);
-          return;
+    try {
+      if (!fullImageUri) return;
+      const memoryHit = peekCachedPath(fullImageUri);
+      if (memoryHit) {
+        if (__DEV__) {
+          console.log('[chat-image] full cache hit', { messageId: message?.id, fullImageUri });
         }
-        const cached = await getCachedPath(fullImageUri);
-        if (mounted && cached) {
-          setLocalFull(cached);
-          return;
-        }
+        if (mounted) setLocalFull(memoryHit);
+        return () => { mounted = false; };
+      }
 
-        prefetchQueue.enqueue(fullImageUri).then((p) => {
-          if (mounted && p) setLocalFull(p);
-        }).catch(() => {});
-      } catch {}
-    })();
+      // Probe disk cache non-blocking, fall back to prefetch queue/download
+      getCachedPath(fullImageUri)
+        .then((cached) => {
+          if (mounted && cached) {
+            if (__DEV__) {
+              console.log('[chat-image] full cache resolved', { messageId: message?.id, fullImageUri });
+            }
+            setLocalFull(cached);
+            return;
+          }
+          prefetchQueue.enqueue(fullImageUri)
+            .then((p) => {
+              if (mounted && p) setLocalFull(p);
+            })
+            .catch(() => {});
+        })
+        .catch(() => {
+          prefetchQueue.enqueue(fullImageUri)
+            .then((p) => {
+              if (mounted && p) setLocalFull(p);
+            })
+            .catch(() => {});
+        });
+    } catch {}
     return () => { mounted = false; };
   }, [fullImageUri]);
 
@@ -172,7 +217,7 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
                   setLocalFull(cached);
                   return;
                 }
-                const p = await downloadToCache(fullImageUri);
+                const p = await prefetchQueue.enqueue(fullImageUri);
                 if (p) setLocalFull(p);
               } catch {}
             })();
@@ -186,19 +231,44 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
         activeOpacity={0.9}
       >
         <View style={{ width: imageWidth, height: imageHeight, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.surfaceVariant }}>
-          {/* full-resolution image (hidden until loaded) */}
+          {/* thumbnail first so the bubble is visually filled immediately */}
+          {localThumb ? (
+            <Image
+              source={{ uri: localThumb }}
+              style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              priority="high"
+              transition={150}
+            />
+          ) : (thumbnailUri ? (
+            <Image
+              source={{ uri: thumbnailUri }}
+              style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              priority="high"
+              transition={150}
+            />
+          ) : null)}
+
+          {/* full-resolution image fades in on top once available */}
           <Image
             source={{ uri: localFull || fullImageUri }}
             style={{
               width: '100%',
               height: '100%',
               backgroundColor: colors.surfaceVariant,
+              opacity: loaded ? 1 : 0,
             }}
             contentFit="contain"
             cachePolicy="memory-disk"
             priority="high"
             transition={200}
             onLoad={(event) => {
+              if (__DEV__) {
+                console.log('[chat-image] full onLoad', { messageId: message?.id, fullImageUri });
+              }
               try {
                 const { width, height } = (event as any).source || (event as any).nativeEvent || {};
                 if (width > 0 && height > 0) {
@@ -210,30 +280,13 @@ export default function MessageImageBubble({ message, screenWidth, colors, allMe
               setLoaded(true);
             }}
             onError={(err) => {
+              if (__DEV__) {
+                console.log('[chat-image] full onError', { messageId: message?.id, fullImageUri, err: String(err) });
+              }
               setLoaded(true);
               error('Image load error:', fullImageUri, err);
             }}
           />
-          {/* thumbnail underneath if available, shown until full image loads */}
-          {localThumb ? (
-            <Image
-              source={{ uri: localThumb }}
-              style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              priority="high"
-              transition={150}
-            />
-          ) : (thumbnailUri && (
-            <Image
-              source={{ uri: thumbnailUri }}
-              style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              priority="high"
-              transition={150}
-            />
-          ))}
           {!loaded && (
             <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, overflow: 'hidden', backgroundColor: colors.surfaceVariant }}>
               <Animated.View

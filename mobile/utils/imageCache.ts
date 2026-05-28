@@ -1,7 +1,24 @@
 import * as FileSystem from "expo-file-system";
+import * as LegacyFS from "expo-file-system/legacy";
 import { downloadAsync as legacyDownloadAsync } from "expo-file-system/legacy";
 
-const CACHE_DIR = `${(FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory}chat-images/`;
+const _fsAny = FileSystem as any;
+const _legacyAny = LegacyFS as any;
+const _baseDir =
+  _fsAny.cacheDirectory ||
+  _fsAny.documentDirectory ||
+  _legacyAny.cacheDirectory ||
+  _legacyAny.documentDirectory ||
+  "";
+if (!(_baseDir && _baseDir.length)) {
+  try {
+    console.warn(
+      "[imageCache] WARNING: FileSystem cache/document directory is not available; downloads will be skipped.",
+    );
+  } catch {}
+}
+const CACHE_DIR = `${_baseDir}chat-images/`;
+const CAN_WRITE_TO_DISK = Boolean(_baseDir && _baseDir.length);
 const INDEX_FILE = `${CACHE_DIR}index.json`;
 const MEMORY_CACHE = new Map<string, string>();
 
@@ -20,7 +37,34 @@ async function ensureCacheDir() {
           intermediates: true,
         });
       }
+      return;
     }
+
+    // Fallback for older expo-file-system versions: use legacy API to avoid deprecated methods
+    const legacyInfo = await LegacyFS.getInfoAsync(CACHE_DIR).catch(() => null);
+    if (!legacyInfo || !legacyInfo.exists) {
+      try {
+        if ((LegacyFS as any).makeDirectoryAsync) {
+          await (LegacyFS as any).makeDirectoryAsync(CACHE_DIR, {
+            intermediates: true,
+          });
+        } else if ((LegacyFS as any).createDirectoryAsync) {
+          await (LegacyFS as any).createDirectoryAsync(CACHE_DIR, {
+            intermediates: true,
+          });
+        }
+      } catch (e) {
+        if (__DEV__) {
+          try {
+            console.warn(
+              "[imageCache] ensureCacheDir: failed to create cache dir",
+              { CACHE_DIR, error: e },
+            );
+          } catch {}
+        }
+      }
+    }
+    return;
   } catch {
     // ignore
   }
@@ -56,6 +100,17 @@ export async function getCachedPath(url?: string | null) {
 
 export async function downloadToCache(url?: string | null) {
   if (!url) return null;
+  if (!CAN_WRITE_TO_DISK) {
+    if (__DEV__) {
+      try {
+        console.warn(
+          "[imageCache] downloadToCache skipped: no writable cache directory",
+          { url },
+        );
+      } catch {}
+    }
+    return null;
+  }
   try {
     await ensureCacheDir();
     const name = filenameForUrl(url);
@@ -67,32 +122,49 @@ export async function downloadToCache(url?: string | null) {
     }
 
     const tmp = path + ".tmp";
-    const res = await legacyDownloadAsync(url, tmp);
+    const res = await legacyDownloadAsync(url, tmp).catch((e) => {
+      if (__DEV__) {
+        try {
+          console.warn("[imageCache] legacyDownloadAsync failed", {
+            url,
+            error: e,
+          });
+        } catch {}
+      }
+      throw e;
+    });
     if (res.status !== 200 && res.status !== 0) {
+      if (__DEV__) {
+        try {
+          console.warn("[imageCache] downloadToCache non-200 status", {
+            url,
+            status: res.status,
+            res,
+          });
+        } catch {}
+      }
       try {
-        await FileSystem.deleteAsync(tmp);
+        await LegacyFS.deleteAsync(tmp);
       } catch {}
       return null;
     }
     try {
-      if (FileSystem.File && FileSystem.File.moveAsync) {
-        await FileSystem.File.moveAsync({ from: tmp, to: path });
-      } else if (FileSystem.moveAsync) {
-        await FileSystem.moveAsync({ from: tmp, to: path });
+      if ((LegacyFS as any).moveAsync) {
+        await (LegacyFS as any).moveAsync({ from: tmp, to: path });
       } else {
-        await FileSystem.copyAsync({ from: tmp, to: path });
-        await FileSystem.deleteAsync(tmp);
+        await LegacyFS.copyAsync({ from: tmp, to: path });
+        await LegacyFS.deleteAsync(tmp);
       }
     } catch {
       try {
-        await FileSystem.copyAsync({ from: tmp, to: path });
-        await FileSystem.deleteAsync(tmp);
+        await LegacyFS.copyAsync({ from: tmp, to: path });
+        await LegacyFS.deleteAsync(tmp);
       } catch {}
     }
     MEMORY_CACHE.set(url, path);
     try {
       // update on-disk index for faster warm-up later
-      const idxRaw = await FileSystem.readAsStringAsync(INDEX_FILE).catch(
+      const idxRaw = await LegacyFS.readAsStringAsync(INDEX_FILE).catch(
         () => "{}",
       );
       let idx = {} as Record<string, string>;
@@ -102,13 +174,17 @@ export async function downloadToCache(url?: string | null) {
         idx = {};
       }
       idx[url] = path;
-      await FileSystem.writeAsStringAsync(
-        INDEX_FILE,
-        JSON.stringify(idx),
-      ).catch(() => {});
+      await LegacyFS.writeAsStringAsync(INDEX_FILE, JSON.stringify(idx)).catch(
+        () => {},
+      );
     } catch {}
     return path;
-  } catch {
+  } catch (e) {
+    if (__DEV__) {
+      try {
+        console.warn("[imageCache] downloadToCache error", { url, error: e });
+      } catch {}
+    }
     return null;
   }
 }
@@ -116,9 +192,7 @@ export async function downloadToCache(url?: string | null) {
 export async function warmMemoryCacheFromIndex(limit?: number) {
   try {
     await ensureCacheDir();
-    const raw = await FileSystem.readAsStringAsync(INDEX_FILE).catch(
-      () => null,
-    );
+    const raw = await LegacyFS.readAsStringAsync(INDEX_FILE).catch(() => null);
     if (!raw) return 0;
     let idx: Record<string, string> = {};
     try {

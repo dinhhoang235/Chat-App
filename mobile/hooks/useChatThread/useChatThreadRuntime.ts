@@ -12,9 +12,22 @@ import {
   mapThreadMedia,
   mapThreadMessage,
 } from "@/utils/chatThread";
-import { downloadToCache } from "@/utils/imageCache";
+import prefetchQueue from "@/utils/prefetchQueue";
 import { log, error } from "@/utils/logger";
 import { resolveMediaUri } from "@/components/chat/messageParts/messageHelpers";
+
+// Schedule a low-priority task without blocking render. Returns a cancel function.
+const scheduleLowPriorityTask = (task: () => void) => {
+  try {
+    const ric = (globalThis as any).requestIdleCallback;
+    if (typeof ric === "function") {
+      const id = ric(() => task());
+      return () => (globalThis as any).cancelIdleCallback?.(id);
+    }
+  } catch {}
+  const t = setTimeout(task, 50);
+  return () => clearTimeout(t);
+};
 
 const MESSAGE_CACHE_PREFIX = "chat_messages_cache:";
 const messageCacheMemory = new Map<string, any[]>();
@@ -126,6 +139,7 @@ export function useChatThreadRuntime({
   flatListRef,
 }: RuntimeArgs) {
   const initialFetchInFlightRef = useRef<string | null>(null);
+  const initialMediaRefreshScheduledRef = useRef<string | null>(null);
   const getMessageCacheKey = useCallback((conversationIdValue: string) => {
     return `${MESSAGE_CACHE_PREFIX}${conversationIdValue}`;
   }, []);
@@ -415,7 +429,10 @@ export function useChatThreadRuntime({
   }, [fetchGroupDetails]);
 
   useEffect(() => {
-    fetchGroupDetails();
+    const cancel = scheduleLowPriorityTask(() => {
+      void fetchGroupDetails();
+    });
+    return () => cancel();
   }, [fetchGroupDetails]);
 
   useEffect(() => {
@@ -447,9 +464,11 @@ export function useChatThreadRuntime({
   }, [targetUserIdState, setTargetUserStatus, setTargetUser]);
 
   useEffect(() => {
-    if (isFocused && targetUserIdState) {
-      getTargetUserStatus();
-    }
+    if (!(isFocused && targetUserIdState)) return;
+    const cancel = scheduleLowPriorityTask(() => {
+      void getTargetUserStatus();
+    });
+    return () => cancel();
   }, [isFocused, targetUserIdState, getTargetUserStatus]);
 
   useEffect(() => {
@@ -546,6 +565,16 @@ export function useChatThreadRuntime({
 
       // Mark as done so focus effect won't trigger a redundant refetch
       setInitialFetchDone(true);
+
+      // Keep media hydration off the critical path for first paint.
+      if (initialMediaRefreshScheduledRef.current !== conversationId) {
+        initialMediaRefreshScheduledRef.current = conversationId;
+        scheduleLowPriorityTask(() => {
+          if (!cancelled) {
+            fetchAllMedia();
+          }
+        });
+      }
 
       // Always fetch fresh messages from the network in the background.
       // This ensures revoked/deleted messages are never stuck in stale cache.
@@ -727,6 +756,7 @@ export function useChatThreadRuntime({
   useEffect(() => {
     if (!isFocused || !conversationId) return;
     if (initialFetchDone) return;
+    if (initialMediaRefreshScheduledRef.current === conversationId) return;
 
     fetchMessages(false);
     fetchAllMedia();
@@ -876,7 +906,8 @@ export function useChatThreadRuntime({
                 mappedMessage.fileInfo.thumbnail ||
                 mappedMessage.fileInfo.thumb;
               if (t) {
-                await downloadToCache(t).catch(() => null);
+                // Use shared prefetch queue to avoid parallel duplicate downloads
+                prefetchQueue.enqueue(resolveMediaUri(t)).catch(() => null);
               }
             }
           } catch {}

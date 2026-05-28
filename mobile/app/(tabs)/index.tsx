@@ -95,6 +95,19 @@ export default function Messages() {
     toggle();
   };
 
+  const debugChatOpenTap = (conversationId: string, extra?: Record<string, any>) => {
+    const startedAt = globalThis?.performance?.now?.() ?? Date.now();
+    (globalThis as any).__chatOpenTapAt = startedAt;
+    (globalThis as any).__chatOpenTapConversationId = conversationId;
+    if (__DEV__) {
+      console.log('[chat-open] tap', {
+        conversationId,
+        startedAt,
+        ...extra,
+      });
+    }
+  };
+
   const handleRowAction = (action: string, id: string, payload?: any) => {
     if (action === 'mark_unread') {
       handleMarkUnread(id);
@@ -200,6 +213,7 @@ export default function Messages() {
               message={item}
               onPress={() => { 
                 if (!selectionMode) {
+                  debugChatOpenTap(item.id, { from: 'conversations-list', isGroup: item.isGroup });
                   // Optimistically clear unread count
                   setData(prev => prev.map(m => m.id === item.id ? { ...m, unread: 0 } : m));
                   if (item.initialMessages?.length) {

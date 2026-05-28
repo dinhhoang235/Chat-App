@@ -53,8 +53,29 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
     return initial;
   });
 
-  const [loadedMap, setLoadedMap] = useState<Record<string, boolean>>({});
+  const [loadedMap, setLoadedMap] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const img of message.images || []) {
+      let uri = img.fileInfo?.url || '';
+      if (uri && !uri.startsWith('http')) uri = getAvatarUrl(uri) || uri;
+      if (!uri) continue;
+      if (peekCachedPath(uri) || localUriMap[uri]) {
+        initial[uri] = true;
+      }
+    }
+    return initial;
+  });
   const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    console.log('[chat-image-group] mount', {
+      messageId: message?.id,
+      imageCount: message?.images?.length ?? 0,
+      cachedCount: Object.keys(localUriMap).length,
+      loadedCount: Object.keys(loadedMap).filter((key) => loadedMap[key]).length,
+    });
+  }, [loadedMap, localUriMap, message?.id, message?.images?.length]);
 
   useEffect(() => {
     Animated.loop(
@@ -72,39 +93,64 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
     let mounted = true;
     if (!message?.images || message.images.length === 0) return;
 
-    (async () => {
-      try {
-        const initial: Record<string, string> = {};
-        for (const img of message.images) {
-          try {
-            let uri = img.fileInfo?.url || '';
-            if (uri && !uri.startsWith('http')) uri = getAvatarUrl(uri) || uri;
-            if (!uri) continue;
+    try {
+      const initial: Record<string, string> = {};
+      for (const img of message.images) {
+        try {
+          let uri = img.fileInfo?.url || '';
+          if (uri && !uri.startsWith('http')) uri = getAvatarUrl(uri) || uri;
+          if (!uri) continue;
 
-            const memoryHit = peekCachedPath(uri);
-            if (mounted && memoryHit) {
-              initial[uri] = memoryHit;
-              continue;
+          const memoryHit = peekCachedPath(uri);
+          if (mounted && memoryHit) {
+            if (__DEV__) {
+              console.log('[chat-image-group] cache hit', { messageId: message?.id, uri });
             }
+            initial[uri] = memoryHit;
+            continue;
+          }
 
-            const cached = await getCachedPath(uri);
-            if (mounted && cached) {
-              initial[uri] = cached;
-              continue;
-            }
-
-            // start background download (don't await serially)
-            prefetchQueue.enqueue(uri).then((p) => {
-              if (mounted && p) setLocalUriMap((s) => ({ ...s, [uri]: p }));
-            }).catch(() => {});
-          } catch {}
-        }
-        if (mounted && Object.keys(initial).length) setLocalUriMap((s) => ({ ...s, ...initial }));
-      } catch {}
-    })();
+          // Probe disk cache non-blocking; if found quickly set it, otherwise
+          // enqueue background prefetch so we don't block the UI thread here.
+          getCachedPath(uri)
+            .then((cached) => {
+              if (mounted && cached) {
+                if (__DEV__) {
+                  console.log('[chat-image-group] cache resolved', { messageId: message?.id, uri });
+                }
+                setLocalUriMap((s) => ({ ...s, [uri]: cached }));
+                setLoadedMap((s) => ({ ...s, [uri]: true }));
+              }
+              else {
+                prefetchQueue.enqueue(uri).then((p) => {
+                  if (mounted && p) {
+                    if (__DEV__) {
+                      console.log('[chat-image-group] prefetch resolved', { messageId: message?.id, uri });
+                    }
+                    setLocalUriMap((s) => ({ ...s, [uri]: p }));
+                    setLoadedMap((s) => ({ ...s, [uri]: true }));
+                  }
+                }).catch(() => {});
+              }
+            })
+            .catch(() => {
+              prefetchQueue.enqueue(uri).then((p) => {
+                if (mounted && p) {
+                  if (__DEV__) {
+                    console.log('[chat-image-group] prefetch resolved', { messageId: message?.id, uri });
+                  }
+                  setLocalUriMap((s) => ({ ...s, [uri]: p }));
+                  setLoadedMap((s) => ({ ...s, [uri]: true }));
+                }
+              }).catch(() => {});
+            });
+        } catch {}
+      }
+      if (mounted && Object.keys(initial).length) setLocalUriMap((s) => ({ ...s, ...initial }));
+    } catch {}
 
     return () => { mounted = false; };
-  }, [message.images]);
+  }, [message.images, message?.id]);
 
   return (
     <View style={{ width: maxWidth, flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -167,8 +213,18 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
               source={{ uri: localUriMap[uri] || uri }}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
-              onLoad={() => setLoadedMap((s) => ({ ...s, [uri]: true }))}
-              onError={() => setLoadedMap((s) => ({ ...s, [uri]: true }))}
+              onLoad={() => {
+                if (__DEV__) {
+                  console.log('[chat-image-group] onLoad', { messageId: message?.id, uri });
+                }
+                setLoadedMap((s) => ({ ...s, [uri]: true }));
+              }}
+              onError={() => {
+                if (__DEV__) {
+                  console.log('[chat-image-group] onError', { messageId: message?.id, uri });
+                }
+                setLoadedMap((s) => ({ ...s, [uri]: true }));
+              }}
             />
             {!isLoaded && (
               <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, overflow: 'hidden', backgroundColor: colors.surfaceVariant }}>

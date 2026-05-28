@@ -32,9 +32,41 @@ class PrefetchQueue {
     if (!job) return;
     this.running++;
     try {
+      const start = globalThis?.performance?.now?.() ?? Date.now();
+      if (__DEV__) {
+        try {
+          console.log("[prefetchQueue] job start", {
+            url: job.url,
+            queueLength: this.queue.length,
+            running: this.running,
+            start,
+          });
+        } catch {}
+      }
+
       const path = await downloadToCache(job.url);
+      const elapsed = Math.round(
+        (globalThis?.performance?.now?.() ?? Date.now()) - start,
+      );
+      if (__DEV__) {
+        try {
+          console.log("[prefetchQueue] job done", {
+            url: job.url,
+            elapsed,
+            path,
+          });
+        } catch {}
+      }
       job.resolve(path);
     } catch (e) {
+      if (__DEV__) {
+        try {
+          console.warn("[prefetchQueue] job error", {
+            url: job?.url,
+            error: e,
+          });
+        } catch {}
+      }
       job.reject(e);
     } finally {
       this.running--;
@@ -44,5 +76,6 @@ class PrefetchQueue {
   }
 }
 
-const shared = new PrefetchQueue(3);
+// Keep concurrency conservative so background warming doesn't compete with first paint.
+const shared = new PrefetchQueue(2);
 export default shared;

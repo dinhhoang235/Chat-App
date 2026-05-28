@@ -57,28 +57,29 @@ export default function MessageVideoBubble({ message, screenWidth, colors, allMe
 
   useEffect(() => {
     let mounted = true;
+    try {
+      if (!videoUrl) return;
 
-    (async () => {
-      try {
-        if (!videoUrl) return;
-
-        const memoryHit = peekCachedPath(videoUrl);
-        if (memoryHit) {
-          if (mounted) setLocalVideoUrl(memoryHit);
-          return;
-        }
-
-        const cached = await getCachedPath(videoUrl);
-        if (mounted && cached) {
-          setLocalVideoUrl(cached);
-          return;
-        }
-
-        prefetchQueue.enqueue(videoUrl).then((p) => {
-          if (mounted && p) setLocalVideoUrl(p);
-        }).catch(() => {});
-      } catch {}
-    })();
+      const memoryHit = peekCachedPath(videoUrl);
+      if (memoryHit) {
+        if (mounted) setLocalVideoUrl(memoryHit);
+      } else {
+        getCachedPath(videoUrl)
+          .then((cached) => {
+            if (mounted && cached) setLocalVideoUrl(cached);
+            else {
+              prefetchQueue.enqueue(videoUrl).then((p) => {
+                if (mounted && p) setLocalVideoUrl(p);
+              }).catch(() => {});
+            }
+          })
+          .catch(() => {
+            prefetchQueue.enqueue(videoUrl).then((p) => {
+              if (mounted && p) setLocalVideoUrl(p);
+            }).catch(() => {});
+          });
+      }
+    } catch {}
 
     return () => {
       mounted = false;

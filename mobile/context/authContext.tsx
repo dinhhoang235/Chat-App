@@ -4,6 +4,18 @@ import { tokenStorage, SavedAccount } from "@/utils/tokenStorage";
 import { socketService } from "@/services/socket";
 import { log } from '@/utils/logger';
 import { userAPI } from "@/services/user";
+// Schedule a low-priority task without blocking render. Returns a cancel function.
+const scheduleLowPriorityTask = (task: () => void) => {
+  try {
+    const ric = (globalThis as any).requestIdleCallback;
+    if (typeof ric === 'function') {
+      const id = ric(() => task());
+      return () => (globalThis as any).cancelIdleCallback?.(id);
+    }
+  } catch {}
+  const t = setTimeout(task, 50);
+  return () => clearTimeout(t);
+};
 
 
 interface AuthContextType {
@@ -50,7 +62,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await tokenStorage.removeTokens();
         await tokenStorage.removeUser();
       }
-      await loadSavedAccounts();
+        // Load saved accounts in background so provider initialization isn't blocked
+        scheduleLowPriorityTask(() => {
+          loadSavedAccounts().catch(() => {});
+        });
+
       setInitialized(true);
     })();
   }, []);

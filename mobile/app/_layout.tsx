@@ -12,6 +12,7 @@ import { BAR_CONTENT_HEIGHT } from '@/components/call/ActiveCallBar';
 import { AuthProvider, useAuth } from "@/context/authContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "@/context/themeContext";
+import { warmMemoryCacheFromIndex } from '@/utils/imageCache';
 import { SelectionProvider } from "@/context/selectionContext";
 import { SearchProvider } from "@/context/searchContext";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -58,6 +59,23 @@ function ThemeRoot() {
     ...Feather.font,
     ...AntDesign.font,
   });
+  // Warm a modest number of image cache entries in the background so the
+  // first chat open can use memory hits without blocking the first paint.
+  useEffect(() => {
+    try {
+      const schedule = (globalThis as any).requestIdleCallback;
+      const run = () => {
+        // best-effort, don't await — we just want to populate MEMORY_CACHE
+        warmMemoryCacheFromIndex(50).catch(() => {});
+      };
+      if (typeof schedule === 'function') {
+        const id = schedule(() => run());
+        return () => (globalThis as any).cancelIdleCallback?.(id);
+      }
+      const t = setTimeout(run, 2000);
+      return () => clearTimeout(t);
+    } catch {}
+  }, []);
 
   if (!fontsLoaded) {
     return <View className={rootClass} style={{ backgroundColor: colors.background }} />;

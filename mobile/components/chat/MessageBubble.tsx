@@ -66,6 +66,125 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
     );
   }
 
+  if (simple) {
+    const isOutgoing = !!message.fromMe;
+    let bubbleBg = colors.bubbleOther;
+    let borderColor = colors.surfaceVariant;
+    let textColor = colors.bubbleOtherText;
+
+    if (isOutgoing) {
+      bubbleBg = colors.bubbleMe;
+      borderColor = colors.bubbleMeBorder || colors.bubbleMe;
+      textColor = colors.bubbleMeText;
+    }
+
+    if (message.type === 'audio') {
+      bubbleBg = isOutgoing ? '#6FAEFF' : '#DDEBFF';
+      borderColor = isOutgoing ? '#6FAEFF' : '#DDEBFF';
+      textColor = '#0F3E84';
+    }
+
+    const callData = (() => {
+      if (message.type !== 'call') return {} as any;
+      try {
+        return typeof message.content === 'string' ? JSON.parse(message.content) : (message.content || {});
+      } catch {
+        return {} as any;
+      }
+    })();
+
+    const simpleContent = (() => {
+      if (message.isRevoked) {
+        return (
+          <View style={{ padding: 4 }}>
+            <Text style={{
+              color: isOutgoing ? colors.bubbleMeText : colors.textSecondary,
+              fontStyle: 'italic',
+              fontSize: 14,
+              opacity: 0.8,
+            }}>
+              Tin nhắn đã được thu hồi
+            </Text>
+          </View>
+        );
+      }
+
+      if (message.type === 'contact') {
+        return (
+          <MessageContactBubble
+            message={message}
+            onPress={onPress}
+            onAvatarPress={onAvatarPress}
+            colors={colors}
+          />
+        );
+      }
+
+        if (message.type === 'image' || message.type === 'video' || message.type === 'image_group' || message.type === 'audio' || message.type === 'file' || message.type === 'location' || message.type === 'call') {
+          return (
+            <MessageContent
+              message={message}
+              screenWidth={screenWidth}
+              colors={colors}
+              allMedia={allMedia}
+              progress={progress}
+              textColor={textColor}
+              highlightQuery={highlightQuery}
+              onVoiceCall={onVoiceCall}
+              onVideoCall={onVideoCall}
+              onCallAction={onCallAction}
+              isGroupThread={isGroupThread}
+            />
+          );
+        }
+
+      return (
+        <MessageContent
+          message={message}
+          screenWidth={screenWidth}
+          colors={colors}
+          allMedia={allMedia}
+          progress={progress}
+          textColor={textColor}
+          highlightQuery={highlightQuery}
+          onVoiceCall={onVoiceCall}
+          onVideoCall={onVideoCall}
+          onCallAction={onCallAction}
+          isGroupThread={isGroupThread}
+        />
+      );
+    })();
+
+    return (
+      <View
+        style={{
+          paddingVertical: 8,
+          paddingHorizontal: 16,
+          flexDirection: 'row',
+          justifyContent: isOutgoing ? 'flex-end' : 'flex-start',
+        }}
+      >
+        <View
+          style={{
+            maxWidth: '85%',
+            backgroundColor:
+              message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact' || message.type === 'audio' || message.type === 'file' || message.type === 'call'
+                ? 'transparent'
+                : message.type === 'call' && (callData.status === 'missed' && !message.fromMe)
+                ? 'rgba(255, 59, 48, 0.1)'
+                : bubbleBg,
+            borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact' || message.type === 'audio' || message.type === 'file' || message.type === 'call') ? 0 : 1.2,
+            borderColor,
+            padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact' || message.type === 'audio' || message.type === 'file' || message.type === 'call') ? 0 : message.type === 'call' ? 14 : 12,
+            borderRadius: 18,
+          }}
+        >
+          {simpleContent}
+        </View>
+      </View>
+    );
+  }
+
 
   const isOutgoing = !!message.fromMe;
   let bubbleBg = colors.bubbleOther;

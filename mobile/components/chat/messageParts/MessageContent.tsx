@@ -23,6 +23,7 @@ type MessageContentProps = {
   onCallAction?: (message: any, callData: any) => void;
   isGroupThread?: boolean;
   onLongPress?: () => void;
+  deferHeavyMediaWork?: boolean;
 };
 
 export default function MessageContent({
@@ -38,6 +39,7 @@ export default function MessageContent({
   onCallAction,
   isGroupThread,
   onLongPress,
+  deferHeavyMediaWork,
 }: MessageContentProps) {
   if (message.type === 'video') {
     return (
@@ -65,6 +67,7 @@ export default function MessageContent({
         allMedia={allMedia}
         progress={progress}
         onLongPress={onLongPress}
+        deferHeavyWork={deferHeavyMediaWork}
       />
     );
   }
@@ -77,6 +80,7 @@ export default function MessageContent({
         colors={colors}
         allMedia={allMedia}
         onLongPress={onLongPress}
+        deferHeavyWork={deferHeavyMediaWork}
       />
     );
   }

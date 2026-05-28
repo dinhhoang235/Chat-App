@@ -18,8 +18,28 @@ class PrefetchQueue {
 
   enqueue(url?: string | null) {
     if (!url) return Promise.resolve(null);
-    if (this.seen.has(url)) return Promise.resolve(null);
+    if (this.seen.has(url)) {
+      if (__DEV__) {
+        try {
+          console.log("[prefetchQueue] enqueue skipped (seen)", {
+            url,
+            ts: globalThis?.performance?.now?.() ?? Date.now(),
+          });
+        } catch {}
+      }
+      return Promise.resolve(null);
+    }
     this.seen.add(url);
+    if (__DEV__) {
+      try {
+        console.log("[prefetchQueue] enqueue", {
+          url,
+          queueLength: this.queue.length,
+          running: this.running,
+          ts: globalThis?.performance?.now?.() ?? Date.now(),
+        });
+      } catch {}
+    }
     return new Promise<string | null>((resolve, reject) => {
       this.queue.push({ url, resolve, reject });
       this.next();

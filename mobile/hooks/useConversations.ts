@@ -15,6 +15,8 @@ import { useConversationSelection } from "@/hooks/useConversations/useConversati
 import { useConversationActions } from "@/hooks/useConversations/useConversationActions";
 import { revokeMessageInCache } from "@/hooks/useChatThread/useChatThreadRuntime";
 import { chatThreadCache } from "@/utils/chatThreadCache";
+import prefetchQueue from "@/utils/prefetchQueue";
+import { resolveMediaUri } from "@/components/chat/messageParts/messageHelpers";
 
 // Schedule a low-priority task without blocking render. Returns a cancel function.
 const scheduleLowPriorityTask = (task: () => void) => {
@@ -27,6 +29,56 @@ const scheduleLowPriorityTask = (task: () => void) => {
   } catch {}
   const t = setTimeout(task, 50);
   return () => clearTimeout(t);
+};
+
+const warmConversationInitialMedia = (conversation: any) => {
+  if (!conversation || !Array.isArray(conversation.initialMessages)) return;
+
+  const seen = new Set<string>();
+  const uris: string[] = [];
+
+  for (const message of conversation.initialMessages) {
+    if (!message || (message.type !== "image" && message.type !== "video"))
+      continue;
+
+    let content: any = message.content;
+    if (typeof content === "string") {
+      try {
+        content = JSON.parse(content);
+      } catch {
+        content = null;
+      }
+    }
+
+    const uri =
+      content?.thumbnailUrl ||
+      content?.thumbnail ||
+      content?.thumb ||
+      content?.url;
+
+    if (!uri) continue;
+
+    const resolved = resolveMediaUri(uri);
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+    uris.push(resolved);
+
+    if (uris.length >= 3) break;
+  }
+
+  if (uris.length === 0) return;
+
+  if (__DEV__) {
+    console.log("[chat-open] list hydrate prewarm", {
+      conversationId: conversation.id,
+      count: uris.length,
+      uris,
+    });
+  }
+
+  for (const uri of uris) {
+    void prefetchQueue.enqueue(uri).catch(() => null);
+  }
 };
 
 export function useConversations() {
@@ -81,6 +133,12 @@ export function useConversations() {
       if (cancelled || cached.length === 0) return;
 
       setData(cached);
+
+      scheduleLowPriorityTask(() => {
+        cached.slice(0, 1).forEach((conversation: any) => {
+          warmConversationInitialMedia(conversation);
+        });
+      });
     };
 
     hydrateCache().finally(() => {
@@ -111,6 +169,12 @@ export function useConversations() {
           return b.updatedAt - a.updatedAt;
         });
       setData(mapped);
+
+      scheduleLowPriorityTask(() => {
+        mapped.slice(0, 1).forEach((conversation: any) => {
+          warmConversationInitialMedia(conversation);
+        });
+      });
 
       // Prefetch avatar images so they appear immediately in the list
       try {

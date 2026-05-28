@@ -27,6 +27,8 @@ export default function ChatThread() {
   const loggedDeferredChromeReadyRef = React.useRef(false);
   const loggedFlashListLayoutRef = React.useRef(false);
   const loggedFirstItemRenderRef = React.useRef(false);
+  const chatRenderCountRef = React.useRef(0);
+  const richChromeReadyTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const thumbnailPrefetchRunRef = React.useRef<string | null>(null);
   const sizePrefillRunRef = React.useRef<string | null>(null);
   const mediaPrefetchRunRef = React.useRef<string | null>(null);
@@ -56,13 +58,20 @@ export default function ChatThread() {
   const [gifVisible, setGifVisible] = React.useState(false);
   const [richMessageChromeReady, setRichMessageChromeReady] = React.useState(false);
   const [chatListReady, setChatListReady] = React.useState(false);
+  const [visibleMessageIdSet, setVisibleMessageIdSet] = React.useState<Set<string>>(new Set());
+  const [backgroundMediaWarmupEnabled, setBackgroundMediaWarmupEnabled] = React.useState(false);
+  const DEBUG_CHAT_SCROLL = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_CHAT_SCROLL;
 
-  if (__DEV__) {
+  if (__DEV__ && DEBUG_CHAT_SCROLL) {
+    chatRenderCountRef.current += 1;
     const tapAt = (globalThis as any).__chatOpenTapAt;
-    console.log('[chat-open] render start', {
+    console.log('[chat-open-debug] render start', {
+      renderCount: chatRenderCountRef.current,
       conversationId: String((globalThis as any).__chatOpenTapConversationId ?? params?.id ?? ''),
       sinceTapMs: typeof tapAt === 'number' ? Math.round(renderStartedAt - tapAt) : null,
       renderStartedAt: Math.round(renderStartedAt),
+      chatListReady,
+      richMessageChromeReady,
     });
   }
 
@@ -179,6 +188,11 @@ export default function ChatThread() {
     setRichMessageChromeReady(false);
     setChatListReady(false);
 
+    if (richChromeReadyTimerRef.current) {
+      clearTimeout(richChromeReadyTimerRef.current);
+      richChromeReadyTimerRef.current = null;
+    }
+
     const requestFrame = (globalThis as any).requestAnimationFrame;
     const cancelFrame = (globalThis as any).cancelAnimationFrame;
 
@@ -186,14 +200,24 @@ export default function ChatThread() {
       typeof requestFrame === 'function'
         ? requestFrame(() => {
             setChatListReady(true);
-            setRichMessageChromeReady(true);
+            richChromeReadyTimerRef.current = setTimeout(() => {
+              setRichMessageChromeReady(true);
+              richChromeReadyTimerRef.current = null;
+            }, 240);
           })
         : setTimeout(() => {
             setChatListReady(true);
-            setRichMessageChromeReady(true);
+            richChromeReadyTimerRef.current = setTimeout(() => {
+              setRichMessageChromeReady(true);
+              richChromeReadyTimerRef.current = null;
+            }, 240);
           }, 0);
 
     return () => {
+      if (richChromeReadyTimerRef.current) {
+        clearTimeout(richChromeReadyTimerRef.current);
+        richChromeReadyTimerRef.current = null;
+      }
       if (typeof cancelFrame === 'function' && typeof frameId === 'number') {
         cancelFrame(frameId);
       } else {
@@ -476,11 +500,13 @@ export default function ChatThread() {
     const nextMessage = processedMessages[index - 1]; 
     const isLastInConsecutiveGroup = !nextMessage || nextMessage.senderId !== item.senderId;
     const isThreadLast = index === 0;
+    const isMediaRow = item.type === 'image' || item.type === 'image_group' || item.type === 'video' || item.type === 'audio' || item.type === 'file' || item.type === 'location';
+    const shouldUseSimpleMode = isMediaRow || !backgroundMediaWarmupEnabled || !richMessageChromeReady || !visibleMessageIdSet.has(item.id?.toString?.() ?? String(item.id ?? ''));
 
     return (
       <MessageBubble
         message={item}
-        simple={!richMessageChromeReady}
+        simple={shouldUseSimpleMode}
         highlightQuery={searchQuery}
         isLastInGroup={isLastInConsecutiveGroup}
         isThreadLast={isThreadLast}
@@ -519,7 +545,7 @@ export default function ChatThread() {
         }}
       />
     );
-  }, [processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage, setReactionSheetVisible, setReactionsDetailVisible, richMessageChromeReady]);
+  }, [backgroundMediaWarmupEnabled, processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage, setReactionSheetVisible, setReactionsDetailVisible, richMessageChromeReady, visibleMessageIdSet]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
@@ -542,6 +568,24 @@ export default function ChatThread() {
     composerVisible ||
     gifVisible ||
     micVisible;
+
+  React.useEffect(() => {
+    if (!DEBUG_CHAT_SCROLL) return;
+    const tapAt = (globalThis as any).__chatOpenTapAt;
+    console.log('[chat-open-debug] flags', {
+      conversationId,
+      renderCount: chatRenderCountRef.current,
+      sinceTapMs: typeof tapAt === 'number' ? Math.round((globalThis?.performance?.now?.() ?? Date.now()) - tapAt) : null,
+      chatListReady,
+      richMessageChromeReady,
+      renderDeferredChrome,
+      messages: messages.length,
+      processedMessages: processedMessages.length,
+      loading,
+      loadingMore,
+      hasMore,
+    });
+  }, [DEBUG_CHAT_SCROLL, chatListReady, conversationId, hasMore, loading, loadingMore, messages.length, processedMessages.length, renderDeferredChrome, richMessageChromeReady]);
 
   React.useEffect(() => {
     if (!__DEV__ || loggedChatListReadyRef.current) return;
@@ -725,6 +769,30 @@ export default function ChatThread() {
   const onViewableItemsChanged = React.useCallback(({ viewableItems }: { viewableItems: any[] }) => {
     visibleItemsRef.current = viewableItems;
     try {
+      const nextVisibleIds = new Set<string>();
+      for (const v of viewableItems || []) {
+        const id = v?.item?.id;
+        if (id == null) continue;
+        nextVisibleIds.add(id.toString());
+      }
+      setVisibleMessageIdSet((prev) => {
+        if (prev.size === nextVisibleIds.size) {
+          let same = true;
+          for (const id of prev) {
+            if (!nextVisibleIds.has(id)) {
+              same = false;
+              break;
+            }
+          }
+          if (same) return prev;
+        }
+        return nextVisibleIds;
+      });
+    } catch {}
+    if (!backgroundMediaWarmupEnabled) {
+      return;
+    }
+    try {
       // throttle prefetching from viewable callback
       const now = Date.now();
       if (!(onViewableItemsChanged as any)._lastPrefetchAt) (onViewableItemsChanged as any)._lastPrefetchAt = 0;
@@ -763,11 +831,14 @@ export default function ChatThread() {
         }).catch(() => {});
       }
     } catch {}
-  }, []);
+  }, [backgroundMediaWarmupEnabled]);
 
   // Pre-warm visible thumbnails after the first interaction frame so the
   // chat shell mounts immediately and image hydration happens in the background.
   React.useEffect(() => {
+    if (!backgroundMediaWarmupEnabled) {
+      return;
+    }
     if (!processedMessages || processedMessages.length === 0) {
       return;
     }
@@ -843,7 +914,7 @@ export default function ChatThread() {
       cancelled = true;
       cancelSchedule();
     };
-  }, [conversationId, processedMessages, scheduleLowPriorityTask]);
+  }, [backgroundMediaWarmupEnabled, conversationId, processedMessages, scheduleLowPriorityTask]);
 
   const viewabilityConfig = React.useMemo(() => ({ itemVisiblePercentThreshold: 5, waitForInteraction: false }), []);
 
@@ -858,6 +929,7 @@ export default function ChatThread() {
   // Prefill cache with estimated sizes after interactions, and only for a
   // small visible window. This keeps the first paint responsive.
   React.useEffect(() => {
+    if (!backgroundMediaWarmupEnabled) return;
     if (!processedMessages || processedMessages.length === 0) return;
     if (sizePrefillRunRef.current === conversationId) return;
     sizePrefillRunRef.current = conversationId;
@@ -957,11 +1029,12 @@ export default function ChatThread() {
       cancelled = true;
       cancelSchedule();
     };
-  }, [conversationId, estimateTextMessageHeight, processedMessages, windowWidth, windowHeight, getChatItemType, scheduleLowPriorityTask]);
+  }, [backgroundMediaWarmupEnabled, conversationId, estimateTextMessageHeight, processedMessages, windowWidth, windowHeight, getChatItemType, scheduleLowPriorityTask]);
 
   // Prefetch thumbnails and a few full images to improve perceived load times.
   // Keep the list small to avoid triggering too much work on open.
   React.useEffect(() => {
+    if (!backgroundMediaWarmupEnabled) return;
     let mounted = true;
     const cancel = scheduleLowPriorityTask(() => {
       void (async () => {
@@ -1009,7 +1082,7 @@ export default function ChatThread() {
       })();
     });
     return () => { mounted = false; cancel(); };
-  }, [conversationId, processedMessages, scheduleLowPriorityTask]);
+  }, [backgroundMediaWarmupEnabled, conversationId, processedMessages, scheduleLowPriorityTask]);
 
   const micSheetHeight = micVoiceFlowActive
     ? Math.round(sheetHeight + composerHeight)
@@ -1246,6 +1319,9 @@ export default function ChatThread() {
                     onScroll={(event) => {
                       if (!hasUserScrolledRef.current && event.nativeEvent.contentOffset.y > 24) {
                         hasUserScrolledRef.current = true;
+                        if (!backgroundMediaWarmupEnabled) {
+                          setBackgroundMediaWarmupEnabled(true);
+                        }
                       }
                     }}
                     onViewableItemsChanged={onViewableItemsChanged}

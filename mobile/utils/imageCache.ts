@@ -78,6 +78,14 @@ function filenameForUrl(url: string) {
 export async function getCachedPath(url?: string | null) {
   if (!url) return null;
   try {
+    if (__DEV__) {
+      try {
+        console.log("[imageCache] getCachedPath start", {
+          url,
+          ts: globalThis?.performance?.now?.() ?? Date.now(),
+        });
+      } catch {}
+    }
     const memoryHit = MEMORY_CACHE.get(url);
     if (memoryHit) return memoryHit;
 
@@ -89,8 +97,26 @@ export async function getCachedPath(url?: string | null) {
       info = await FileSystem.File.getInfoAsync(path);
       if (info && info.exists && info.size && info.size > 0) {
         MEMORY_CACHE.set(url, path);
+        if (__DEV__) {
+          try {
+            console.log("[imageCache] getCachedPath disk hit", {
+              url,
+              path,
+              ts: globalThis?.performance?.now?.() ?? Date.now(),
+            });
+          } catch {}
+        }
         return path;
       }
+    }
+    if (__DEV__) {
+      try {
+        console.log("[imageCache] getCachedPath disk miss", {
+          url,
+          path,
+          ts: globalThis?.performance?.now?.() ?? Date.now(),
+        });
+      } catch {}
     }
     return null;
   } catch {
@@ -112,6 +138,12 @@ export async function downloadToCache(url?: string | null) {
     return null;
   }
   try {
+    const start = globalThis?.performance?.now?.() ?? Date.now();
+    if (__DEV__) {
+      try {
+        console.log("[imageCache] downloadToCache start", { url, ts: start });
+      } catch {}
+    }
     await ensureCacheDir();
     const name = filenameForUrl(url);
     const path = CACHE_DIR + name;
@@ -128,6 +160,7 @@ export async function downloadToCache(url?: string | null) {
           console.warn("[imageCache] legacyDownloadAsync failed", {
             url,
             error: e,
+            ts: globalThis?.performance?.now?.() ?? Date.now(),
           });
         } catch {}
       }
@@ -162,6 +195,17 @@ export async function downloadToCache(url?: string | null) {
       } catch {}
     }
     MEMORY_CACHE.set(url, path);
+    if (__DEV__) {
+      try {
+        console.log("[imageCache] downloadToCache done", {
+          url,
+          path,
+          elapsed: Math.round(
+            (globalThis?.performance?.now?.() ?? Date.now()) - start,
+          ),
+        });
+      } catch {}
+    }
     try {
       // update on-disk index for faster warm-up later
       const idxRaw = await LegacyFS.readAsStringAsync(INDEX_FILE).catch(

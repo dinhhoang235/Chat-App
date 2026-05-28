@@ -13,8 +13,10 @@ import {
   mapThreadMessage,
 } from "@/utils/chatThread";
 import prefetchQueue from "@/utils/prefetchQueue";
+import { getCachedPath } from "@/utils/imageCache";
 import { log, error } from "@/utils/logger";
 import { resolveMediaUri } from "@/components/chat/messageParts/messageHelpers";
+import { setImageMetadata } from "@/utils/imageMetadataCache";
 
 // Schedule a low-priority task without blocking render. Returns a cancel function.
 const scheduleLowPriorityTask = (task: () => void) => {
@@ -31,6 +33,47 @@ const scheduleLowPriorityTask = (task: () => void) => {
 
 const MESSAGE_CACHE_PREFIX = "chat_messages_cache:";
 const messageCacheMemory = new Map<string, any[]>();
+
+const messageFileInfoKey = (message: any) => {
+  const fileInfo = message?.fileInfo || {};
+  return [
+    fileInfo.url || "",
+    fileInfo.thumbnailUrl || fileInfo.thumbnail || fileInfo.thumb || "",
+    fileInfo.width || "",
+    fileInfo.height || "",
+    fileInfo.duration || "",
+  ].join("|");
+};
+
+const areMessageListsEffectivelyEqual = (prev: any[], next: any[]) => {
+  if (prev === next) return true;
+  if (prev.length !== next.length) return false;
+
+  for (let i = 0; i < prev.length; i++) {
+    const prevMessage = prev[i];
+    const nextMessage = next[i];
+    if (prevMessage === nextMessage) continue;
+    if (!prevMessage || !nextMessage) return false;
+    if (prevMessage.id?.toString() !== nextMessage.id?.toString()) return false;
+    if (prevMessage.type !== nextMessage.type) return false;
+    if (prevMessage.status !== nextMessage.status) return false;
+    if (prevMessage.isRevoked !== nextMessage.isRevoked) return false;
+    if (prevMessage.text !== nextMessage.text) return false;
+    if (prevMessage.content !== nextMessage.content) return false;
+    if (prevMessage.fromMe !== nextMessage.fromMe) return false;
+    if (prevMessage.edited !== nextMessage.edited) return false;
+    if (prevMessage.senderId !== nextMessage.senderId) return false;
+    if (prevMessage.createdAt !== nextMessage.createdAt) return false;
+    if (prevMessage.updatedAt !== nextMessage.updatedAt) return false;
+    if (prevMessage.reactions?.length !== nextMessage.reactions?.length)
+      return false;
+    if (prevMessage.seenBy?.length !== nextMessage.seenBy?.length) return false;
+    if (messageFileInfoKey(prevMessage) !== messageFileInfoKey(nextMessage))
+      return false;
+  }
+
+  return true;
+};
 
 /**
  * Update a specific message in the module-level cache as revoked.
@@ -140,6 +183,64 @@ export function useChatThreadRuntime({
 }: RuntimeArgs) {
   const initialFetchInFlightRef = useRef<string | null>(null);
   const initialMediaRefreshScheduledRef = useRef<string | null>(null);
+  const initialVisibleMediaWarmupRef = useRef<string | null>(null);
+  const initialCachedMediaWarmupRef = useRef<string | null>(null);
+
+  const warmMediaUris = useCallback(
+    async (uris: string[]) => {
+      const seen = new Set<string>();
+
+      if (__DEV__) {
+        console.log("[chat-runtime] warmMediaUris start", {
+          conversationId,
+          count: uris.length,
+          ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
+        });
+      }
+
+      const tasks = uris.map(async (uri) => {
+        if (!uri || seen.has(uri)) return;
+        seen.add(uri);
+
+        try {
+          const cached = await getCachedPath(uri);
+          if (cached) {
+            if (__DEV__) {
+              console.log("[chat-runtime] warmMediaUris cache hit", {
+                conversationId,
+                uri,
+                ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
+              });
+            }
+            return;
+          }
+        } catch {}
+
+        try {
+          if (__DEV__) {
+            console.log("[chat-runtime] warmMediaUris enqueue", {
+              conversationId,
+              uri,
+              ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
+            });
+          }
+          await prefetchQueue.enqueue(uri).catch(() => null);
+        } catch {}
+      });
+
+      await Promise.all(tasks);
+
+      if (__DEV__) {
+        console.log("[chat-runtime] warmMediaUris end", {
+          conversationId,
+          count: seen.size,
+          ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
+        });
+      }
+    },
+    [conversationId],
+  );
+
   const getMessageCacheKey = useCallback((conversationIdValue: string) => {
     return `${MESSAGE_CACHE_PREFIX}${conversationIdValue}`;
   }, []);
@@ -293,6 +394,11 @@ export function useChatThreadRuntime({
     }
   }, [id, params.isGroup, setGroupDetails]);
 
+  const fetchGroupDetailsRef = useRef(fetchGroupDetails);
+  useEffect(() => {
+    fetchGroupDetailsRef.current = fetchGroupDetails;
+  }, [fetchGroupDetails]);
+
   const fetchMessages = useCallback(
     async (isLoadMore = false) => {
       if (!conversationId) return;
@@ -362,10 +468,56 @@ export function useChatThreadRuntime({
           });
         }
 
+        if (
+          !isLoadMore &&
+          initialVisibleMediaWarmupRef.current !== conversationId
+        ) {
+          initialVisibleMediaWarmupRef.current = conversationId;
+
+          const warmUris: string[] = [];
+          const warmMessages: any[] = [];
+          for (const message of mapped) {
+            if (message?.type !== "image" && message?.type !== "video")
+              continue;
+            warmMessages.push(message);
+            if (warmMessages.length >= 4) break;
+          }
+
+          for (const message of warmMessages) {
+            const fileInfo = message.fileInfo || {};
+            const uri =
+              fileInfo.thumbnailUrl ||
+              fileInfo.thumbnail ||
+              fileInfo.thumb ||
+              fileInfo.url;
+            if (!uri) continue;
+            warmUris.push(resolveMediaUri(uri));
+          }
+
+          if (warmUris.length > 0) {
+            if (__DEV__) {
+              console.log("[chat-runtime] warmMediaUris selected", {
+                conversationId,
+                messageIds: warmMessages.map(
+                  (message: any) => message?.id ?? null,
+                ),
+                uris: warmUris,
+                ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
+              });
+            }
+            void warmMediaUris(warmUris);
+          }
+        }
+
         if (isLoadMore) {
           setMessages((prev) => dedupeById([...prev, ...mapped]));
         } else {
-          setMessages(dedupeById(mapped));
+          const nextMessages = dedupeById(mapped);
+          setMessages((prev) =>
+            areMessageListsEffectivelyEqual(prev, nextMessages)
+              ? prev
+              : nextMessages,
+          );
           setInitialFetchDone(true);
         }
 
@@ -410,45 +562,9 @@ export function useChatThreadRuntime({
       setLoadingMore,
       setMessages,
       setTargetUserIdState,
+      warmMediaUris,
     ],
   );
-
-  const markAsReadWithRetryRef = useRef(markAsReadWithRetry);
-  useEffect(() => {
-    markAsReadWithRetryRef.current = markAsReadWithRetry;
-  }, [markAsReadWithRetry]);
-
-  const fetchMessagesRef = useRef(fetchMessages);
-  useEffect(() => {
-    fetchMessagesRef.current = fetchMessages;
-  }, [fetchMessages]);
-
-  const fetchGroupDetailsRef = useRef(fetchGroupDetails);
-  useEffect(() => {
-    fetchGroupDetailsRef.current = fetchGroupDetails;
-  }, [fetchGroupDetails]);
-
-  useEffect(() => {
-    const cancel = scheduleLowPriorityTask(() => {
-      void fetchGroupDetails();
-    });
-    return () => cancel();
-  }, [fetchGroupDetails]);
-
-  useEffect(() => {
-    if (params.isGroup !== "true") return;
-
-    const handleUpdate = (data: any) => {
-      if (data.conversationId?.toString() === id?.toString()) {
-        fetchGroupDetails();
-      }
-    };
-
-    socketService.on("conversation_updated", handleUpdate);
-    return () => {
-      socketService.off("conversation_updated", handleUpdate);
-    };
-  }, [id, params.isGroup, fetchGroupDetails]);
 
   const getTargetUserStatus = useCallback(async () => {
     if (!targetUserIdState) return;
@@ -536,6 +652,7 @@ export function useChatThreadRuntime({
             if (
               !cancelled &&
               cachedMessages.length > 0 &&
+              messages.length === 0 &&
               messagesRef.current.length === 0
             ) {
               setMessages(cachedMessages);
@@ -565,16 +682,6 @@ export function useChatThreadRuntime({
 
       // Mark as done so focus effect won't trigger a redundant refetch
       setInitialFetchDone(true);
-
-      // Keep media hydration off the critical path for first paint.
-      if (initialMediaRefreshScheduledRef.current !== conversationId) {
-        initialMediaRefreshScheduledRef.current = conversationId;
-        scheduleLowPriorityTask(() => {
-          if (!cancelled) {
-            fetchAllMedia();
-          }
-        });
-      }
 
       // Always fetch fresh messages from the network in the background.
       // This ensures revoked/deleted messages are never stuck in stale cache.
@@ -618,34 +725,20 @@ export function useChatThreadRuntime({
 
     if (missingMetadata.length === 0) return;
 
-    // Give old messages an immediate thumbnail fallback so the first paint
-    // doesn't wait on a separate media-specific field.
-    setMessages((prev) => {
-      let changed = false;
-      const next = prev.map((message) => {
-        if (message?.type !== "image" || !message.fileInfo) return message;
+    for (const message of missingMetadata) {
+      const fileInfo = message.fileInfo || {};
+      const thumbnailUrl =
+        fileInfo.thumbnailUrl ||
+        fileInfo.thumbnail ||
+        fileInfo.thumb ||
+        fileInfo.url;
 
-        const fileInfo = message.fileInfo;
-        const thumbnailUrl =
-          fileInfo.thumbnailUrl ||
-          fileInfo.thumbnail ||
-          fileInfo.thumb ||
-          fileInfo.url;
-
-        if (fileInfo.thumbnailUrl === thumbnailUrl) return message;
-
-        changed = true;
-        return {
-          ...message,
-          fileInfo: {
-            ...fileInfo,
-            thumbnailUrl,
-          },
-        };
-      });
-
-      return changed ? next : prev;
-    });
+      if (message.id != null) {
+        setImageMetadata(message.id, {
+          ...(thumbnailUrl ? { thumbnailUrl } : {}),
+        });
+      }
+    }
 
     setTimeout(() => {
       (async () => {
@@ -701,35 +794,12 @@ export function useChatThreadRuntime({
 
         if (byId.size === 0) return;
 
-        setMessages((prev) =>
-          prev.map((message) => {
-            const update =
-              message?.id != null ? byId.get(message.id.toString()) : null;
-            if (!update || !message.fileInfo) return message;
-
-            const fileInfo = message.fileInfo;
-            if (
-              fileInfo.width === update.width &&
-              fileInfo.height === update.height
-            ) {
-              return message;
-            }
-
-            return {
-              ...message,
-              fileInfo: {
-                ...fileInfo,
-                width: update.width,
-                height: update.height,
-                thumbnailUrl:
-                  fileInfo.thumbnailUrl ||
-                  fileInfo.thumbnail ||
-                  fileInfo.thumb ||
-                  fileInfo.url,
-              },
-            };
-          }),
-        );
+        for (const [key, update] of byId.entries()) {
+          setImageMetadata(key, {
+            width: update.width,
+            height: update.height,
+          });
+        }
       })();
     }, 0);
 
@@ -737,6 +807,49 @@ export function useChatThreadRuntime({
       cancelled = true;
     };
   }, [messages, setMessages]);
+
+  useEffect(() => {
+    if (!conversationId || !isFocused) return;
+    if (!messages || messages.length === 0) return;
+    if (initialCachedMediaWarmupRef.current === conversationId) return;
+    initialCachedMediaWarmupRef.current = conversationId;
+
+    const cancel = scheduleLowPriorityTask(() => {
+      void (async () => {
+        try {
+          const toWarm: string[] = [];
+          const seen = new Set<string>();
+
+          for (const message of messages.slice(0, 10)) {
+            if (message?.type !== "image" && message?.type !== "video")
+              continue;
+            const fileInfo = message.fileInfo || {};
+            const uri =
+              fileInfo.thumbnailUrl ||
+              fileInfo.thumbnail ||
+              fileInfo.thumb ||
+              fileInfo.url;
+            if (!uri) continue;
+            const resolved = resolveMediaUri(uri);
+            if (seen.has(resolved)) continue;
+            seen.add(resolved);
+            toWarm.push(resolved);
+            if (toWarm.length >= 3) break;
+          }
+
+          for (const uri of toWarm) {
+            const cached = await getCachedPath(uri).catch(() => null);
+            if (cached) continue;
+            await prefetchQueue.enqueue(uri).catch(() => null);
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    });
+
+    return () => cancel();
+  }, [conversationId, isFocused, messages]);
 
   useEffect(() => {
     if (!isFocused || !conversationId || conversationId === "new") return;
@@ -759,14 +872,7 @@ export function useChatThreadRuntime({
     if (initialMediaRefreshScheduledRef.current === conversationId) return;
 
     fetchMessages(false);
-    fetchAllMedia();
-  }, [
-    conversationId,
-    isFocused,
-    initialFetchDone,
-    fetchMessages,
-    fetchAllMedia,
-  ]);
+  }, [conversationId, isFocused, initialFetchDone, fetchMessages]);
 
   useEffect(() => {
     if (!isFocused) return;

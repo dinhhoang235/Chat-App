@@ -34,6 +34,7 @@ type ChatMessage = {
 function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread, contactAvatarFallback, onRetry, onLongPress, onReactPress, simple }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean, contactAvatarFallback?: string, onRetry?: (message: ChatMessage) => void, onLongPress?: (message: ChatMessage, x: number, y: number, w: number, h: number) => void, onReactPress?: (message: ChatMessage) => void, simple?: boolean }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
+  const DEBUG_CHAT_SCROLL = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_CHAT_SCROLL;
 
   const highlightAnim = useRef(new Animated.Value(0)).current;
 
@@ -54,6 +55,21 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
       ]).start();
     }
   }, [isHighlighted, highlightAnim]);
+
+  useEffect(() => {
+    if (!DEBUG_CHAT_SCROLL) return;
+    console.log('[chat-bubble-debug] mode snapshot', {
+      messageId: message?.id,
+      type: message?.type,
+      simple: !!simple,
+      fromMe: !!message?.fromMe,
+      hasFileInfo: !!message?.fileInfo,
+      hasImages: Array.isArray(message?.images) && message.images.length > 0,
+      isRevoked: !!message?.isRevoked,
+      isLastInGroup: !!isLastInGroup,
+      isThreadLast: !!isThreadLast,
+    });
+  }, [DEBUG_CHAT_SCROLL, isLastInGroup, isThreadLast, message?.fileInfo, message?.fromMe, message?.id, message?.images, message?.isRevoked, message?.type, simple]);
 
   if (message.type === 'separator' || message.type === 'system') {
     const textToShow = message.text || message.content;
@@ -134,6 +150,7 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
               onVideoCall={onVideoCall}
               onCallAction={onCallAction}
               isGroupThread={isGroupThread}
+              deferHeavyMediaWork={simple}
             />
           );
         }
@@ -300,6 +317,7 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
         onVideoCall={onVideoCall}
         onCallAction={onCallAction}
         isGroupThread={isGroupThread}
+        deferHeavyMediaWork={simple}
       />
     );
   }
@@ -346,9 +364,57 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
   );
 }
 
-// OPTIMIZATION #4: Memoize MessageBubble to prevent re-renders when props haven't changed
-// We use default memoization to ensure render updates when the message object itself changes.
-const MessageBubble = memo(MessageBubbleComponent);
+function areMediaFilesEqual(prevFileInfo: any, nextFileInfo: any) {
+  if (prevFileInfo === nextFileInfo) return true;
+  if (!prevFileInfo || !nextFileInfo) return false;
+  return (
+    prevFileInfo.url === nextFileInfo.url &&
+    prevFileInfo.thumbnailUrl === nextFileInfo.thumbnailUrl &&
+    prevFileInfo.thumbnail === nextFileInfo.thumbnail &&
+    prevFileInfo.thumb === nextFileInfo.thumb &&
+    prevFileInfo.width === nextFileInfo.width &&
+    prevFileInfo.height === nextFileInfo.height &&
+    prevFileInfo.duration === nextFileInfo.duration &&
+    prevFileInfo.mime === nextFileInfo.mime
+  );
+}
+
+function areMessageBubblePropsEqual(prevProps: any, nextProps: any) {
+  const prev = prevProps.message;
+  const next = nextProps.message;
+  if (prev === next) return true;
+  if (!prev || !next) return false;
+
+  if (prev.id !== next.id) return false;
+  if (prev.type !== next.type) return false;
+  if (prev.text !== next.text) return false;
+  if (prev.content !== next.content) return false;
+  if (prev.time !== next.time) return false;
+  if (prev.fromMe !== next.fromMe) return false;
+  if (prev.status !== next.status) return false;
+  if (prev.isRevoked !== next.isRevoked) return false;
+  if (prev.edited !== next.edited) return false;
+  if (prev.senderId !== next.senderId) return false;
+  if (prev.contactName !== next.contactName) return false;
+  if (prev.contactAvatar !== next.contactAvatar) return false;
+  if (prev.replyTo?.id !== next.replyTo?.id) return false;
+  if ((prev.reactions?.length ?? 0) !== (next.reactions?.length ?? 0)) return false;
+  if ((prev.images?.length ?? 0) !== (next.images?.length ?? 0)) return false;
+  if (!areMediaFilesEqual(prev.fileInfo, next.fileInfo)) return false;
+
+  if ((prevProps.allMedia?.length ?? 0) !== (nextProps.allMedia?.length ?? 0)) return false;
+  if (prevProps.simple !== nextProps.simple) return false;
+  if (prevProps.isLastInGroup !== nextProps.isLastInGroup) return false;
+  if (prevProps.isThreadLast !== nextProps.isThreadLast) return false;
+  if (prevProps.isHighlighted !== nextProps.isHighlighted) return false;
+  if (prevProps.highlightQuery !== nextProps.highlightQuery) return false;
+  if (prevProps.progress !== nextProps.progress) return false;
+  if (prevProps.isGroupThread !== nextProps.isGroupThread) return false;
+
+  return true;
+}
+
+const MessageBubble = memo(MessageBubbleComponent, areMessageBubblePropsEqual);
 
 export default MessageBubble;
 

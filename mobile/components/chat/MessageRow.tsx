@@ -23,13 +23,14 @@ type Props = {
     isPinned?: boolean;
   };
   onPress?: () => void;
+  onPressIn?: () => void;
   onAction?: (action: string, data?: any) => void;
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
 };
 
-export default function MessageRow({ message, onPress, onAction, selectionMode = false, selected = false, onToggleSelect }: Props) {
+export default function MessageRow({ message, onPress, onPressIn, onAction, selectionMode = false, selected = false, onToggleSelect }: Props) {
   const [menuVisible, setMenuVisible] = useState(false);
   const [muteVisible, setMuteVisible] = useState(false);
   const [muteSettingsVisible, setMuteSettingsVisible] = useState(false);
@@ -79,6 +80,11 @@ export default function MessageRow({ message, onPress, onAction, selectionMode =
     <>
       <TouchableOpacity
         ref={rowRef}
+        onPressIn={() => {
+          if (!selectionMode) {
+            onPressIn?.();
+          }
+        }}
         onPress={() => {
           if (selectionMode) {
             onToggleSelect?.(message.id);

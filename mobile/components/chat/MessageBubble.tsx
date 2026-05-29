@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, memo } from 'react';
 // Removed useChatThread import to prevent infinite loop
-import { View, Text, useWindowDimensions, Animated } from 'react-native';
+import { View, Text, useWindowDimensions, Animated, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { useTheme } from '@/context/themeContext';
 import MessageContent from './messageParts/MessageContent';
 import MessageContactBubble from './messageParts/MessageContactBubble';
@@ -8,6 +9,8 @@ import MessageReplyPreview from './messageParts/MessageReplyPreview';
 import MessageCallBubble from './messageParts/MessageCallBubble';
 import MessageSwipeableBubble from './messageParts/MessageSwipeableBubble';
 import { setMessageSize } from '@/utils/messageSizeCache';
+import { getAvatarUrl } from '@/utils/avatar';
+import { getInitials } from '@/utils/initials';
 
 
 type ChatMessage = {
@@ -31,11 +34,9 @@ type ChatMessage = {
   isRevoked?: boolean;
 };
 
-function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread, contactAvatarFallback, onRetry, onLongPress, onReactPress, simple }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean, contactAvatarFallback?: string, onRetry?: (message: ChatMessage) => void, onLongPress?: (message: ChatMessage, x: number, y: number, w: number, h: number) => void, onReactPress?: (message: ChatMessage) => void, simple?: boolean }) {
+function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPress, isLastInGroup, isThreadLast, onReply, isHighlighted, onReplyPress, progress, allMedia, onVoiceCall, onVideoCall, onCallAction, isGroupThread, contactAvatarFallback, contactNameFallback, onRetry, onLongPress, onReactPress, simple }: { message: ChatMessage, onPress?: () => void, highlightQuery?: string, onAvatarPress?: () => void, isLastInGroup?: boolean, isThreadLast?: boolean, onReply?: () => void, isHighlighted?: boolean, onReplyPress?: (id: string) => void, progress?: number, allMedia?: any[], onVoiceCall?: () => void, onVideoCall?: () => void, onCallAction?: (message: ChatMessage, callData: any) => void, isGroupThread?: boolean, contactAvatarFallback?: string, contactNameFallback?: string, onRetry?: (message: ChatMessage) => void, onLongPress?: (message: ChatMessage, x: number, y: number, w: number, h: number) => void, onReactPress?: (message: ChatMessage) => void, simple?: boolean }) {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
-  const DEBUG_CHAT_SCROLL = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_CHAT_SCROLL;
-
   const highlightAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -55,21 +56,6 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
       ]).start();
     }
   }, [isHighlighted, highlightAnim]);
-
-  useEffect(() => {
-    if (!DEBUG_CHAT_SCROLL) return;
-    console.log('[chat-bubble-debug] mode snapshot', {
-      messageId: message?.id,
-      type: message?.type,
-      simple: !!simple,
-      fromMe: !!message?.fromMe,
-      hasFileInfo: !!message?.fileInfo,
-      hasImages: Array.isArray(message?.images) && message.images.length > 0,
-      isRevoked: !!message?.isRevoked,
-      isLastInGroup: !!isLastInGroup,
-      isThreadLast: !!isThreadLast,
-    });
-  }, [DEBUG_CHAT_SCROLL, isLastInGroup, isThreadLast, message?.fileInfo, message?.fromMe, message?.id, message?.images, message?.isRevoked, message?.type, simple]);
 
   if (message.type === 'separator' || message.type === 'system') {
     const textToShow = message.text || message.content;
@@ -108,6 +94,30 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
         return {} as any;
       }
     })();
+
+    // Ended group calls are always centered system messages — bypass the regular bubble layout
+    if (message.type === 'call') {
+      const isGroupCallSimple = Boolean(
+        isGroupThread ||
+        callData.isGroupCall ||
+        (Array.isArray(callData.groupTargets) && callData.groupTargets.length > 2) ||
+        (Array.isArray(callData.targetUserIds) && callData.targetUserIds.length > 1)
+      );
+      const isMissedSimple = callData.status === 'missed' || callData.status === 'rejected' || callData.status === 'no_answer';
+      const isEndedGroupCallSimple = isGroupCallSimple && (isMissedSimple || callData.status === 'completed');
+      if (isEndedGroupCallSimple) {
+        return (
+          <MessageCallBubble
+            message={message}
+            onVoiceCall={onVoiceCall}
+            onVideoCall={onVideoCall}
+            onCallAction={onCallAction}
+            isGroupThread={isGroupThread}
+            colors={colors}
+          />
+        );
+      }
+    }
 
     const simpleContent = (() => {
       if (message.isRevoked) {
@@ -172,6 +182,8 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
       );
     })();
 
+    const avatarUri = message.contactAvatar || (contactAvatarFallback ? getAvatarUrl(contactAvatarFallback) || undefined : undefined);
+
     return (
       <View
         style={{
@@ -179,20 +191,45 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
           paddingHorizontal: 16,
           flexDirection: 'row',
           justifyContent: isOutgoing ? 'flex-end' : 'flex-start',
+          position: 'relative',
         }}
       >
+        {!isOutgoing && (
+          <View style={{ position: 'absolute', left: 16, top: 8, zIndex: 1 }}>
+            <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ opacity: isLastInGroup ? 1 : 0 }}>
+              <View 
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: colors.tint,
+                  overflow: 'hidden',
+                }}
+              >
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={{ width: 40, height: 40 }} />
+                ) : (
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>{getInitials(message.contactName || contactNameFallback)}</Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
         <View
           style={{
             maxWidth: '85%',
+            marginLeft: isOutgoing ? 0 : 52,
             backgroundColor:
-              message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact' || message.type === 'audio' || message.type === 'file' || message.type === 'call'
+              message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact'
                 ? 'transparent'
                 : message.type === 'call' && (callData.status === 'missed' && !message.fromMe)
                 ? 'rgba(255, 59, 48, 0.1)'
                 : bubbleBg,
-            borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact' || message.type === 'audio' || message.type === 'file' || message.type === 'call') ? 0 : 1.2,
+            borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : 1.2,
             borderColor,
-            padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact' || message.type === 'audio' || message.type === 'file' || message.type === 'call') ? 0 : message.type === 'call' ? 14 : 12,
+            padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : message.type === 'call' ? 14 : 12,
             borderRadius: 18,
           }}
         >
@@ -335,6 +372,7 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
     <MessageSwipeableBubble
       message={message}
         contactAvatarFallback={contactAvatarFallback}
+        contactNameFallback={contactNameFallback}
       onPress={onPress}
       onReply={onReply}
       onAvatarPress={onAvatarPress}
@@ -410,6 +448,8 @@ function areMessageBubblePropsEqual(prevProps: any, nextProps: any) {
   if (prevProps.highlightQuery !== nextProps.highlightQuery) return false;
   if (prevProps.progress !== nextProps.progress) return false;
   if (prevProps.isGroupThread !== nextProps.isGroupThread) return false;
+  if (prevProps.contactAvatarFallback !== nextProps.contactAvatarFallback) return false;
+  if (prevProps.contactNameFallback !== nextProps.contactNameFallback) return false;
 
   return true;
 }

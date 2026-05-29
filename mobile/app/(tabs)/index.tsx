@@ -101,13 +101,7 @@ export default function Messages() {
     const startedAt = globalThis?.performance?.now?.() ?? Date.now();
     (globalThis as any).__chatOpenTapAt = startedAt;
     (globalThis as any).__chatOpenTapConversationId = conversationId;
-    if (__DEV__) {
-      console.log('[chat-open] tap', {
-        conversationId,
-        startedAt,
-        ...extra,
-      });
-    }
+    // log removed
   };
 
   const warmConversationMedia = (conversationId: string, initialMessages?: any[]) => {
@@ -147,13 +141,7 @@ export default function Messages() {
 
     if (mediaUris.length === 0) return;
 
-    if (__DEV__) {
-      console.log('[chat-open] list prewarm', {
-        conversationId,
-        count: mediaUris.length,
-        mediaUris,
-      });
-    }
+    // log removed
 
     const idle = (globalThis as any).requestIdleCallback || ((cb: any) => setTimeout(cb, 0));
     idle(() => {

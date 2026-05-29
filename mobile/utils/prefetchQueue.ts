@@ -19,27 +19,10 @@ class PrefetchQueue {
   enqueue(url?: string | null) {
     if (!url) return Promise.resolve(null);
     if (this.seen.has(url)) {
-      if (__DEV__) {
-        try {
-          console.log("[prefetchQueue] enqueue skipped (seen)", {
-            url,
-            ts: globalThis?.performance?.now?.() ?? Date.now(),
-          });
-        } catch {}
-      }
       return Promise.resolve(null);
     }
     this.seen.add(url);
-    if (__DEV__) {
-      try {
-        console.log("[prefetchQueue] enqueue", {
-          url,
-          queueLength: this.queue.length,
-          running: this.running,
-          ts: globalThis?.performance?.now?.() ?? Date.now(),
-        });
-      } catch {}
-    }
+
     return new Promise<string | null>((resolve, reject) => {
       this.queue.push({ url, resolve, reject });
       this.next();
@@ -52,47 +35,26 @@ class PrefetchQueue {
     if (!job) return;
     this.running++;
     try {
-      const start = globalThis?.performance?.now?.() ?? Date.now();
-      if (__DEV__) {
-        try {
-          console.log("[prefetchQueue] job start", {
-            url: job.url,
-            queueLength: this.queue.length,
-            running: this.running,
-            start,
-          });
-        } catch {}
-      }
-
       const path = await downloadToCache(job.url);
-      const elapsed = Math.round(
-        (globalThis?.performance?.now?.() ?? Date.now()) - start,
-      );
-      if (__DEV__) {
-        try {
-          console.log("[prefetchQueue] job done", {
-            url: job.url,
-            elapsed,
-            path,
-          });
-        } catch {}
-      }
       job.resolve(path);
     } catch (e) {
-      if (__DEV__) {
-        try {
-          console.warn("[prefetchQueue] job error", {
-            url: job?.url,
-            error: e,
-          });
-        } catch {}
-      }
+      // errors intentionally not logged to reduce noise
       job.reject(e);
     } finally {
       this.running--;
       // schedule next tick
       setTimeout(() => this.next(), 0);
     }
+  }
+
+  // Clear any pending jobs in the queue (does not abort running jobs).
+  clearPending() {
+    this.queue = [];
+  }
+
+  // Adjust concurrency at runtime (minimum 1)
+  setConcurrency(n: number) {
+    this.concurrency = Math.max(1, Math.floor(n || 1));
   }
 }
 

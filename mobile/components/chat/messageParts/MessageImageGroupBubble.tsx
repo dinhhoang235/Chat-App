@@ -72,39 +72,6 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
   const shimmer = useRef(new Animated.Value(0)).current;
 
   const DEBUG_IMAGE_LOG = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_IMAGE;
-  const DEBUG_CHAT_SCROLL = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_CHAT_SCROLL;
-
-  useEffect(() => {
-    if (!DEBUG_IMAGE_LOG) return;
-    console.log('[chat-image-group] mount', {
-      messageId: message?.id,
-      imageCount: message?.images?.length ?? 0,
-      cachedCount: Object.keys(localUriMap).length,
-      loadedCount: Object.keys(loadedMap).filter((key) => loadedMap[key]).length,
-    });
-  }, [loadedMap, localUriMap, message?.id, message?.images?.length, DEBUG_IMAGE_LOG]);
-
-  useEffect(() => {
-    if (!DEBUG_IMAGE_LOG) return;
-    const now = globalThis?.performance?.now?.() ?? Date.now();
-    console.log('[chat-image-group] state snapshot', {
-      messageId: message?.id,
-      ts: now,
-      cachedCount: Object.keys(localUriMap).length,
-      loadedCount: Object.keys(loadedMap).filter((key) => loadedMap[key]).length,
-    });
-  }, [localUriMap, loadedMap, message?.id, DEBUG_IMAGE_LOG]);
-
-  useEffect(() => {
-    if (!DEBUG_CHAT_SCROLL) return;
-    console.log('[chat-image-group-debug] work mode', {
-      messageId: message?.id,
-      deferHeavyWork: !!deferHeavyWork,
-      imageCount: message?.images?.length ?? 0,
-      cachedCount: Object.keys(localUriMap).length,
-      loadedCount: Object.keys(loadedMap).filter((key) => loadedMap[key]).length,
-    });
-  }, [DEBUG_CHAT_SCROLL, deferHeavyWork, loadedMap, localUriMap, message?.id, message?.images?.length]);
 
   const allImagesLoaded = message.images.length > 0 && message.images.every((img: any) => {
     let uri = img.fileInfo?.url || '';
@@ -140,7 +107,7 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
 
           const memoryHit = peekCachedPath(uri);
           if (mounted && memoryHit) {
-            if (DEBUG_IMAGE_LOG) console.log('[chat-image-group] cache hit', { messageId: message?.id, uri });
+            // log removed
             initial[uri] = memoryHit;
             continue;
           }
@@ -149,17 +116,16 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
           // enqueue background prefetch so we don't block the UI thread here.
           getCachedPath(uri)
             .then((cached) => {
-              const now = globalThis?.performance?.now?.() ?? Date.now();
               if (mounted && cached) {
-                if (DEBUG_IMAGE_LOG) console.log('[chat-image-group] cache resolved', { messageId: message?.id, uri, ts: now });
+                // log removed
                 setLocalUriMap((s) => ({ ...s, [uri]: cached }));
                 setLoadedMap((s) => ({ ...s, [uri]: true }));
               }
               else {
-                if (DEBUG_IMAGE_LOG) console.log('[chat-image-group] cache miss, enqueueing', { messageId: message?.id, uri, ts: now });
+                // log removed
                 prefetchQueue.enqueue(uri).then((p) => {
                   if (mounted && p) {
-                    if (DEBUG_IMAGE_LOG) console.log('[chat-image-group] prefetch resolved', { messageId: message?.id, uri, ts: globalThis?.performance?.now?.() ?? Date.now() });
+                    // log removed
                     setLocalUriMap((s) => ({ ...s, [uri]: p }));
                     setLoadedMap((s) => ({ ...s, [uri]: true }));
                   }
@@ -168,12 +134,12 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
             })
             .catch(() => {
               prefetchQueue.enqueue(uri).then((p) => {
-                if (mounted && p) {
-                  if (DEBUG_IMAGE_LOG) console.log('[chat-image-group] prefetch resolved', { messageId: message?.id, uri });
-                  setLocalUriMap((s) => ({ ...s, [uri]: p }));
-                  setLoadedMap((s) => ({ ...s, [uri]: true }));
-                }
-              }).catch(() => {});
+                  if (mounted && p) {
+                    // log removed
+                    setLocalUriMap((s) => ({ ...s, [uri]: p }));
+                    setLoadedMap((s) => ({ ...s, [uri]: true }));
+                  }
+                }).catch(() => {});
             });
         } catch {}
       }
@@ -213,7 +179,7 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
               const newRatio = w / h || 0;
               if (!prev || Math.abs(prevRatio - newRatio) > 0.03) {
                 IMAGE_SIZE_CACHE.set(uri, { width: w, height: h });
-                if (DEBUG_IMAGE_LOG) console.log('[chat-image-group] measured', { messageId: message?.id, uri, w, h });
+                // log removed
               }
             } catch {}
           }, () => {});
@@ -251,9 +217,8 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
             }
           })();
 
-          if (computed && message.id != null) {
+            if (computed && message.id != null) {
             setMessageSize(message.id, computed);
-            if (DEBUG_IMAGE_LOG) console.log('[chat-image-group] setMessageSize', { messageId: message.id, size: computed });
           }
         } catch {}
       }, 260);
@@ -328,12 +293,12 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
               contentFit="cover"
               onLoad={() => {
                 if (LOADED_IMAGE_URIS.has(uri)) return;
-                if (DEBUG_IMAGE_LOG) console.log('[chat-image-group] onLoad', { messageId: message?.id, uri });
+                // log removed
                 LOADED_IMAGE_URIS.add(uri);
                 setLoadedMap((s) => ({ ...s, [uri]: true }));
               }}
               onError={() => {
-                if (DEBUG_IMAGE_LOG) console.log('[chat-image-group] onError', { messageId: message?.id, uri });
+                  // log removed
                 setLoadedMap((s) => ({ ...s, [uri]: true }));
               }}
             />

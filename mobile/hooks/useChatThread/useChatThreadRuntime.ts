@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { getAvatarUrl } from "@/utils/avatar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   setActiveConversationId,
@@ -186,60 +187,33 @@ export function useChatThreadRuntime({
   const initialVisibleMediaWarmupRef = useRef<string | null>(null);
   const initialCachedMediaWarmupRef = useRef<string | null>(null);
 
-  const warmMediaUris = useCallback(
-    async (uris: string[]) => {
-      const seen = new Set<string>();
+  const warmMediaUris = useCallback(async (uris: string[]) => {
+    const seen = new Set<string>();
 
-      if (__DEV__) {
-        console.log("[chat-runtime] warmMediaUris start", {
-          conversationId,
-          count: uris.length,
-          ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
-        });
-      }
+    // log removed
 
-      const tasks = uris.map(async (uri) => {
-        if (!uri || seen.has(uri)) return;
-        seen.add(uri);
+    const tasks = uris.map(async (uri) => {
+      if (!uri || seen.has(uri)) return;
+      seen.add(uri);
 
-        try {
-          const cached = await getCachedPath(uri);
-          if (cached) {
-            if (__DEV__) {
-              console.log("[chat-runtime] warmMediaUris cache hit", {
-                conversationId,
-                uri,
-                ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
-              });
-            }
-            return;
-          }
-        } catch {}
+      try {
+        const cached = await getCachedPath(uri);
+        if (cached) {
+          // log removed
+          return;
+        }
+      } catch {}
 
-        try {
-          if (__DEV__) {
-            console.log("[chat-runtime] warmMediaUris enqueue", {
-              conversationId,
-              uri,
-              ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
-            });
-          }
-          await prefetchQueue.enqueue(uri).catch(() => null);
-        } catch {}
-      });
+      try {
+        // log removed
+        await prefetchQueue.enqueue(uri).catch(() => null);
+      } catch {}
+    });
 
-      await Promise.all(tasks);
+    await Promise.all(tasks);
 
-      if (__DEV__) {
-        console.log("[chat-runtime] warmMediaUris end", {
-          conversationId,
-          count: seen.size,
-          ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
-        });
-      }
-    },
-    [conversationId],
-  );
+    // log removed
+  }, []);
 
   const getMessageCacheKey = useCallback((conversationIdValue: string) => {
     return `${MESSAGE_CACHE_PREFIX}${conversationIdValue}`;
@@ -385,14 +359,15 @@ export function useChatThreadRuntime({
   );
 
   const fetchGroupDetails = useCallback(async () => {
-    if (!id || params.isGroup !== "true") return;
+    const activeId = conversationId || id;
+    if (!activeId || activeId === "new" || params.isGroup !== "true") return;
     try {
-      const response = await chatApi.getConversationDetails(id);
+      const response = await chatApi.getConversationDetails(activeId);
       setGroupDetails(response.data);
     } catch (err) {
       error("Fetch group details error:", err);
     }
-  }, [id, params.isGroup, setGroupDetails]);
+  }, [id, conversationId, params.isGroup, setGroupDetails]);
 
   const fetchGroupDetailsRef = useRef(fetchGroupDetails);
   useEffect(() => {
@@ -407,17 +382,7 @@ export function useChatThreadRuntime({
         return;
       }
 
-      const startedAt = globalThis?.performance?.now?.() ?? Date.now();
-
-      if (__DEV__) {
-        console.log("[chat-runtime] fetchMessages start", {
-          conversationId,
-          isLoadMore,
-          messagesInRef: messagesRef.current.length,
-          hasMore,
-          loadingMore,
-        });
-      }
+      // timing removed
 
       try {
         if (isLoadMore) setLoadingMore(true);
@@ -428,7 +393,7 @@ export function useChatThreadRuntime({
             ? messagesRef.current[messagesRef.current.length - 1].id
             : undefined;
 
-        const networkStartedAt = globalThis?.performance?.now?.() ?? Date.now();
+        // const networkStartedAt = globalThis?.performance?.now?.() ?? Date.now();
 
         const response = await chatApi.getMessages(
           Number(conversationId),
@@ -436,37 +401,16 @@ export function useChatThreadRuntime({
           20,
         );
 
-        if (__DEV__) {
-          console.log("[chat-runtime] fetchMessages network done", {
-            conversationId,
-            isLoadMore,
-            ms: Math.round(
-              (globalThis?.performance?.now?.() ?? Date.now()) -
-                networkStartedAt,
-            ),
-            count: response.data?.length ?? 0,
-          });
-        }
+        // log removed
 
         const newMessages = response.data;
 
-        const mappingStartedAt = globalThis?.performance?.now?.() ?? Date.now();
+        // const mappingStartedAt = globalThis?.performance?.now?.() ?? Date.now();
         const mapped = newMessages.map((m: any) =>
           mapThreadMessage(m, userId, { includeSeenBy: true }),
         );
 
-        if (__DEV__) {
-          console.log("[chat-runtime] fetchMessages mapped", {
-            conversationId,
-            isLoadMore,
-            ms: Math.round(
-              (globalThis?.performance?.now?.() ?? Date.now()) -
-                mappingStartedAt,
-            ),
-            mappedCount: mapped.length,
-            withMedia: mapped.filter((m: any) => !!m.fileInfo).length,
-          });
-        }
+        // log removed
 
         if (
           !isLoadMore &&
@@ -495,22 +439,15 @@ export function useChatThreadRuntime({
           }
 
           if (warmUris.length > 0) {
-            if (__DEV__) {
-              console.log("[chat-runtime] warmMediaUris selected", {
-                conversationId,
-                messageIds: warmMessages.map(
-                  (message: any) => message?.id ?? null,
-                ),
-                uris: warmUris,
-                ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
-              });
-            }
             void warmMediaUris(warmUris);
           }
         }
 
         if (isLoadMore) {
-          setMessages((prev) => dedupeById([...prev, ...mapped]));
+          setMessages((prev) => {
+            const next = dedupeById([...prev, ...mapped]);
+            return next;
+          });
         } else {
           const nextMessages = dedupeById(mapped);
           setMessages((prev) =>
@@ -536,16 +473,6 @@ export function useChatThreadRuntime({
         setLoadingMore(false);
         if (!isLoadMore && initialFetchInFlightRef.current === conversationId) {
           initialFetchInFlightRef.current = null;
-        }
-
-        if (__DEV__) {
-          console.log("[chat-runtime] fetchMessages end", {
-            conversationId,
-            isLoadMore,
-            elapsedMs: Math.round(
-              (globalThis?.performance?.now?.() ?? Date.now()) - startedAt,
-            ),
-          });
         }
       }
     },
@@ -636,19 +563,10 @@ export function useChatThreadRuntime({
 
         // Try to read cache as soon as possible (do not defer to interactions)
         // so we can render cached messages immediately on open.
-        const cacheStartedAt = globalThis?.performance?.now?.() ?? Date.now();
+        // timing removed
         loadMessagesCache(conversationId)
           .then((cachedMessages) => {
-            if (__DEV__) {
-              console.log("[chat-runtime] cache read done", {
-                conversationId,
-                cachedCount: cachedMessages.length,
-                ms: Math.round(
-                  (globalThis?.performance?.now?.() ?? Date.now()) -
-                    cacheStartedAt,
-                ),
-              });
-            }
+            // log removed
             if (
               !cancelled &&
               cachedMessages.length > 0 &&
@@ -873,6 +791,49 @@ export function useChatThreadRuntime({
 
     fetchMessages(false);
   }, [conversationId, isFocused, initialFetchDone, fetchMessages]);
+
+  useEffect(() => {
+    if (isFocused && isGroup && conversationId) {
+      fetchGroupDetails();
+    }
+  }, [isFocused, isGroup, conversationId, fetchGroupDetails]);
+
+  // When groupDetails loads (after the initial render), FlashList won't re-render
+  // existing cells unless the data items themselves change. Patch each message
+  // with the sender's name + avatar so the FlashList data array is updated and
+  // bubbles re-render with correct initials instead of the 'U' fallback.
+  useEffect(() => {
+    if (!groupDetails?.participants || !setMessages) return;
+
+    const participantMap = new Map<string, { fullName: string; avatar: string | null }>();
+    for (const p of groupDetails.participants) {
+      if (p.user?.id != null) {
+        participantMap.set(String(p.user.id), {
+          fullName: p.user.fullName,
+          avatar: p.user.avatar ?? null,
+        });
+      }
+    }
+
+    setMessages((prev: any[]) => {
+      let changed = false;
+      const next = prev.map((m: any) => {
+        if (!m.senderId || m.fromMe) return m;
+        const participant = participantMap.get(String(m.senderId));
+        if (!participant) return m;
+
+        const newContactName = participant.fullName;
+        const newContactAvatar = participant.avatar
+          ? getAvatarUrl(participant.avatar) ?? undefined
+          : undefined;
+
+        if (m.contactName === newContactName && m.contactAvatar === newContactAvatar) return m;
+        changed = true;
+        return { ...m, contactName: newContactName, contactAvatar: newContactAvatar };
+      });
+      return changed ? next : prev;
+    });
+  }, [groupDetails, setMessages]);
 
   useEffect(() => {
     if (!isFocused) return;

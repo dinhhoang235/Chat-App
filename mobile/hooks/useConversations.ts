@@ -67,14 +67,7 @@ const warmConversationInitialMedia = (conversation: any) => {
   }
 
   if (uris.length === 0) return;
-
-  if (__DEV__) {
-    console.log("[chat-open] list hydrate prewarm", {
-      conversationId: conversation.id,
-      count: uris.length,
-      uris,
-    });
-  }
+  // log removed
 
   for (const uri of uris) {
     void prefetchQueue.enqueue(uri).catch(() => null);

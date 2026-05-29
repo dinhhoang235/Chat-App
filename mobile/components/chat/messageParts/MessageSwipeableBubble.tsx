@@ -20,6 +20,7 @@ type MessageSwipeableBubbleProps = {
   isThreadLast?: boolean;
   isOutgoing: boolean;
   contactAvatarFallback?: string;
+  contactNameFallback?: string;
   bubbleBg: string;
   animatedBorderStyle: any;
   children: React.ReactNode;
@@ -46,6 +47,7 @@ export default function MessageSwipeableBubble({
   isThreadLast,
   isOutgoing,
   contactAvatarFallback,
+  contactNameFallback,
   bubbleBg,
   animatedBorderStyle,
   children,
@@ -138,6 +140,8 @@ export default function MessageSwipeableBubble({
 
   const avatarUri = message.contactAvatar || (contactAvatarFallback ? getAvatarUrl(contactAvatarFallback) || undefined : undefined);
 
+  // debug logs removed
+
   const handleInnerLongPress = () => {
     if (message.isRevoked || message.type === 'call') return;
     bubbleRef.current?.measureInWindow((x, y, w, h) => {
@@ -198,7 +202,7 @@ export default function MessageSwipeableBubble({
                 {avatarUri ? (
                   <Image source={{ uri: avatarUri }} style={{ width: 40, height: 40 }} />
                 ) : (
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>{getInitials(message.contactName)}</Text>
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>{getInitials(message.contactName || contactNameFallback)}</Text>
                 )}
               </Reanimated.View>
             </TouchableOpacity>

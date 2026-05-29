@@ -40,78 +40,37 @@ export function useChatThread(options?: UseChatThreadOptions) {
   const paramStatus = params.status as string | undefined;
   const paramLastSeen = params.lastSeen as string | undefined;
   const initialMessages = useMemo(() => {
-    const startedAt = globalThis?.performance?.now?.() ?? Date.now();
+    // timing removed
     if (id && chatThreadCache.hasMessages(id)) {
       const cachedMessages = chatThreadCache
         .getMessages(id)
         .map((message: any) =>
           mapThreadMessage(message, user?.id, { includeSeenBy: true }),
         );
-      if (__DEV__) {
-        console.log("[chat-thread] initialMessages from memory cache", {
-          conversationId: id,
-          count: cachedMessages.length,
-          ms: Math.round(
-            (globalThis?.performance?.now?.() ?? Date.now()) - startedAt,
-          ),
-        });
-      }
+      // log removed
       return cachedMessages;
     }
 
     const raw = params.initialMessages as string | undefined;
     if (!raw) {
-      if (__DEV__) {
-        console.log("[chat-thread] initialMessages empty", {
-          conversationId: id,
-          source: "none",
-          ms: Math.round(
-            (globalThis?.performance?.now?.() ?? Date.now()) - startedAt,
-          ),
-        });
-      }
+      // log removed
       return [] as any[];
     }
 
     try {
       const parsed = JSON.parse(decodeURIComponent(raw));
       if (!Array.isArray(parsed)) {
-        if (__DEV__) {
-          console.log("[chat-thread] initialMessages invalid payload", {
-            conversationId: id,
-            source: "params.initialMessages",
-            ms: Math.round(
-              (globalThis?.performance?.now?.() ?? Date.now()) - startedAt,
-            ),
-          });
-        }
+        // log removed
         return [] as any[];
       }
 
       const mapped = parsed.map((message: any) =>
         mapThreadMessage(message, user?.id, { includeSeenBy: true }),
       );
-      if (__DEV__) {
-        console.log("[chat-thread] initialMessages from params", {
-          conversationId: id,
-          count: mapped.length,
-          rawLength: raw.length,
-          ms: Math.round(
-            (globalThis?.performance?.now?.() ?? Date.now()) - startedAt,
-          ),
-        });
-      }
+      // log removed
       return mapped;
     } catch (error) {
-      if (__DEV__) {
-        console.log("[chat-thread] initialMessages parse failed", {
-          conversationId: id,
-          error: String(error),
-          ms: Math.round(
-            (globalThis?.performance?.now?.() ?? Date.now()) - startedAt,
-          ),
-        });
-      }
+      // log removed
       return [] as any[];
     }
   }, [id, params.initialMessages, user?.id]);
@@ -258,34 +217,14 @@ export function useChatThread(options?: UseChatThreadOptions) {
   });
 
   const processedMessages = useMemo(() => {
-    const startedAt = globalThis?.performance?.now?.() ?? Date.now();
+    // timing removed
     const processed = buildProcessedMessages(messages);
-    if (__DEV__) {
-      console.log("[chat-thread] buildProcessedMessages", {
-        conversationId: id,
-        messages: messages.length,
-        processed: processed.length,
-        ms: Math.round(
-          (globalThis?.performance?.now?.() ?? Date.now()) - startedAt,
-        ),
-      });
-    }
+    // log removed
     return processed;
   }, [id, messages]);
 
   useEffect(() => {
-    if (!__DEV__) return;
-    console.log("[chat-thread] state snapshot", {
-      conversationId: conversationId ?? id,
-      messages: messages.length,
-      processedMessages: processedMessages.length,
-      loading,
-      loadingMore,
-      initialFetchDone,
-      isFocused,
-      isGroup,
-      hasMore,
-    });
+    // log removed
   }, [
     conversationId,
     id,
@@ -504,6 +443,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     targetUserStatus,
     isGroup,
     groupAvatars,
+    groupDetails,
     membersCount,
     allMedia,
     fetchAllMedia,

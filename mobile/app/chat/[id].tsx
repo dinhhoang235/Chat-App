@@ -17,17 +17,18 @@ import { chatThreadCache } from '@/utils/chatThreadCache';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 
+
+
 export default function ChatThread() {
   const DEFAULT_COMPOSER_HEIGHT = 74;
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const renderStartedAt = globalThis?.performance?.now?.() ?? Date.now();
-  const mountedAtRef = React.useRef(globalThis?.performance?.now?.() ?? Date.now());
+  
+  // mountedAtRef intentionally removed (timing/logging removed)
   const loggedFirstLayoutRef = React.useRef(false);
   const loggedChatListReadyRef = React.useRef(false);
   const loggedDeferredChromeReadyRef = React.useRef(false);
   const loggedFlashListLayoutRef = React.useRef(false);
   const loggedFirstItemRenderRef = React.useRef(false);
-  const chatRenderCountRef = React.useRef(0);
   const richChromeReadyTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const thumbnailPrefetchRunRef = React.useRef<string | null>(null);
   const sizePrefillRunRef = React.useRef<string | null>(null);
@@ -60,20 +61,7 @@ export default function ChatThread() {
   const [chatListReady, setChatListReady] = React.useState(false);
   const [visibleMessageIdSet, setVisibleMessageIdSet] = React.useState<Set<string>>(new Set());
   const [backgroundMediaWarmupEnabled, setBackgroundMediaWarmupEnabled] = React.useState(false);
-  const DEBUG_CHAT_SCROLL = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_CHAT_SCROLL;
-
-  if (__DEV__ && DEBUG_CHAT_SCROLL) {
-    chatRenderCountRef.current += 1;
-    const tapAt = (globalThis as any).__chatOpenTapAt;
-    console.log('[chat-open-debug] render start', {
-      renderCount: chatRenderCountRef.current,
-      conversationId: String((globalThis as any).__chatOpenTapConversationId ?? params?.id ?? ''),
-      sinceTapMs: typeof tapAt === 'number' ? Math.round(renderStartedAt - tapAt) : null,
-      renderStartedAt: Math.round(renderStartedAt),
-      chatListReady,
-      richMessageChromeReady,
-    });
-  }
+  const DEBUG_CHAT_UI = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_UI;
 
   const scheduleLowPriorityTask = React.useCallback((task: () => void) => {
     const requestIdle = (globalThis as any).requestIdleCallback;
@@ -139,6 +127,7 @@ export default function ChatThread() {
     targetUser,
     isGroup,
     groupAvatars,
+    groupDetails,
     membersCount,
     lastKeyboardHeight,
     processedMessages,
@@ -171,17 +160,17 @@ export default function ChatThread() {
     }, []),
   });
 
+
+
+  if (__DEV__ && DEBUG_CHAT_UI) {
+    try {
+      // log removed
+    } catch {}
+  }
+
   React.useEffect(() => {
     if (!__DEV__) return;
-    const mountedAt = mountedAtRef.current;
-    const tapAt = (globalThis as any).__chatOpenTapAt;
-    const tapConversationId = (globalThis as any).__chatOpenTapConversationId;
-    console.log('[chat-open] screen mount', {
-      conversationId,
-      mountedAt: Math.round(mountedAt),
-      sinceTapMs: typeof tapAt === 'number' ? Math.round((globalThis?.performance?.now?.() ?? Date.now()) - tapAt) : null,
-      tapConversationId: tapConversationId ?? null,
-    });
+    // log removed
   }, [conversationId]);
 
   React.useEffect(() => {
@@ -228,14 +217,7 @@ export default function ChatThread() {
 
   React.useEffect(() => {
     if (!__DEV__) return;
-    console.log('[chat-screen] state snapshot', {
-      conversationId,
-      messages: messages.length,
-      processedMessages: processedMessages.length,
-      loading,
-      loadingMore,
-      hasMore,
-    });
+    // log removed
   }, [conversationId, messages.length, processedMessages.length, loading, loadingMore, hasMore]);
 
   // Run a small prewarm for visible thumbnails in background to improve
@@ -487,6 +469,7 @@ export default function ChatThread() {
   );
 
   const renderItem = React.useCallback(({ item, index }: any) => {
+    // log removed
     if (item.type === 'date_separator') {
       return (
         <View className="items-center my-4">
@@ -503,6 +486,22 @@ export default function ChatThread() {
     const isMediaRow = item.type === 'image' || item.type === 'image_group' || item.type === 'video' || item.type === 'audio' || item.type === 'file' || item.type === 'location';
     const shouldUseSimpleMode = isMediaRow || !backgroundMediaWarmupEnabled || !richMessageChromeReady || !visibleMessageIdSet.has(item.id?.toString?.() ?? String(item.id ?? ''));
 
+    let groupSenderAvatar: string | undefined = undefined;
+    let groupSenderName: string | undefined = undefined;
+
+    if (isGroup && groupDetails?.participants) {
+      const senderObj = groupDetails.participants.find((p: any) => {
+        const pUserId = p.user?.id;
+        const matches = pUserId != null && String(pUserId) === String(item.senderId);
+        return matches;
+      });
+      const sender = senderObj?.user;
+      if (sender) {
+        groupSenderAvatar = sender.avatar || undefined;
+        groupSenderName = sender.fullName || undefined;
+      }
+    }
+
     return (
       <MessageBubble
         message={item}
@@ -510,7 +509,8 @@ export default function ChatThread() {
         highlightQuery={searchQuery}
         isLastInGroup={isLastInConsecutiveGroup}
         isThreadLast={isThreadLast}
-        contactAvatarFallback={!isGroup ? (targetUser?.avatar || (params.avatar as string | undefined)) : undefined}
+        contactAvatarFallback={isGroup ? groupSenderAvatar : (targetUser?.avatar || (params.avatar as string | undefined))}
+        contactNameFallback={isGroup ? groupSenderName : (targetUser?.fullName || (paramName as string | undefined))}
         onPress={() => {
           if (composerVisible) closeAll();
           if (gifVisible) setGifVisible(false);
@@ -545,7 +545,7 @@ export default function ChatThread() {
         }}
       />
     );
-  }, [backgroundMediaWarmupEnabled, processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage, setReactionSheetVisible, setReactionsDetailVisible, richMessageChromeReady, visibleMessageIdSet]);
+  }, [backgroundMediaWarmupEnabled, processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, targetUser?.fullName, params.avatar, paramName, handleRetryMessage, setReactionSheetVisible, setReactionsDetailVisible, richMessageChromeReady, visibleMessageIdSet, groupDetails]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
@@ -570,59 +570,17 @@ export default function ChatThread() {
     micVisible;
 
   React.useEffect(() => {
-    if (!DEBUG_CHAT_SCROLL) return;
-    const tapAt = (globalThis as any).__chatOpenTapAt;
-    console.log('[chat-open-debug] flags', {
-      conversationId,
-      renderCount: chatRenderCountRef.current,
-      sinceTapMs: typeof tapAt === 'number' ? Math.round((globalThis?.performance?.now?.() ?? Date.now()) - tapAt) : null,
-      chatListReady,
-      richMessageChromeReady,
-      renderDeferredChrome,
-      messages: messages.length,
-      processedMessages: processedMessages.length,
-      loading,
-      loadingMore,
-      hasMore,
-    });
-  }, [DEBUG_CHAT_SCROLL, chatListReady, conversationId, hasMore, loading, loadingMore, messages.length, processedMessages.length, renderDeferredChrome, richMessageChromeReady]);
-
-  React.useEffect(() => {
     if (!__DEV__ || loggedChatListReadyRef.current) return;
     if (!chatListReady) return;
     loggedChatListReadyRef.current = true;
-    const tapAt = (globalThis as any).__chatOpenTapAt;
-    console.log('[chat-open] chatListReady', {
-      conversationId,
-      sinceTapMs: typeof tapAt === 'number' ? Math.round((globalThis?.performance?.now?.() ?? Date.now()) - tapAt) : null,
-      sinceMountMs: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - mountedAtRef.current),
-      processedMessages: processedMessages.length,
-    });
+    // log removed
   }, [chatListReady, conversationId, processedMessages.length]);
 
   React.useEffect(() => {
     if (!__DEV__ || loggedDeferredChromeReadyRef.current) return;
     if (!renderDeferredChrome) return;
     loggedDeferredChromeReadyRef.current = true;
-    const tapAt = (globalThis as any).__chatOpenTapAt;
-    console.log('[chat-open] deferred chrome ready', {
-      conversationId,
-      sinceTapMs: typeof tapAt === 'number' ? Math.round((globalThis?.performance?.now?.() ?? Date.now()) - tapAt) : null,
-      sinceMountMs: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - mountedAtRef.current),
-      chatListReady,
-      composerVisible,
-      galleryVisible,
-      emojiVisible,
-      micVisible,
-      gifVisible,
-      messageMenuVisible,
-      reactionSheetVisible,
-      reactionsDetailVisible,
-      forwardSheetVisible,
-      deleteSheetVisible,
-      shareContactModalVisible,
-      locationModalVisible,
-    });
+    // log removed
   }, [chatListReady, composerVisible, conversationId, deleteSheetVisible, emojiVisible, forwardSheetVisible, gifVisible, galleryVisible, locationModalVisible, messageMenuVisible, reactionSheetVisible, reactionsDetailVisible, renderDeferredChrome, shareContactModalVisible, micVisible]);
 
   const getChatItemType = React.useCallback((item: any) => {
@@ -677,6 +635,7 @@ export default function ChatThread() {
       const measured = getMessageSize(item.id);
       if (measured && measured > 0) {
         layout.size = measured;
+        // log removed
         return;
       }
     } catch {
@@ -696,6 +655,7 @@ export default function ChatThread() {
         }
         // include bubble padding + footer estimate
         layout.size = Math.round(imgH + 12 + 10);
+        // log removed
         return;
       } catch {
         // fall through
@@ -767,6 +727,7 @@ export default function ChatThread() {
   const visibleItemsRef = React.useRef<any[]>([]);
 
   const onViewableItemsChanged = React.useCallback(({ viewableItems }: { viewableItems: any[] }) => {
+    // log removed
     visibleItemsRef.current = viewableItems;
     try {
       const nextVisibleIds = new Set<string>();
@@ -788,6 +749,7 @@ export default function ChatThread() {
         }
         return nextVisibleIds;
       });
+    // log removed
     } catch {}
     if (!backgroundMediaWarmupEnabled) {
       return;
@@ -846,7 +808,6 @@ export default function ChatThread() {
       return;
     }
     thumbnailPrefetchRunRef.current = conversationId;
-    const startedAt = globalThis?.performance?.now?.() ?? Date.now();
     let cancelled = false;
 
     const cancelSchedule = scheduleLowPriorityTask(() => {
@@ -864,21 +825,8 @@ export default function ChatThread() {
           }
 
           if (cancelled || toPrefetch.length === 0) {
-            if (__DEV__) {
-              console.log('[chat-screen] thumbnail prefetch skipped', {
-                conversationId,
-                processedMessages: processedMessages.length,
-                ms: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - startedAt),
-              });
-            }
+            // log removed
             return;
-          }
-
-          if (__DEV__) {
-            console.log('[chat-screen] thumbnail prefetch start', {
-              conversationId,
-              count: toPrefetch.length,
-            });
           }
 
           const [{ getCachedPath }, { default: prefetchQueue }] = await Promise.all([
@@ -897,13 +845,7 @@ export default function ChatThread() {
             new Promise((res) => setTimeout(res, 80)),
           ]);
 
-          if (__DEV__) {
-            console.log('[chat-screen] thumbnail prefetch done', {
-              conversationId,
-              count: toPrefetch.length,
-              ms: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - startedAt),
-            });
-          }
+          // log removed
         } catch {
           // ignore
         }
@@ -916,15 +858,27 @@ export default function ChatThread() {
     };
   }, [backgroundMediaWarmupEnabled, conversationId, processedMessages, scheduleLowPriorityTask]);
 
+  // Ensure any pending prefetch jobs scheduled by this screen are cleared
+  // when the conversation changes or the component unmounts to avoid
+  // background work competing with navigation / first paint.
+  React.useEffect(() => {
+    return () => {
+      try {
+        import('../../utils/prefetchQueue').then(({ default: prefetchQueue }) => {
+          try {
+            prefetchQueue.clearPending();
+          } catch {}
+        }).catch(() => {});
+      } catch {}
+    };
+  }, [conversationId]);
+
   const viewabilityConfig = React.useMemo(() => ({ itemVisiblePercentThreshold: 5, waitForInteraction: false }), []);
 
   const handleBlankArea = React.useCallback((event: { offsetStart: number; offsetEnd: number; blankArea: number }) => {
     if (event.blankArea <= 0) return;
-    if (__DEV__) {
-      const visible = (visibleItemsRef.current || []).map((v) => ({ index: v.index, id: v.item?.id, type: getChatItemType(v.item) }));
-      console.debug('[FlashList] blank area', event, 'visibleItems:', visible);
-    }
-  }, [getChatItemType]);
+    // log removed
+  }, []);
 
   // Prefill cache with estimated sizes after interactions, and only for a
   // small visible window. This keeps the first paint responsive.
@@ -934,18 +888,13 @@ export default function ChatThread() {
     if (sizePrefillRunRef.current === conversationId) return;
     sizePrefillRunRef.current = conversationId;
 
-    const startedAt = globalThis?.performance?.now?.() ?? Date.now();
+    // timing removed
     let cancelled = false;
 
     const cancelSchedule = scheduleLowPriorityTask(() => {
       if (cancelled) return;
 
-      if (__DEV__) {
-        console.log('[chat-screen] size prefill start', {
-          conversationId,
-          processedMessages: processedMessages.length,
-        });
-      }
+      // log removed
 
       try {
         const prefillItems = processedMessages.slice(0, 24);
@@ -1016,13 +965,7 @@ export default function ChatThread() {
         // ignore
       }
 
-      if (__DEV__) {
-        console.log('[chat-screen] size prefill done', {
-          conversationId,
-          prefilled: Math.min(60, processedMessages.length),
-          ms: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - startedAt),
-        });
-      }
+      // log removed
     });
 
     return () => {
@@ -1041,7 +984,7 @@ export default function ChatThread() {
         if (!processedMessages || processedMessages.length === 0) return;
         if (mediaPrefetchRunRef.current === conversationId) return;
         mediaPrefetchRunRef.current = conversationId;
-        const startedAt = globalThis?.performance?.now?.() ?? Date.now();
+        // timing removed
         const toPrefetch: string[] = [];
 
         for (const item of processedMessages) {
@@ -1057,12 +1000,7 @@ export default function ChatThread() {
 
         // enqueue downloads to the shared prefetch queue so they write to disk cache
         const { default: prefetchQueue } = await import('../../utils/prefetchQueue');
-        if (__DEV__) {
-          console.log('[chat-screen] media prefetch queue start', {
-            conversationId,
-            count: toPrefetch.length,
-          });
-        }
+        // log removed
         for (let i = 0; i < toPrefetch.length && mounted; i++) {
           const uri = toPrefetch[i];
           // stagger slightly but rely on queue concurrency; slower stagger to reduce spikes
@@ -1072,13 +1010,7 @@ export default function ChatThread() {
             } catch {}
           }, i * 220);
         }
-        if (__DEV__) {
-          console.log('[chat-screen] media prefetch queue scheduled', {
-            conversationId,
-            count: toPrefetch.length,
-            ms: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - startedAt),
-          });
-        }
+        // log removed
       })();
     });
     return () => { mounted = false; cancel(); };
@@ -1100,12 +1032,7 @@ export default function ChatThread() {
       onLayout={() => {
         if (!__DEV__ || loggedFirstLayoutRef.current) return;
         loggedFirstLayoutRef.current = true;
-        const tapAt = (globalThis as any).__chatOpenTapAt;
-        console.log('[chat-open] first layout', {
-          conversationId,
-          sinceTapMs: typeof tapAt === 'number' ? Math.round((globalThis?.performance?.now?.() ?? Date.now()) - tapAt) : null,
-          sinceMountMs: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - mountedAtRef.current),
-        });
+        // log removed
       }}
     >
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -1277,6 +1204,7 @@ export default function ChatThread() {
                   onTouchStart={maybeCloseAll}
                 >
                   <FlashList
+                    extraData={{ groupDetails, colors, searchQuery, highlightedMessageId }}
                     initialNumToRender={4}
                     ref={flatListRef}
                     data={processedMessages}
@@ -1302,13 +1230,7 @@ export default function ChatThread() {
                     onLayout={() => {
                       if (!__DEV__ || loggedFlashListLayoutRef.current) return;
                       loggedFlashListLayoutRef.current = true;
-                      const tapAt = (globalThis as any).__chatOpenTapAt;
-                      console.log('[chat-open] flashlist layout', {
-                        conversationId,
-                        sinceTapMs: typeof tapAt === 'number' ? Math.round((globalThis?.performance?.now?.() ?? Date.now()) - tapAt) : null,
-                        sinceMountMs: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - mountedAtRef.current),
-                        processedMessages: processedMessages.length,
-                      });
+                      // log removed
                     }}
                     // Keep the initial draw window smaller so the list does less
                     // work while the first page is still settling.
@@ -1383,15 +1305,7 @@ export default function ChatThread() {
                     renderItem={(info) => {
                       if (__DEV__ && !loggedFirstItemRenderRef.current) {
                         loggedFirstItemRenderRef.current = true;
-                        const tapAt = (globalThis as any).__chatOpenTapAt;
-                        console.log('[chat-open] first item render', {
-                          conversationId,
-                          sinceTapMs: typeof tapAt === 'number' ? Math.round((globalThis?.performance?.now?.() ?? Date.now()) - tapAt) : null,
-                          sinceMountMs: Math.round((globalThis?.performance?.now?.() ?? Date.now()) - mountedAtRef.current),
-                          itemType: info?.item?.type ?? null,
-                          itemId: info?.item?.id ?? null,
-                          index: info?.index ?? null,
-                        });
+                        // log removed
                       }
                       return renderItem(info);
                     }}

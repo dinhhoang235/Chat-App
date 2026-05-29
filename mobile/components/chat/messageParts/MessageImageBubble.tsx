@@ -80,25 +80,12 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
   }
 
   const shimmer = useRef(new Animated.Value(0)).current;
-  const DEBUG_CHAT_SCROLL = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_CHAT_SCROLL;
 
   const cachedLocalFull = fullImageUri ? (IMAGE_SOURCE_CACHE.get(fullImageUri) || peekCachedPath(fullImageUri) || null) : null;
   const cachedLocalThumb = thumbnailUri ? peekCachedPath(thumbnailUri) : null;
   const [localThumb, setLocalThumb] = useState<string | null>(cachedLocalThumb);
   const [localFull, setLocalFull] = useState<string | null>(cachedLocalFull);
   const [loaded, setLoaded] = useState(() => Boolean(fullImageUri && LOADED_IMAGE_URIS.has(fullImageUri)) || Boolean(cachedLocalFull || cachedLocalThumb));
-
-  useEffect(() => {
-    if (!__DEV__) return;
-    console.log('[chat-image] cache init', {
-      messageId: message?.id,
-      fullImageUri,
-      cachedLocalFull: !!cachedLocalFull,
-      cachedLocalThumb: !!cachedLocalThumb,
-      loaded,
-      ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
-    });
-  }, [cachedLocalFull, cachedLocalThumb, fullImageUri, loaded, message?.id]);
 
   const thumbnailSource = useMemo(() => {
     const uri = localThumb || thumbnailUri || warmedMetadata?.thumbnailUrl;
@@ -111,63 +98,13 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
   }, [localFull, fullImageUri]);
 
   useEffect(() => {
-    if (!__DEV__) return;
-    console.log('[chat-image] mount', {
-      messageId: message?.id,
-      hasThumb: !!thumbnailUri,
-      hasFull: !!fullImageUri,
-      localThumb: !!localThumb,
-      localFull: !!localFull,
-      loaded,
-    });
-  }, [fullImageUri, localFull, localThumb, loaded, message?.id, thumbnailUri]);
-
-  useEffect(() => {
-    if (!__DEV__) return;
-    const now = globalThis?.performance?.now?.() ?? Date.now();
-    console.log('[chat-image] state snapshot', {
-      messageId: message?.id,
-      ts: now,
-      localThumb: !!localThumb,
-      localFull: !!localFull,
-      loaded,
-      imageSize: imageSize || null,
-    });
-  }, [localThumb, localFull, loaded, imageSize, message?.id]);
-
-  useEffect(() => {
-    if (!DEBUG_CHAT_SCROLL) return;
-    console.log('[chat-image-debug] work mode', {
-      messageId: message?.id,
-      deferHeavyWork: !!deferHeavyWork,
-      hasThumbUri: !!thumbnailUri,
-      hasFullUri: !!fullImageUri,
-      localThumb: !!localThumb,
-      localFull: !!localFull,
-      loaded: !!loaded,
-    });
-  }, [DEBUG_CHAT_SCROLL, deferHeavyWork, fullImageUri, localFull, localThumb, loaded, message?.id, thumbnailUri]);
-
-  useEffect(() => {
     if (!fullImageUri) return;
     const cached = IMAGE_SOURCE_CACHE.get(fullImageUri) || peekCachedPath(fullImageUri) || null;
-    if (__DEV__) {
-      console.log('[chat-image] cache resolve check', {
-        messageId: message?.id,
-        fullImageUri,
-        cached: !!cached,
-        localFull: !!localFull,
-        loaded,
-        ts: Math.round(globalThis?.performance?.now?.() ?? Date.now()),
-      });
+    if (cached) {
+      if (!localFull) setLocalFull(cached);
+      if (!loaded) setLoaded(true);
     }
-    if (cached && localFull !== cached) {
-      setLocalFull(cached);
-    }
-    if (cached || LOADED_IMAGE_URIS.has(fullImageUri)) {
-      setLoaded(true);
-    }
-  }, [fullImageUri, localFull, loaded, message?.id]);
+  }, [fullImageUri, localFull, loaded]);
 
   useEffect(() => {
     if (loaded) return;
@@ -202,7 +139,6 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
               const newRatio = w / h;
               if (!prev || Math.abs((prevRatio || newRatio) - newRatio) > 0.03) {
                 IMAGE_SIZE_CACHE.set(fullImageUri, next);
-                setImageSize(next);
               }
             }
           },
@@ -242,32 +178,23 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
     try {
       if (!thumbnailUri) return;
       const memoryHit = peekCachedPath(thumbnailUri);
-      if (memoryHit) {
-        if (__DEV__) {
-          console.log('[chat-image] thumb cache hit', { messageId: message?.id, thumbnailUri });
-        }
+        if (memoryHit) {
+        // log removed
         if (mounted) setLocalThumb(memoryHit);
         return;
       }
 
       getCachedPath(thumbnailUri)
-        .then((cached) => {
-          const now = globalThis?.performance?.now?.() ?? Date.now();
+            .then((cached) => {
           if (mounted && cached) {
-            if (__DEV__) {
-              console.log('[chat-image] thumb cache resolved', { messageId: message?.id, thumbnailUri, ts: now });
-            }
+            // log removed
             setLocalThumb(cached);
           } else {
-            if (__DEV__) {
-              console.log('[chat-image] thumb cache miss, enqueueing', { messageId: message?.id, thumbnailUri, ts: now });
-            }
+            // log removed
             prefetchQueue.enqueue(thumbnailUri)
               .then((p) => {
                 if (mounted && p) {
-                  if (__DEV__) {
-                    console.log('[chat-image] thumb prefetch resolved', { messageId: message?.id, thumbnailUri, ts: globalThis?.performance?.now?.() ?? Date.now() });
-                  }
+                  // log removed
                   setLocalThumb(p);
                 }
               })
@@ -294,32 +221,23 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
       if (!fullImageUri) return;
       const memoryHit = peekCachedPath(fullImageUri);
       if (memoryHit) {
-        if (__DEV__) {
-          console.log('[chat-image] full cache hit', { messageId: message?.id, fullImageUri });
-        }
+        // log removed
         if (mounted) setLocalFull(memoryHit);
         return;
       }
 
       getCachedPath(fullImageUri)
         .then((cached) => {
-          const now = globalThis?.performance?.now?.() ?? Date.now();
           if (mounted && cached) {
-            if (__DEV__) {
-              console.log('[chat-image] full cache resolved', { messageId: message?.id, fullImageUri, ts: now });
-            }
+            // log removed
             setLocalFull(cached);
             return;
           }
-          if (__DEV__) {
-            console.log('[chat-image] full cache miss, enqueueing', { messageId: message?.id, fullImageUri, ts: now });
-          }
+          // log removed
           prefetchQueue.enqueue(fullImageUri)
             .then((p) => {
               if (mounted && p) {
-                if (__DEV__) {
-                  console.log('[chat-image] full prefetch resolved', { messageId: message?.id, fullImageUri, ts: globalThis?.performance?.now?.() ?? Date.now() });
-                }
+                // log removed
                 setLocalFull(p);
               }
             })
@@ -338,7 +256,8 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
     };
   }, [fullImageUri, message?.id, deferHeavyWork, loaded]);
 
-  if (!message.fileInfo || !fullImageUri) {
+  // If there's no fileInfo or neither a full image nor a thumbnail, don't render.
+  if (!message.fileInfo || (!fullImageUri && !thumbnailUri)) {
     return null;
   }
 
@@ -422,9 +341,6 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
               if (fullImageUri && LOADED_IMAGE_URIS.has(fullImageUri)) {
                 return;
               }
-              if (__DEV__) {
-                console.log('[chat-image] full onLoad', { messageId: message?.id, fullImageUri });
-              }
               try {
                 const { width, height } = (event as any).source || (event as any).nativeEvent || {};
                 if (width > 0 && height > 0) {
@@ -441,9 +357,6 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
               setLoaded(true);
             }}
             onError={(err) => {
-              if (__DEV__) {
-                console.log('[chat-image] full onError', { messageId: message?.id, fullImageUri, err: String(err) });
-              }
               setLoaded(true);
               error('Image load error:', fullImageUri, err);
             }}

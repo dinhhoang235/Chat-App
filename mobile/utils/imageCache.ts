@@ -78,14 +78,7 @@ function filenameForUrl(url: string) {
 export async function getCachedPath(url?: string | null) {
   if (!url) return null;
   try {
-    if (__DEV__) {
-      try {
-        console.log("[imageCache] getCachedPath start", {
-          url,
-          ts: globalThis?.performance?.now?.() ?? Date.now(),
-        });
-      } catch {}
-    }
+    // logging removed to reduce noise
     const memoryHit = MEMORY_CACHE.get(url);
     if (memoryHit) return memoryHit;
 
@@ -97,27 +90,10 @@ export async function getCachedPath(url?: string | null) {
       info = await FileSystem.File.getInfoAsync(path);
       if (info && info.exists && info.size && info.size > 0) {
         MEMORY_CACHE.set(url, path);
-        if (__DEV__) {
-          try {
-            console.log("[imageCache] getCachedPath disk hit", {
-              url,
-              path,
-              ts: globalThis?.performance?.now?.() ?? Date.now(),
-            });
-          } catch {}
-        }
         return path;
       }
     }
-    if (__DEV__) {
-      try {
-        console.log("[imageCache] getCachedPath disk miss", {
-          url,
-          path,
-          ts: globalThis?.performance?.now?.() ?? Date.now(),
-        });
-      } catch {}
-    }
+    // logging removed to reduce noise
     return null;
   } catch {
     return null;
@@ -127,23 +103,11 @@ export async function getCachedPath(url?: string | null) {
 export async function downloadToCache(url?: string | null) {
   if (!url) return null;
   if (!CAN_WRITE_TO_DISK) {
-    if (__DEV__) {
-      try {
-        console.warn(
-          "[imageCache] downloadToCache skipped: no writable cache directory",
-          { url },
-        );
-      } catch {}
-    }
+    // logging removed to reduce noise
     return null;
   }
   try {
-    const start = globalThis?.performance?.now?.() ?? Date.now();
-    if (__DEV__) {
-      try {
-        console.log("[imageCache] downloadToCache start", { url, ts: start });
-      } catch {}
-    }
+    // logging removed to reduce noise
     await ensureCacheDir();
     const name = filenameForUrl(url);
     const path = CACHE_DIR + name;
@@ -155,27 +119,11 @@ export async function downloadToCache(url?: string | null) {
 
     const tmp = path + ".tmp";
     const res = await legacyDownloadAsync(url, tmp).catch((e) => {
-      if (__DEV__) {
-        try {
-          console.warn("[imageCache] legacyDownloadAsync failed", {
-            url,
-            error: e,
-            ts: globalThis?.performance?.now?.() ?? Date.now(),
-          });
-        } catch {}
-      }
+      // logging removed to reduce noise
       throw e;
     });
     if (res.status !== 200 && res.status !== 0) {
-      if (__DEV__) {
-        try {
-          console.warn("[imageCache] downloadToCache non-200 status", {
-            url,
-            status: res.status,
-            res,
-          });
-        } catch {}
-      }
+      // logging removed to reduce noise
       try {
         await LegacyFS.deleteAsync(tmp);
       } catch {}
@@ -195,17 +143,6 @@ export async function downloadToCache(url?: string | null) {
       } catch {}
     }
     MEMORY_CACHE.set(url, path);
-    if (__DEV__) {
-      try {
-        console.log("[imageCache] downloadToCache done", {
-          url,
-          path,
-          elapsed: Math.round(
-            (globalThis?.performance?.now?.() ?? Date.now()) - start,
-          ),
-        });
-      } catch {}
-    }
     try {
       // update on-disk index for faster warm-up later
       const idxRaw = await LegacyFS.readAsStringAsync(INDEX_FILE).catch(
@@ -223,12 +160,8 @@ export async function downloadToCache(url?: string | null) {
       );
     } catch {}
     return path;
-  } catch (e) {
-    if (__DEV__) {
-      try {
-        console.warn("[imageCache] downloadToCache error", { url, error: e });
-      } catch {}
-    }
+  } catch {
+    // logging removed to reduce noise
     return null;
   }
 }

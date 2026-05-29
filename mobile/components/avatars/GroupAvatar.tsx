@@ -45,7 +45,7 @@ const GroupAvatar = ({
     const name = typeof item === 'object' ? item.name : '';
 
     if (url) {
-      return <Image source={{ uri: url }} style={styles.image} />;
+      return <Image source={{ uri: url }} style={styles.image} onError={(e) => console.log('[DEBUG GroupAvatar] Image load error:', e.nativeEvent.error)} />;
     }
 
     // Modern initial-style placeholder

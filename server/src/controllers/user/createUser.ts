@@ -1,17 +1,34 @@
-import { Request, Response } from 'express';
-import prisma from '../../db.js';
+import { Request, Response } from "express";
+import prisma from "../../db.js";
+import { bucketName } from "../../utils/minio.js";
 
-export const createUser = async (req: Request, res: Response): Promise<void> => {
+export const createUser = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { phone, fullName, password, avatar, coverImage, bio } = req.body;
-    
+
     if (!phone || !fullName || !password) {
-      res.status(400).json({ error: 'Phone, fullName and password are required' });
+      res
+        .status(400)
+        .json({ error: "Phone, fullName and password are required" });
       return;
     }
 
+    const defaultAvatarPath =
+      process.env.DEFAULT_USER_AVATAR ||
+      `/storage/${bucketName}/default_avatar.png`;
+
     const user = await prisma.user.create({
-      data: { phone, fullName, password, avatar, coverImage, bio },
+      data: {
+        phone,
+        fullName,
+        password,
+        avatar: avatar || defaultAvatarPath,
+        coverImage,
+        bio,
+      },
       select: {
         id: true,
         phone: true,
@@ -20,13 +37,13 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
         coverImage: true,
         bio: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     res.status(201).json(user);
   } catch (err) {
-    console.error('Error:', err);
-    res.status(500).json({ error: 'Failed to create user' });
+    console.error("Error:", err);
+    res.status(500).json({ error: "Failed to create user" });
   }
 };

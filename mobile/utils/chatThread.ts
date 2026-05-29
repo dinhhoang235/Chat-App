@@ -52,7 +52,7 @@ export const mapThreadMessage = (
 ) => {
   const mapped: any = {
     ...message,
-    fromMe: message.senderId ? message.senderId === currentUserId : false,
+    fromMe: message.senderId ? String(message.senderId) === String(currentUserId) : false,
     time: new Date(message.createdAt).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
@@ -118,7 +118,7 @@ export const mapThreadMedia = (media: any[], currentUserId?: number) => {
 
     return {
       ...item,
-      fromMe: item.senderId ? item.senderId === currentUserId : false,
+      fromMe: item.senderId ? String(item.senderId) === String(currentUserId) : false,
       contactName: item.sender?.id ? item.sender.fullName : undefined,
       contactAvatar: item.sender?.avatar
         ? getAvatarUrl(item.sender.avatar) || undefined
@@ -159,14 +159,17 @@ const getSeparatorText = (dateStr: string) => {
   return `${time} ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 };
 
-export const buildProcessedMessages = (messages: any[]) => {
+export const buildProcessedMessages = (messages: any[], currentUserId?: number) => {
   if (!messages || messages.length === 0) return [];
 
   const withDates: any[] = [];
   const grouped: any[] = [];
+  const msgById: Record<string, any> = {};
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
+    const key = msg.id != null ? msg.id.toString() : `i-${i}`;
+    msgById[key] = msg;
 
     if (msg.type === "image" && msg.status !== "sending") {
       const groupImages = [msg];
@@ -208,13 +211,40 @@ export const buildProcessedMessages = (messages: any[]) => {
 
   for (let i = 0; i < grouped.length; i++) {
     const msg = grouped[i];
-    // Ensure every processed message has a stable id to avoid unstable keys
+    const stableId =
+      msg.id != null && msg.id.toString() !== ""
+        ? msg.id
+        : `auto-${Math.round(new Date(msg.createdAt).getTime())}-${i}`;
+
+    // Resolve replyToId → replyTo object
+    let replyTo = msg.replyTo;
+    if (!replyTo && msg.replyToId != null) {
+      const repliedMsg = msgById[msg.replyToId.toString()];
+      if (repliedMsg) {
+        replyTo = {
+          ...repliedMsg,
+          fromMe: repliedMsg.senderId
+            ? String(repliedMsg.senderId) === String(currentUserId)
+            : false,
+        };
+        if (!replyTo.contactName && !replyTo.sender?.fullName && replyTo.senderId) {
+          for (const key of Object.keys(msgById)) {
+            const other = msgById[key];
+            if (other !== repliedMsg && String(other.senderId) === String(replyTo.senderId)) {
+              if (other.contactName) {
+                replyTo.contactName = other.contactName;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
     withDates.push({
       ...msg,
-      id:
-        msg.id != null && msg.id.toString() !== ""
-          ? msg.id
-          : `auto-${Math.round(new Date(msg.createdAt).getTime())}-${i}`,
+      id: stableId,
+      replyTo,
     });
 
     const nextMsg = grouped[i + 1];

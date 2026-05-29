@@ -4,10 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Header } from '@/components';
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from '@/context/themeContext';
-import { useAuth } from '@/context/authContext';
-import { useRouter } from "expo-router";
-import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 export default function SwitchAccount() {
   const { scheme, colors } = useTheme();
@@ -115,7 +112,7 @@ export default function SwitchAccount() {
                               style={{ width: 48, height: 48, borderRadius: 24 }}
                             />
                           ) : (
-                            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{getInitials(account.user.fullName, account.user.id?.toString())}</Text>
+                             <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                           )}
                         </View>
                         {isCurrent && (
@@ -124,7 +121,7 @@ export default function SwitchAccount() {
                           </View>
                         )}
                       </View>
-
+                        <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                       <View className="flex-1 flex-row items-center justify-between pr-2">
                         <Text style={{ color: colors.text, fontWeight: '700', fontSize: 17, flexShrink: 1 }} numberOfLines={1}>
                           {account.user.fullName}
@@ -195,7 +192,7 @@ export default function SwitchAccount() {
                           style={{ width: 48, height: 48, borderRadius: 24 }}
                         />
                       ) : (
-                        <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{getInitials(user.fullName, user.id?.toString())}</Text>
+                        <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                       )}
                     </View>
                     <View style={{ position: 'absolute', right: -6, top: -6, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success, borderWidth: 2, borderColor: '#fff' }}>

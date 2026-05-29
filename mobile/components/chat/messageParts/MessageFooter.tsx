@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 import { Image } from 'expo-image';
 
 type MessageFooterProps = {
@@ -50,10 +49,10 @@ export default function MessageFooter({ message, isOutgoing, isLastInGroup, isTh
                   width: 24,
                   height: 24,
                   borderRadius: 12,
-                  backgroundColor: colors.surfaceVariant,
+                  backgroundColor: 'transparent',
                   marginLeft: idx > 0 ? -8 : 0,
-                  borderWidth: 1.5,
-                  borderColor: colors.background,
+                  borderWidth: 0,
+                  borderColor: 'transparent',
                   overflow: 'hidden',
                 }}
               >
@@ -64,9 +63,7 @@ export default function MessageFooter({ message, isOutgoing, isLastInGroup, isTh
                   onError={(e) => console.log('Avatar load error:', e)}
                 />
               ) : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}>
-                  <Text style={{ fontSize: 12, color: '#FFFFFF' }}>{getInitials(u.fullName)}</Text>
-                </View>
+                <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 24, height: 24, borderRadius: 12 }} />
               )}
             </View>
           ))}

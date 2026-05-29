@@ -1,22 +1,23 @@
-import 'dotenv/config';
-import express, { Express } from 'express';
-import cors from 'cors';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import prisma from './db.js';
-import userRoutes from './routes/users.js';
-import storageRoutes from './routes/storage.js';
-import livekitRoutes from './routes/livekit.js';
-import { chatRoutes } from './routes/chats.js';
-import { setupSocket } from './socket.js';
-import { connectRedis } from './utils/redis.js';
-import { initMinio } from './utils/minio.js';
+import "dotenv/config";
+import express, { Express } from "express";
+import cors from "cors";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import prisma from "./db.js";
+import userRoutes from "./routes/users.js";
+import storageRoutes from "./routes/storage.js";
+import livekitRoutes from "./routes/livekit.js";
+import { chatRoutes } from "./routes/chats.js";
+import { setupSocket } from "./socket.js";
+import { connectRedis } from "./utils/redis.js";
+import { initMinio } from "./utils/minio.js";
+import { uploadDefaultIfMissing } from "./utils/uploadDefaultOnStart.js";
 
 const app: Express = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
+    origin: "*",
   },
 });
 
@@ -26,50 +27,63 @@ const PORT = process.env.PORT || 3000;
 setupSocket(io);
 
 // Connect Redis (Caching only)
-connectRedis().catch((err: any) => console.error('Redis startup failed:', err));
+const startUp = async () => {
+  try {
+    await connectRedis();
+  } catch (err: any) {
+    console.error("Redis startup failed:", err);
+  }
 
-// Initialize MinIO
-initMinio().catch((err: any) => console.error('MinIO startup failed:', err));
+  try {
+    await initMinio();
+    // upload default avatar from server/assets if present
+    await uploadDefaultIfMissing();
+  } catch (err: any) {
+    console.error("MinIO startup failed or default upload failed:", err);
+  }
+};
+
+startUp();
 
 // Middleware
 app.use(cors());
 
 // JSON/URL parsing with limits
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // Health check
-app.get('/health', async (_req, res) => {
+app.get("/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ 
-      status: 'ok',
-      database: 'connected'
+    res.json({
+      status: "ok",
+      database: "connected",
     });
   } catch (err) {
-    console.error('✗ Database error:', err);
-    res.status(500).json({ 
-      status: 'error',
-      message: 'Database connection failed'
+    console.error("✗ Database error:", err);
+    res.status(500).json({
+      status: "error",
+      message: "Database connection failed",
     });
   }
 });
 
 // Routes (multer applied per route)
-app.use('/api/users', userRoutes);
-app.use('/api/storage', storageRoutes);
-app.use('/api/livekit', livekitRoutes);
-app.use('/api/chats', chatRoutes(io));
+app.use("/api/users", userRoutes);
+app.use("/api/storage", storageRoutes);
+app.use("/api/livekit", livekitRoutes);
+app.use("/api/chats", chatRoutes(io));
 
 // Start server
 httpServer.listen(PORT, async () => {
   try {
     // Test database connection once on startup
     await prisma.$queryRaw`SELECT 1`;
-    console.log('✓ Database connected');
+    console.log("✓ Database connected");
     console.log(`Server running on port ${PORT}`);
   } catch (err) {
-    console.error('✗ Failed to connect to database:', err);
+    console.error("✗ Failed to connect to database:", err);
     process.exit(1);
   }
 });

@@ -19,8 +19,7 @@ import { useCall } from '@/context/callContext';
 import { useAuth } from '@/context/authContext';
 import { webrtcService } from '@/services/webrtc';
 import { socketService } from '@/services/socket';
-import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 
 export default function VideoCallScreen() {
@@ -399,7 +398,7 @@ export default function VideoCallScreen() {
               <Image source={{ uri: avatarUrl }} className="w-[120px] h-[120px] rounded-[60px] border border-white/20" />
             ) : (
               <View className="w-[120px] h-[120px] rounded-[60px] border border-white/20 bg-[#0A84FF] items-center justify-center">
-                <Text className="text-white text-[48px] font-bold">{getInitials(remoteName)}</Text>
+                <Image source={{ uri: getDefaultAvatarUrl() }} className="w-[100px] h-[100px] rounded-[50px]" />
               </View>
             )}
             <Text className="text-white text-xl mt-4 opacity-80">Đã tắt camera</Text>
@@ -468,7 +467,7 @@ export default function VideoCallScreen() {
               <Image source={{ uri: avatarUrl }} className="w-[100px] h-[100px] rounded-[50px] border-2 border-white mb-4" />
             ) : (
               <View className="w-[100px] h-[100px] rounded-[50px] border-2 border-white bg-blue-600 items-center justify-center mb-4">
-                <Text className="text-white text-[38px] font-bold">{getInitials(remoteName)}</Text>
+                <Image source={{ uri: getDefaultAvatarUrl() }} className="w-[84px] h-[84px] rounded-[42px]" />
               </View>
             )}
             <Text

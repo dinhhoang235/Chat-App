@@ -16,6 +16,7 @@ import { useConversationActions } from "@/hooks/useConversations/useConversation
 import { revokeMessageInCache } from "@/hooks/useChatThread/useChatThreadRuntime";
 import { chatThreadCache } from "@/utils/chatThreadCache";
 import prefetchQueue from "@/utils/prefetchQueue";
+import compositeCache from "@/utils/groupCompositeCache";
 import { resolveMediaUri } from "@/components/chat/messageParts/messageHelpers";
 
 // Schedule a low-priority task without blocking render. Returns a cancel function.
@@ -186,6 +187,18 @@ export function useConversations() {
         // ignore prefetch errors — doesn't block rendering
         console.warn("Avatar prefetch failed", e);
       }
+      // Prefetch composite avatars to local cache (file://) for fast render
+      scheduleLowPriorityTask(() => {
+        mapped.forEach((conv: any) => {
+          const convId = conv.id;
+          const compositeUrl = conv.compositeAvatarUrl;
+          if (compositeUrl) {
+            void compositeCache
+              .prefetchComposite(convId, compositeUrl)
+              .catch(() => null);
+          }
+        });
+      });
     } catch (err: any) {
       // 401 may occur if auth isn't ready; we already guard but log others
       if (err?.response?.status !== 401) {

@@ -6,7 +6,6 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/authContext';
 import { Header, ProfileBioModal } from '@/components';
 import { ChatAvatar } from '@/components/avatars';
-import { getInitials } from '@/utils/initials';
 import { getAvatarUrl } from '@/utils/avatar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { userAPI } from '@/services/user';
@@ -36,8 +35,6 @@ export default function UserProfile() {
 
   // Support special 'me' route which shows the logged-in user's profile
   const isMeRoute = id === 'me';
-
-  const initials = useMemo(() => getInitials(profile?.fullName, id), [profile?.fullName, id]);
 
   const avatarUrl = useMemo(() => getAvatarUrl(profile?.avatar), [profile?.avatar]);
   const coverUrl = useMemo(() => getAvatarUrl(profile?.coverImage), [profile?.coverImage]);
@@ -293,8 +290,8 @@ export default function UserProfile() {
             style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: HEADER_ELEVATION }}
           >
             <ChatAvatar
-              avatar={avatarUrl}
-              name={profile?.fullName || initials}
+              avatar={profile?.avatar}
+              name={profile?.fullName || ''}
               online={!isMeRoute && profile?.status === 'online'}
               size={AVATAR_SIZE}
               tintColor={colors.tint}

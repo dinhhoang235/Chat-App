@@ -3,8 +3,7 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/themeContext';
 import type { FriendRequestItem } from '@/services/friendship';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 type Props = {
   request: FriendRequestItem;
@@ -27,14 +26,14 @@ const FriendRequestRow = ({ request, onAccept, onDecline, isSent = false, avatar
 
   return (
     <View className="px-4 py-3" style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <TouchableOpacity onPress={handleProfilePress} style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: request.color || '#0084FF', overflow: 'hidden' }}>
+      <TouchableOpacity onPress={handleProfilePress} style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         {avatar ? (
           <Image
             source={{ uri: getAvatarUrl(avatar) || undefined }}
             style={{ width: 48, height: 48, borderRadius: 24 }}
           />
         ) : (
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>{getInitials(request.name)}</Text>
+          <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 48, height: 48, borderRadius: 24 }} />
         )}
       </TouchableOpacity>
 

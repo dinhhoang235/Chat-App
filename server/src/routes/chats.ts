@@ -1,5 +1,5 @@
-import express from 'express';
-import { authMiddleware } from '../middleware/auth.js';
+import express from "express";
+import { authMiddleware } from "../middleware/auth.js";
 import {
   getConversations,
   getMessages,
@@ -10,6 +10,7 @@ import {
   disbandGroup,
   createGroup,
   getConversationDetails,
+  regenerateComposite,
   addMembers,
   removeMember,
   leaveGroup,
@@ -21,41 +22,49 @@ import {
   forwardMessage,
   searchMessages,
   deleteMessage,
-  reactMessage
-} from '../controllers/chat/index.js';
-import { upload } from '../middleware/upload.js';
-import { Server } from 'socket.io';
+  reactMessage,
+} from "../controllers/chat/index.js";
+import { upload } from "../middleware/upload.js";
+import { Server } from "socket.io";
 
 export const chatRoutes = (io: Server) => {
   const router = express.Router();
 
   router.use(authMiddleware);
 
-  router.get('/conversations', getConversations);
-  router.post('/group', upload.any(), createGroup(io));
-  router.get('/:conversationId', getConversationDetails);
-  router.get('/:conversationId/media', getConversationMedia);
-  router.get('/:conversationId/messages', getMessages(io));
+  router.get("/conversations", getConversations);
+  router.post("/group", upload.any(), createGroup(io));
+  router.post("/:conversationId/composite/regenerate", regenerateComposite(io));
+  router.get("/:conversationId", getConversationDetails);
+  router.get("/:conversationId/media", getConversationMedia);
+  router.get("/:conversationId/messages", getMessages(io));
   // messages can include a file attachment under fieldname 'file'
-  router.post('/:conversationId/messages', upload.single('file'), sendMessage(io));
-  router.post('/:conversationId/read', markAsRead(io));
+  router.post(
+    "/:conversationId/messages",
+    upload.single("file"),
+    sendMessage(io),
+  );
+  router.post("/:conversationId/read", markAsRead(io));
   // starting a conversation may also include an initial attachment
-  router.post('/start', upload.single('file'), startConversation(io));
-  router.patch('/:conversationId/messages/:messageId', editMessage(io));
-  router.post('/:conversationId/messages/:messageId/forward', forwardMessage(io));
-  router.delete('/:conversationId', deleteConversation(io));
-  router.delete('/:conversationId/disband', disbandGroup(io));
-  router.delete('/:conversationId/leave', leaveGroup(io));
-  
+  router.post("/start", upload.single("file"), startConversation(io));
+  router.patch("/:conversationId/messages/:messageId", editMessage(io));
+  router.post(
+    "/:conversationId/messages/:messageId/forward",
+    forwardMessage(io),
+  );
+  router.delete("/:conversationId", deleteConversation(io));
+  router.delete("/:conversationId/disband", disbandGroup(io));
+  router.delete("/:conversationId/leave", leaveGroup(io));
+
   // Group member management
-  router.post('/:conversationId/members', addMembers(io));
-  router.delete('/:conversationId/members/:userId', removeMember(io));
-  router.post('/:conversationId/mute', muteConversation);
-  router.post('/:conversationId/pin', pinConversation);
-  router.post('/:conversationId/unread', markAsUnread(io));
-  router.get('/:conversationId/search', searchMessages);
-  router.delete('/:conversationId/messages/:messageId', deleteMessage(io));
-  router.post('/:conversationId/messages/:messageId/react', reactMessage(io));
+  router.post("/:conversationId/members", addMembers(io));
+  router.delete("/:conversationId/members/:userId", removeMember(io));
+  router.post("/:conversationId/mute", muteConversation);
+  router.post("/:conversationId/pin", pinConversation);
+  router.post("/:conversationId/unread", markAsUnread(io));
+  router.get("/:conversationId/search", searchMessages);
+  router.delete("/:conversationId/messages/:messageId", deleteMessage(io));
+  router.post("/:conversationId/messages/:messageId/react", reactMessage(io));
 
   return router;
 };

@@ -14,8 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '@/context/themeContext';
 import { useAuth } from '@/context/authContext';
 import { chatApi } from '@/services/chat';
-import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 type GroupMember = {
   id: number;
@@ -173,7 +172,7 @@ export default function GroupVideoCallModal({
               renderItem={({ item }) => {
                 const selected = selectedIds.includes(item.id);
                 const avatarUrl = getAvatarUrl(item.avatar);
-                const initials = getInitials(item.fullName, item.id.toString());
+                const defaultAvatar = getDefaultAvatarUrl();
 
                 return (
                   <TouchableOpacity
@@ -200,7 +199,7 @@ export default function GroupVideoCallModal({
                       {avatarUrl ? (
                         <Image source={{ uri: avatarUrl }} style={{ width: 54, height: 54 }} />
                       ) : (
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+                        <Image source={{ uri: defaultAvatar }} style={{ width: 48, height: 48 }} />
                       )}
                     </View>
 
@@ -234,7 +233,7 @@ export default function GroupVideoCallModal({
               contentContainerStyle={{ paddingBottom: 12 }}
               renderItem={({ item }) => {
                 const avatarUrl = getAvatarUrl(item.avatar);
-                const initials = getInitials(item.fullName, item.id.toString());
+                const defaultAvatar = getDefaultAvatarUrl();
                 return (
                   <View className="mr-2.5 relative">
                     <View
@@ -246,7 +245,7 @@ export default function GroupVideoCallModal({
                       {avatarUrl ? (
                         <Image source={{ uri: avatarUrl }} style={{ width: 50, height: 50 }} />
                       ) : (
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+                        <Image source={{ uri: defaultAvatar }} style={{ width: 44, height: 44 }} />
                       )}
                     </View>
 

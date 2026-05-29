@@ -7,8 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '@/context/authContext';
 import { Header, MemberActionsSheet, AddToGroupModal } from '@/components';
 import { chatApi } from '@/services/chat';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 export default function MembersScreen() {
   const { colors } = useTheme();
@@ -164,16 +163,16 @@ export default function MembersScreen() {
             keyExtractor={(i: any) => i.id.toString()}
             renderItem={({ item }: any) => {
               const avatarUrl = getAvatarUrl(item.avatar);
-              const initials = getInitials(item.fullName);
+              const defaultAvatar = getDefaultAvatarUrl();
 
               return (
                 <TouchableOpacity onPress={() => { setSelectedMember(item); setMemberModalVisible(true); }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWidth: 1, borderColor: '#fff' }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12, overflow: 'hidden' }}>
                       {avatarUrl ? (
                         <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                       ) : (
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+                        <Image source={{ uri: defaultAvatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                       )}
                     </View>
                     <View>

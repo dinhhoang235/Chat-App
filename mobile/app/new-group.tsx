@@ -9,7 +9,7 @@ import { ContactItem } from '@/components/lists/ContactRow';
 import { chatApi } from '../services/chat';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { getInitials } from '@/utils/initials';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -111,7 +111,6 @@ export default function NewGroup() {
   };
 
   const renderItem = ({ item }: { item: ContactItem }) => {
-    const initials = getInitials(item.fullName, item.id?.toString());
     
     return (
       <TouchableOpacity onPress={() => toggle(item.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
@@ -126,15 +125,11 @@ export default function NewGroup() {
         <View style={{ marginLeft: 12 }}>
           {item.avatar ? (
             <Image
-              source={{ uri: `${API_BASE_URL}${item.avatar}` }}
+              source={{ uri: getAvatarUrl(item.avatar) }}
               style={{ width: 48, height: 48, borderRadius: 24 }}
             />
           ) : (
-            <View
-              style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
-            </View>
+            <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 48, height: 48, borderRadius: 24 }} />
           )}
         </View>
 
@@ -213,19 +208,16 @@ export default function NewGroup() {
       {selected.length > 0 && (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.header, borderRadius: 0, paddingHorizontal: 12, paddingVertical: 10, paddingBottom: insets.bottom + 12, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 8 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
-            {selectedContacts.map((c) => {
-              const sInitials = getInitials(c.fullName, c.id?.toString());
+              {selectedContacts.map((c) => {
               return (
               <View key={c.id} style={{ marginRight: 8, position: 'relative' }}>
                 {c.avatar ? (
                   <Image
-                    source={{ uri: `${API_BASE_URL}${c.avatar}` }}
+                    source={{ uri: getAvatarUrl(c.avatar) }}
                     style={{ width: 44, height: 44, borderRadius: 22 }}
                   />
                 ) : (
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>{sInitials}</Text>
-                  </View>
+                  <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                 )}
                 <TouchableOpacity onPress={() => toggle(c.id)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>
                   <MaterialIcons name="close" size={12} color={colors.text} />

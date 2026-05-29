@@ -1,4 +1,5 @@
 const chatThreadMessagesCache = new Map<string, any[]>();
+const groupDetailsCache = new Map<string, any>();
 
 const normalizeConversationId = (conversationId: string | number) => {
   return conversationId.toString();
@@ -29,5 +30,25 @@ export const chatThreadCache = {
     }
 
     chatThreadMessagesCache.delete(normalizeConversationId(conversationId));
+  },
+
+  setGroupDetails(conversationId: string | number, details: any) {
+    groupDetailsCache.set(normalizeConversationId(conversationId), details);
+  },
+
+  getGroupDetails(conversationId: string | number) {
+    return groupDetailsCache.get(normalizeConversationId(conversationId)) || null;
+  },
+
+  hasGroupDetails(conversationId: string | number) {
+    return groupDetailsCache.has(normalizeConversationId(conversationId));
+  },
+
+  clearGroupDetails(conversationId?: string | number) {
+    if (conversationId == null) {
+      groupDetailsCache.clear();
+      return;
+    }
+    groupDetailsCache.delete(normalizeConversationId(conversationId));
   },
 };

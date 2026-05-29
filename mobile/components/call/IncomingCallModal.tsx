@@ -9,8 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCall } from '@/context/callContext';
-import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 const AVATAR_SIZE = 140;
 
@@ -63,7 +62,6 @@ export function IncomingCallModal() {
   const isVideo = incomingCall.callType === 'video';
   const isGroup = incomingCall.isGroupCall;
   const avatarUrl = getAvatarUrl(incomingCall.remoteAvatar);
-  const initials = getInitials(incomingCall.remoteName);
   const callLabel = isVideo
     ? isGroup
       ? 'Cuộc gọi video nhóm'
@@ -110,9 +108,9 @@ export function IncomingCallModal() {
               source={{ uri: avatarUrl }}
               className="w-[140px] h-[140px] rounded-[70px] border border-white/40"
             />
-          ) : (
+            ) : (
             <View className="w-[140px] h-[140px] rounded-[70px] border border-white/40 bg-blue-500 items-center justify-center">
-              <Text className="text-white text-[48px] font-bold">{initials}</Text>
+              <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 120, height: 120, borderRadius: 60 }} />
             </View>
           )}
         </View>

@@ -1,10 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/themeContext';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
 
 export interface ContactItem {
   id: number | string;
@@ -27,7 +26,6 @@ export default function ContactRow({ contact, onPress, onCall, onVideo }: Props)
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const iconColor = colors.icon;
-  const initials = getInitials(contact.fullName);
 
   return (
     <TouchableOpacity onPress={onPress} className="px-4 py-3 flex-row items-center" style={{ paddingRight: 0 }}>
@@ -39,11 +37,10 @@ export default function ContactRow({ contact, onPress, onCall, onVideo }: Props)
               style={{ width: 48, height: 48, borderRadius: 24 }}
             />
           ) : (
-            <View
-              style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{initials.toUpperCase()}</Text>
-            </View>
+            <Image
+              source={{ uri: getDefaultAvatarUrl() }}
+              style={{ width: 48, height: 48, borderRadius: 24 }}
+            />
           )}
           {contact.status === 'online' && (
             <View 

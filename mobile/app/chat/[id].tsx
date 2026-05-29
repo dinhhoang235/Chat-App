@@ -16,6 +16,7 @@ import { checkFriendshipStatus, sendFriendRequest } from '@/services/friendship'
 import { chatThreadCache } from '@/utils/chatThreadCache';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { getDefaultAvatarUrl } from '@/utils/avatar';
 
 
 
@@ -49,6 +50,7 @@ export default function ChatThread() {
   const [shareContactModalVisible, setShareContactModalVisible] = React.useState(false);
   const hasUserScrolledRef = React.useRef(false);
   const lastLoadMoreAtRef = React.useRef(0);
+  
 
   const [forwardSheetVisible, setForwardSheetVisible] = React.useState(false);
   
@@ -57,9 +59,9 @@ export default function ChatThread() {
   const [reactionsDetailVisible, setReactionsDetailVisible] = React.useState(false);
 
   const [gifVisible, setGifVisible] = React.useState(false);
-  const [richMessageChromeReady, setRichMessageChromeReady] = React.useState(false);
+  const [, setRichMessageChromeReady] = React.useState(false);
   const [chatListReady, setChatListReady] = React.useState(false);
-  const [visibleMessageIdSet, setVisibleMessageIdSet] = React.useState<Set<string>>(new Set());
+  const visibleMessageIdSetRef = React.useRef<Set<string>>(new Set());
   const [backgroundMediaWarmupEnabled, setBackgroundMediaWarmupEnabled] = React.useState(false);
   const DEBUG_CHAT_UI = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_UI;
 
@@ -92,7 +94,6 @@ export default function ChatThread() {
     creatingConversation,
     isTyping,
     displayTypingAvatar,
-    typingUserInitials,
     flatListRef,
     inputRef,
     searchMode,
@@ -469,7 +470,6 @@ export default function ChatThread() {
   );
 
   const renderItem = React.useCallback(({ item, index }: any) => {
-    // log removed
     if (item.type === 'date_separator') {
       return (
         <View className="items-center my-4">
@@ -483,11 +483,11 @@ export default function ChatThread() {
     const nextMessage = processedMessages[index - 1]; 
     const isLastInConsecutiveGroup = !nextMessage || nextMessage.senderId !== item.senderId;
     const isThreadLast = index === 0;
-    const isMediaRow = item.type === 'image' || item.type === 'image_group' || item.type === 'video' || item.type === 'audio' || item.type === 'file' || item.type === 'location';
-    const shouldUseSimpleMode = isMediaRow || !backgroundMediaWarmupEnabled || !richMessageChromeReady || !visibleMessageIdSet.has(item.id?.toString?.() ?? String(item.id ?? ''));
+    const shouldUseSimpleMode = true;
 
     let groupSenderAvatar: string | undefined = undefined;
     let groupSenderName: string | undefined = undefined;
+    let replyToSenderName: string | undefined = undefined;
 
     if (isGroup && groupDetails?.participants) {
       const senderObj = groupDetails.participants.find((p: any) => {
@@ -500,8 +500,21 @@ export default function ChatThread() {
         groupSenderAvatar = sender.avatar || undefined;
         groupSenderName = sender.fullName || undefined;
       }
+
+      if (item.replyTo?.senderId != null) {
+        const repliedSenderObj = groupDetails.participants.find((p: any) => {
+          const pUserId = p.user?.id;
+          return pUserId != null && String(pUserId) === String(item.replyTo.senderId);
+        });
+        replyToSenderName = repliedSenderObj?.user?.fullName || undefined;
+      }
+    } else if (!isGroup && item.replyTo?.senderId != null) {
+      const repliedSenderId = String(item.replyTo.senderId);
+      const isCurrentUser = String(user?.id) === repliedSenderId;
+      replyToSenderName = isCurrentUser ? user?.fullName : (targetUser?.fullName || (paramName as string | undefined));
     }
 
+    const finalSenderName = item.sender?.fullName || item.contactName || groupSenderName;
     return (
       <MessageBubble
         message={item}
@@ -509,6 +522,7 @@ export default function ChatThread() {
         highlightQuery={searchQuery}
         isLastInGroup={isLastInConsecutiveGroup}
         isThreadLast={isThreadLast}
+        senderName={finalSenderName}
         contactAvatarFallback={isGroup ? groupSenderAvatar : (targetUser?.avatar || (params.avatar as string | undefined))}
         contactNameFallback={isGroup ? groupSenderName : (targetUser?.fullName || (paramName as string | undefined))}
         onPress={() => {
@@ -519,7 +533,9 @@ export default function ChatThread() {
           if (item.fromMe) return router.push('/profile/me');
           router.push(`/profile/${item.senderId}`);
         }}
-        onReply={() => setReplyingTo(item)}
+        onReply={() => {
+          setReplyingTo(item);
+        }}
         isHighlighted={item.id?.toString() === highlightedMessageId}
         onReplyPress={(replyId: string) => scrollToMessageId(replyId)}
         progress={uploadProgress[item.id]}
@@ -543,9 +559,11 @@ export default function ChatThread() {
             setReactionSheetVisible(true);
           }
         }}
+        currentUserName={user?.fullName}
+        replyToSenderName={replyToSenderName}
       />
     );
-  }, [backgroundMediaWarmupEnabled, processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, targetUser?.fullName, params.avatar, paramName, handleRetryMessage, setReactionSheetVisible, setReactionsDetailVisible, richMessageChromeReady, visibleMessageIdSet, groupDetails]);
+  }, [processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, targetUser?.fullName, user?.fullName, user?.id, params.avatar, paramName, handleRetryMessage, setReactionSheetVisible, setReactionsDetailVisible, groupDetails]);
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
@@ -736,20 +754,7 @@ export default function ChatThread() {
         if (id == null) continue;
         nextVisibleIds.add(id.toString());
       }
-      setVisibleMessageIdSet((prev) => {
-        if (prev.size === nextVisibleIds.size) {
-          let same = true;
-          for (const id of prev) {
-            if (!nextVisibleIds.has(id)) {
-              same = false;
-              break;
-            }
-          }
-          if (same) return prev;
-        }
-        return nextVisibleIds;
-      });
-    // log removed
+      visibleMessageIdSetRef.current = nextVisibleIds;
     } catch {}
     if (!backgroundMediaWarmupEnabled) {
       return;
@@ -1204,7 +1209,7 @@ export default function ChatThread() {
                   onTouchStart={maybeCloseAll}
                 >
                   <FlashList
-                    extraData={{ groupDetails, colors, searchQuery, highlightedMessageId }}
+                    extraData={{ groupDetails, targetUser, colors, searchQuery, highlightedMessageId }}
                     initialNumToRender={4}
                     ref={flatListRef}
                     data={processedMessages}
@@ -1279,9 +1284,7 @@ export default function ChatThread() {
                               className="w-10 h-10 rounded-full"
                             />
                           ) : (
-                            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>
-                              {typingUserInitials}
-                            </Text>
+                            <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                           )}
                         </View>
                         <View
@@ -1360,6 +1363,7 @@ export default function ChatThread() {
                     onClearAttachments={clearAttachments}
                     replyingTo={replyingTo}
                     onCancelReply={() => setReplyingTo(null)}
+                    currentUserName={user?.fullName}
                     onFocus={() => {
                       if (galleryVisible) setGalleryVisible(false);
                       if (composerVisible) setComposerVisible(false);
@@ -1546,12 +1550,14 @@ export default function ChatThread() {
                     message={selectedMessage}
                     isLastInGroup={true}
                     isThreadLast={false}
+                    senderName={selectedMessage.sender?.fullName || selectedMessage.contactName}
                     contactAvatarFallback={!isGroup ? (targetUser?.avatar || (params.avatar as string | undefined)) : undefined}
                     isGroupThread={isGroup}
                     // Pass dummy props to avoid interactions
                     onPress={() => {}}
                     onLongPress={() => {}}
                     simple={true}
+                    inModal={true}
                   />
                 )}
               </MessageMenuModal>

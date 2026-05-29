@@ -4,8 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFriendsList } from '@/services/friendship';
-import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 type Props = {
   visible: boolean;
@@ -55,7 +54,7 @@ export default function AddToGroupModal({ visible, onClose, onSave, initialSelec
             name: userInfo.fullName || 'Người dùng',
             phone: userInfo.phone || '',
             avatar: getAvatarUrl(userInfo.avatar),
-            initials: getInitials(userInfo.fullName, userInfo.id?.toString()),
+            // initials removed; UI will use default avatar image when needed
             color: '#6B7280'
           };
         });
@@ -122,11 +121,11 @@ export default function AddToGroupModal({ visible, onClose, onSave, initialSelec
               }
               renderItem={({ item }) => (
                 <TouchableOpacity onPress={() => toggleSelect(item.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12, overflow: 'hidden' }}>
                     {item.avatar ? (
                       <Image source={{ uri: item.avatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                     ) : (
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>{item.initials ?? 'U'}</Text>
+                      <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                     )}
                   </View>
 
@@ -158,11 +157,11 @@ export default function AddToGroupModal({ visible, onClose, onSave, initialSelec
                     if (!c) return null;
                     return (
                       <View key={id} style={{ marginRight: 8, position: 'relative' }}>
-                        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' , overflow: 'hidden'}}>
                           {c.avatar ? (
                             <Image source={{ uri: c.avatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                           ) : (
-                            <Text style={{ color: '#fff', fontWeight: '700' }}>{c.initials}</Text>
+                            <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 44, height: 44, borderRadius: 22 }} />
                           )}
                         </View>
                         <TouchableOpacity onPress={() => toggleSelect(id)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border }}>

@@ -141,6 +141,17 @@ export const removeMember =
         });
       });
 
+      // Enqueue composite regeneration after member removal
+      try {
+        const { addCompositeJob } =
+          await import("../../workers/compositeQueue.js");
+        addCompositeJob(convId).catch((e: any) =>
+          console.error("enqueue composite job error", e),
+        );
+      } catch (e) {
+        console.error("Error importing compositeQueue for enqueue", e);
+      }
+
       // Notify the removed member
       io.to(`user:${targetUserId}`).emit("conversation_removed", {
         conversationId: convId,

@@ -1,9 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from "@/context/themeContext";
 import { MenuModal, MuteOptionsSheet, MuteSettingsModal } from '@/components/modals';
 import { GroupAvatar, ChatAvatar } from '@/components/avatars';
+import {
+  getLocalCompositePath,
+  prefetchComposite,
+} from '@/utils/groupCompositeCache';
 
 type Props = {
   message: {
@@ -39,6 +43,26 @@ export default function MessageRow({ message, onPress, onPressIn, onAction, sele
   const rowRef = useRef<any>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const isGroupConversation = !!message.isGroup;
+  const [localComposite, setLocalComposite] = useState<string | null>(null);
+  const compositeAvatarUrl = (message as any).compositeAvatarUrl;
+
+  useEffect(() => {
+    let mounted = true;
+    const convId = message.id;
+    const compositeUrl = compositeAvatarUrl;
+    if (!compositeUrl) return;
+    (async () => {
+      const local = await getLocalCompositePath(convId, compositeUrl).catch(() => null);
+      if (mounted && local) setLocalComposite(local);
+      // if not local, kick off background download
+      if (!local) {
+        void prefetchComposite(convId, compositeUrl).then((p) => {
+          if (mounted && p) setLocalComposite(p);
+        }).catch(() => null);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [compositeAvatarUrl, message.id]);
 
   const menuItems = [
     { 
@@ -120,17 +144,29 @@ export default function MessageRow({ message, onPress, onPressIn, onAction, sele
 
             <View style={{ marginLeft: 8 }}>
               {isGroupConversation ? (
-                <GroupAvatar avatars={message.avatars} size={48} membersCount={message.membersCount} />
-              ) : (
-                <ChatAvatar
-                  avatar={message.avatar}
-                  name={message.name}
-                  online={message.status === 'online'}
-                  size={48}
-                  tintColor={message.color || colors.tint}
-                  borderColor={colors.background}
-                />
-              )}
+                  // Prefer server-generated composite avatar when available
+                  (localComposite || (message as any).compositeAvatarUrl) ? (
+                    <ChatAvatar
+                      avatar={localComposite || (message as any).compositeAvatarUrl}
+                      name={message.name}
+                      online={message.status === 'online'}
+                      size={48}
+                      tintColor={message.color || colors.tint}
+                      borderColor={colors.background}
+                    />
+                  ) : (
+                    <GroupAvatar avatars={message.avatars} size={48} membersCount={message.membersCount} />
+                  )
+                ) : (
+                  <ChatAvatar
+                    avatar={message.avatar}
+                    name={message.name}
+                    online={message.status === 'online'}
+                    size={48}
+                    tintColor={message.color || colors.tint}
+                    borderColor={colors.background}
+                  />
+                )}
             </View>
           </View>
         ) : (

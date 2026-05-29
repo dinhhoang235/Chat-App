@@ -13,6 +13,7 @@ import {
   mapThreadMedia,
   mapThreadMessage,
 } from "@/utils/chatThread";
+import { chatThreadCache } from "@/utils/chatThreadCache";
 import prefetchQueue from "@/utils/prefetchQueue";
 import { getCachedPath } from "@/utils/imageCache";
 import { log, error } from "@/utils/logger";
@@ -361,9 +362,11 @@ export function useChatThreadRuntime({
   const fetchGroupDetails = useCallback(async () => {
     const activeId = conversationId || id;
     if (!activeId || activeId === "new" || params.isGroup !== "true") return;
+
     try {
       const response = await chatApi.getConversationDetails(activeId);
       setGroupDetails(response.data);
+      chatThreadCache.setGroupDetails(activeId, response.data);
     } catch (err) {
       error("Fetch group details error:", err);
     }
@@ -461,9 +464,9 @@ export function useChatThreadRuntime({
         setHasMore(newMessages.length >= 20);
 
         if (!targetUserIdState && mapped.length > 0) {
-          const otherMessage = mapped.find((m: any) => m.senderId !== userId);
+          const otherMessage = mapped.find((m: any) => String(m.senderId) !== String(userId));
           if (otherMessage) {
-            setTargetUserIdState(otherMessage.senderId.toString());
+              setTargetUserIdState(otherMessage.senderId.toString());
           }
         }
       } catch (err) {
@@ -500,6 +503,18 @@ export function useChatThreadRuntime({
       if (data) {
         setTargetUserStatus({ status: data.status, lastSeen: data.lastSeen });
         setTargetUser(data);
+        // Update contactName on messages from this user (same as groupDetails effect)
+        setMessages((prev: any[]) => {
+          let changed = false;
+          const next = prev.map((m: any) => {
+            if (m.fromMe) return m;
+            if (String(m.senderId) !== String(targetUserIdState)) return m;
+            if (m.contactName === data.fullName) return m;
+            changed = true;
+            return { ...m, contactName: data.fullName, contactAvatar: data.avatar ? getAvatarUrl(data.avatar) ?? undefined : undefined };
+          });
+          return changed ? next : prev;
+        });
       }
     } catch (err) {
       error("Fetch target user status error:", err);
@@ -890,7 +905,7 @@ export function useChatThreadRuntime({
           `[ChatThread] 💬 New message received in conversation ${conversationId}:`,
           message,
         );
-        if (message.senderId !== userId) {
+        if (String(message.senderId) !== String(userId)) {
           // Mark as read with retry (fire and forget)
           markAsReadWithRetryRef.current(message.conversationId);
         }

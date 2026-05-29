@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 import { useRouter } from 'expo-router';
 import { checkFriendshipStatus } from '@/services/friendship';
 import { useCall } from '@/context/callContext';
@@ -29,7 +28,6 @@ export default function MessageContactBubble({
   const sharedContact = message.sharedContact || {};
   const fullName = sharedContact.fullName || 'Người dùng';
   const avatar = sharedContact.avatar ? getAvatarUrl(sharedContact.avatar) : undefined;
-  const initials = getInitials(fullName);
 
   const isMe = Number(sharedContact.id) === Number(user?.id);
 
@@ -105,13 +103,13 @@ export default function MessageContactBubble({
   };
 
   return (
-    <View style={{ width: 240, backgroundColor: colors.tint, borderRadius: 12, overflow: 'hidden', borderWidth: 1.5, borderColor: colors.tint }}>
+    <View style={{ width: 240, backgroundColor: colors.tint, borderRadius: 12, overflow: 'hidden' }}>
       <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.8} style={{ paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center' }}>
-        <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', marginRight: 10, overflow: 'hidden', borderWidth: 1.5, borderColor: '#fff' }}>
+        <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 10, overflow: 'hidden', backgroundColor: 'transparent' }}>
           {avatar ? (
             <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} />
           ) : (
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{initials}</Text>
+            <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
           )}
         </View>
         <View style={{ flex: 1, paddingRight: 4 }}>

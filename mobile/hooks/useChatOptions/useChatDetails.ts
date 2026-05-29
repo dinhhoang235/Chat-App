@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { chatApi } from "@/services/chat";
 import { socketService } from "@/services/socket";
 import { getAvatarUrl } from "@/utils/avatar";
-import { getInitials } from "@/utils/initials";
 
 export function useChatDetails(params: any, user: any) {
   const id = (params as any).id as string;
@@ -32,7 +31,6 @@ export function useChatDetails(params: any, user: any) {
         .map((p: any) => ({
           url: p.user.avatar ? getAvatarUrl(p.user.avatar) : null,
           name: p.user.fullName,
-          initials: getInitials(p.user.fullName),
         }));
     }
 

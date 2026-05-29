@@ -18,7 +18,6 @@ import { useTheme } from "@/context/themeContext";
 import { chatApi } from "@/services/chat";
 import { getFriendsList } from "@/services/friendship";
 import { getAvatarUrl } from "@/utils/avatar";
-import { getInitials } from "@/utils/initials";
 import { mapConversationResponse } from "@/utils/conversation";
 import { ChatAvatar, GroupAvatar } from "@/components/avatars";
 
@@ -137,7 +136,6 @@ export default function ForwardMessageSheet({
               name: userInfo.fullName || "Người dùng",
               phone: userInfo.phone || "",
               avatar: getAvatarUrl(userInfo.avatar),
-              initials: getInitials(userInfo.fullName, userInfo.id?.toString()),
               color: "#6B7280",
             };
           });

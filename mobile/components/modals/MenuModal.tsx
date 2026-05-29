@@ -3,7 +3,6 @@ import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions, Im
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import { GroupAvatar, ChatAvatar } from '@/components/avatars';
-import { getInitials } from '@/utils/initials';
 
 export type MenuItem = { key: string; label: string; icon: string; destructive?: boolean };
 

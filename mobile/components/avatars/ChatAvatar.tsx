@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
 
 interface ChatAvatarProps {
   avatar?: string | string[];
@@ -25,23 +24,22 @@ const ChatAvatar = ({
 
   const avatarUrl = avatarStr ? getAvatarUrl(avatarStr) : undefined;
 
+  // Fallback to server default avatar (served via /storage proxy or CDN)
+  const DEFAULT_FALLBACK_PATH = '/storage/chatapp/default_avatar.png';
+  const fallbackUrl = getAvatarUrl(DEFAULT_FALLBACK_PATH) || undefined;
+
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: tintColor }}>
-      {avatarUrl ? (
-        <ExpoImage
-          source={{ uri: avatarUrl }}
-          key={avatarUrl}
-          style={{ width: size, height: size, borderRadius: size / 2 }}
-          cachePolicy="disk"
-          priority="high"
-          contentFit="cover"
-          transition={200}
-        />
-      ) : (
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.4 }}>
-          {getInitials(name)}
-        </Text>
-      )}
+    <View style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'hidden' }}>
+      <ExpoImage
+        source={{ uri: (avatarUrl || fallbackUrl) as string | undefined }}
+        key={(avatarUrl || fallbackUrl) as string | undefined}
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+        cachePolicy="disk"
+        priority="high"
+        contentFit="cover"
+        transition={200}
+      />
+      {/* online indicator */}
       {online && (
         <View
           style={{

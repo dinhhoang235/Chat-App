@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 
@@ -29,7 +30,7 @@ const VideoThumbnail = ({ uri, style }: VideoThumbnailProps) => {
   return (
     <View style={[style, { backgroundColor: '#1C1C1E', overflow: 'hidden' }]}>
       {image ? (
-        <Image source={{ uri: image }} style={{ width: '100%', height: '100%' }} />
+        <Image source={{ uri: image }} style={{ width: '100%', height: '100%' }} contentFit="cover" cachePolicy="memory-disk" />
       ) : (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <MaterialIcons name="videocam" size={20} color="rgba(255,255,255,0.3)" />

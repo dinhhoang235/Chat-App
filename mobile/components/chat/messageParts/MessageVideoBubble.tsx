@@ -20,7 +20,7 @@ type MessageVideoBubbleProps = {
   onLongPress?: () => void;
 };
 
-export default function MessageVideoBubble({ message, screenWidth, colors, allMedia, progress, onLongPress }: MessageVideoBubbleProps) {
+function MessageVideoBubble({ message, screenWidth, colors, allMedia, progress, onLongPress }: MessageVideoBubbleProps) {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [localThumb, setLocalThumb] = useState<string | null>(null);
@@ -166,6 +166,34 @@ export default function MessageVideoBubble({ message, screenWidth, colors, allMe
     </>
   );
 }
+
+function areMessageVideoBubblePropsEqual(prevProps: MessageVideoBubbleProps, nextProps: MessageVideoBubbleProps) {
+  if (prevProps.allMedia === nextProps.allMedia && prevProps.message === nextProps.message) return true;
+  const prev = prevProps.message;
+  const next = nextProps.message;
+  if (!prev || !next) return false;
+  return (
+    prev.id === next.id &&
+    prev.type === next.type &&
+    prev.status === next.status &&
+    prev.fromMe === next.fromMe &&
+    prev.isRevoked === next.isRevoked &&
+    prev.content === next.content &&
+    prev.fileInfo?.url === next.fileInfo?.url &&
+    prev.fileInfo?.thumbnailUrl === next.fileInfo?.thumbnailUrl &&
+    prev.fileInfo?.thumbnail === next.fileInfo?.thumbnail &&
+    prev.fileInfo?.thumb === next.fileInfo?.thumb &&
+    prev.fileInfo?.width === next.fileInfo?.width &&
+    prev.fileInfo?.height === next.fileInfo?.height &&
+    prev.fileInfo?.duration === next.fileInfo?.duration &&
+    prevProps.progress === nextProps.progress &&
+    prevProps.onLongPress === nextProps.onLongPress &&
+    prevProps.allMedia === nextProps.allMedia
+  );
+}
+
+const MemoizedMessageVideoBubble = React.memo(MessageVideoBubble, areMessageVideoBubblePropsEqual);
+export default MemoizedMessageVideoBubble;
 
 const styles = StyleSheet.create({
   overlay: {

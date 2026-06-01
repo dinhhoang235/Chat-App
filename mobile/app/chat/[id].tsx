@@ -162,6 +162,7 @@ export default function ChatThread() {
     startGroupVideoCall,
     handleGroupVideoHeaderPress,
     allMedia,
+    fetchAllMedia,
     deleteMessage
   } = useChatThread({
     gifVisible,
@@ -634,6 +635,14 @@ export default function ChatThread() {
       prefetchTimeoutsRef.current = [];
     };
   }, [backgroundMediaWarmupEnabled, conversationId, processedMessages, scheduleLowPriorityTask]);
+
+  // Fetch all media for the image viewer on mount
+  const mediaFetchedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!conversationId || mediaFetchedRef.current === conversationId) return;
+    mediaFetchedRef.current = conversationId;
+    fetchAllMedia();
+  }, [conversationId, fetchAllMedia]);
 
   const micSheetHeight = micVoiceFlowActive
     ? Math.round(sheetHeight + composerHeight)

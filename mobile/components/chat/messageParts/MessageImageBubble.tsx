@@ -429,7 +429,7 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
 }
 
 function areMessageImageBubblePropsEqual(prevProps: MessageImageBubbleProps, nextProps: MessageImageBubbleProps) {
-  if (prevProps.message === nextProps.message && prevProps.deferHeavyWork === nextProps.deferHeavyWork) return true;
+  if (prevProps.allMedia === nextProps.allMedia && prevProps.message === nextProps.message && prevProps.deferHeavyWork === nextProps.deferHeavyWork) return true;
   const prev = prevProps.message;
   const next = nextProps.message;
   if (!prev || !next) return false;
@@ -452,7 +452,8 @@ function areMessageImageBubblePropsEqual(prevProps: MessageImageBubbleProps, nex
     prevProps.screenWidth === nextProps.screenWidth &&
     prevProps.colors === nextProps.colors &&
     prevProps.progress === nextProps.progress &&
-    prevProps.onLongPress === nextProps.onLongPress
+    prevProps.onLongPress === nextProps.onLongPress &&
+    prevProps.allMedia === nextProps.allMedia
   );
 }
 

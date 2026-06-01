@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Image, Linking, StyleSheet, SectionList } from 'react-native';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, Linking, StyleSheet, SectionList } from 'react-native';
+import { Image } from 'expo-image';
 import { useTheme } from '@/context/themeContext';
 import { Header, FullscreenImageViewer, VideoThumbnail } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,13 +28,15 @@ export default function ChatMedia() {
     fetchAllMedia();
   }, [fetchAllMedia]);
 
-  const imageMessages = allMedia.filter(m => (m.type === 'image' || m.type === 'video') && m.fileInfo?.url);
-  const fileMessages = allMedia.filter(m => m.type === 'file' && m.fileInfo?.url);
-  const linkMessages = allMedia.filter(
-    m =>
-      m.type === 'text' &&
-      typeof m.content === 'string' &&
-      /(https?:\/\/\S+)/.test(m.content),
+  const imageMessages = useMemo(() => allMedia.filter(m => (m.type === 'image' || m.type === 'video') && m.fileInfo?.url), [allMedia]);
+  const fileMessages = useMemo(() => allMedia.filter(m => m.type === 'file' && m.fileInfo?.url), [allMedia]);
+  const linkMessages = useMemo(
+    () => allMedia.filter(
+      m =>
+        m.type === 'text' &&
+        typeof m.content === 'string' &&
+        /(https?:\/\/\S+)/.test(m.content),
+    ), [allMedia]
   );
 
   const groupedImages = useMemo(() => {
@@ -88,26 +91,34 @@ export default function ChatMedia() {
     return order.map((label) => ({ title: label, data: groups[label] }));
   }, [linkMessages]);
 
-  const renderSectionHeader = ({ section: { title } }: { section: { title: string } }) => (
+  const imageIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    imageMessages.forEach((m, i) => {
+      if (m.id != null) map.set(m.id.toString(), i);
+    });
+    return map;
+  }, [imageMessages]);
+
+  const renderSectionHeader = useCallback(({ section: { title } }: { section: { title: string } }) => (
     <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
       <Text style={[styles.sectionHeaderText, { color: colors.textSecondary }]}>{title}</Text>
     </View>
-  );
+  ), [colors]);
 
-  const renderImageRow = ({ item: rowItems }: { item: ChatMessage[] }) => (
+  const renderImageRow = useCallback(({ item: rowItems }: { item: ChatMessage[] }) => (
     <View style={{ flexDirection: 'row' }}>
       {rowItems.map((item) => {
         let uri = item.fileInfo?.url;
         if (uri && !uri.startsWith('http')) {
           uri = getAvatarUrl(uri) || uri;
         }
-        const globalIndex = imageMessages.indexOf(item);
+        const globalIndex = item.id != null ? (imageIndexMap.get(item.id.toString()) ?? 0) : 0;
         return (
           <TouchableOpacity
             key={item.id}
             style={styles.imageWrapper}
             onPress={() => {
-              setSelectedIndex(globalIndex || 0);
+              setSelectedIndex(globalIndex);
               setViewerVisible(true);
             }}
           >
@@ -115,7 +126,7 @@ export default function ChatMedia() {
               {item.type === 'video' ? (
                 <VideoThumbnail uri={uri} style={styles.image} />
               ) : (
-                <Image source={{ uri }} style={styles.image} resizeMode="cover" />
+                <Image source={{ uri }} style={styles.image} contentFit="cover" cachePolicy="memory-disk" />
               )}
             </View>
           </TouchableOpacity>
@@ -126,9 +137,9 @@ export default function ChatMedia() {
           .fill(0)
           .map((_, i) => <View key={`empty-${i}`} style={styles.imageWrapper} />)}
     </View>
-  );
+  ), [imageIndexMap]);
 
-  const renderFile = ({ item }: { item: ChatMessage }) => {
+  const renderFile = useCallback(({ item }: { item: ChatMessage }) => {
     const { fileInfo } = item;
     let uri = fileInfo?.url;
     if (uri && !uri.startsWith('http')) {
@@ -143,9 +154,9 @@ export default function ChatMedia() {
         </Text>
       </TouchableOpacity>
     );
-  };
+  }, [colors]);
 
-  const renderLink = ({ item }: { item: ChatMessage }) => {
+  const renderLink = useCallback(({ item }: { item: ChatMessage }) => {
     const text = item.content as string;
     const match = text.match(/https?:\/\/\S+/);
     const url = match ? match[0] : text;
@@ -162,7 +173,7 @@ export default function ChatMedia() {
         </Text>
       </TouchableOpacity>
     );
-  };
+  }, [colors]);
 
   const content = () => {
     switch (selectedTab) {
@@ -179,6 +190,9 @@ export default function ChatMedia() {
             onEndReached={() => fetchAllMedia(true)}
             onEndReachedThreshold={0.5}
             stickySectionHeadersEnabled={false}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={5}
+            windowSize={5}
           />
         );
       case 'File':
@@ -194,6 +208,9 @@ export default function ChatMedia() {
             onEndReached={() => fetchAllMedia(true)}
             onEndReachedThreshold={0.5}
             stickySectionHeadersEnabled={false}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={5}
           />
         );
       case 'Link':
@@ -209,6 +226,9 @@ export default function ChatMedia() {
             onEndReached={() => fetchAllMedia(true)}
             onEndReachedThreshold={0.5}
             stickySectionHeadersEnabled={false}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={5}
           />
         );
       default:

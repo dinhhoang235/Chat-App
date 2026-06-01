@@ -4,8 +4,7 @@ import Reanimated, { Extrapolation, interpolate, SharedValue, useAnimatedStyle, 
 import Swipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 import MessageFooter from './MessageFooter';
 
 type MessageSwipeableBubbleProps = {
@@ -18,8 +17,11 @@ type MessageSwipeableBubbleProps = {
   onCallAction?: (message: any, callData: any) => void;
   isLastInGroup?: boolean;
   isThreadLast?: boolean;
+  isGroupThread?: boolean;
   isOutgoing: boolean;
   contactAvatarFallback?: string;
+  contactNameFallback?: string;
+  senderName?: string;
   bubbleBg: string;
   animatedBorderStyle: any;
   children: React.ReactNode;
@@ -31,6 +33,7 @@ type MessageSwipeableBubbleProps = {
   onLongPress?: (x: number, y: number, w: number, h: number) => void;
   onQuickReactPress?: () => void;
   simple?: boolean;
+  onMeasure?: (id: string | number | null | undefined, height: number) => void;
 };
 
 export default function MessageSwipeableBubble({
@@ -43,8 +46,11 @@ export default function MessageSwipeableBubble({
   onCallAction,
   isLastInGroup,
   isThreadLast,
+  isGroupThread,
   isOutgoing,
   contactAvatarFallback,
+  contactNameFallback,
+  senderName,
   bubbleBg,
   animatedBorderStyle,
   children,
@@ -56,6 +62,7 @@ export default function MessageSwipeableBubble({
   onLongPress,
   onQuickReactPress,
   simple,
+  onMeasure,
 }: MessageSwipeableBubbleProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
   const bubbleRef = useRef<View>(null);
@@ -135,6 +142,11 @@ export default function MessageSwipeableBubble({
   }));
 
   const avatarUri = message.contactAvatar || (contactAvatarFallback ? getAvatarUrl(contactAvatarFallback) || undefined : undefined);
+  const resolvedSenderName = senderName || message.contactName || contactNameFallback;
+  const showSenderName = Boolean(isGroupThread && !isOutgoing && resolvedSenderName);
+  const avatarTopOffset = showSenderName ? 30 : 8;
+
+  // debug logs removed
 
   const handleInnerLongPress = () => {
     if (message.isRevoked || message.type === 'call') return;
@@ -158,13 +170,18 @@ export default function MessageSwipeableBubble({
                 : message.type === 'call' && (JSON.parse(message.content || '{}').status === 'missed' && !message.fromMe)
                 ? 'rgba(255, 59, 48, 0.1)'
                 : bubbleBg,
-            borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : 1.2,
+            borderWidth: 0,
             padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : message.type === 'call' ? 14 : 12,
             borderRadius: 18,
           },
           message.type !== 'image' && message.type !== 'image_group' && message.type !== 'video' && message.type !== 'location' && message.type !== 'contact' ? animatedBorderStyle : {},
         ]}
       >
+        {showSenderName && (
+          <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 4 }} numberOfLines={1}>
+            {resolvedSenderName}
+          </Text>
+        )}
         {replyBlock}
         {children}
       </View>
@@ -172,21 +189,31 @@ export default function MessageSwipeableBubble({
   }
 
   return (
-    <RNAnimated.View style={[{ position: 'relative', paddingVertical: 8 }, highlightRowStyle]}>
+    <RNAnimated.View
+      onLayout={(e) => {
+        try {
+          const h = e.nativeEvent.layout?.height;
+          if (h && onMeasure) onMeasure(message.id, h);
+        } catch {
+          // ignore
+        }
+      }}
+      style={[{ position: 'relative', paddingVertical: 8 }, highlightRowStyle]}
+    >
       {!message.fromMe && (
-        <View style={{ position: 'absolute', left: 0, right: 0, top: 8, bottom: 0, zIndex: 1 }} pointerEvents="box-none">
+        <View style={{ position: 'absolute', left: 0, right: 0, top: avatarTopOffset, bottom: 0, zIndex: 1 }} pointerEvents="box-none">
           <View style={{ flexDirection: 'row', justifyContent: 'flex-start', paddingHorizontal: 16 }}>
             <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ opacity: isLastInGroup ? 1 : 0 }}>
               <Reanimated.View 
                 style={[
-                  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint, overflow: 'hidden' },
+                  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'hidden' },
                   avatarAnimatedStyle
                 ]}
               >
                 {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={{ width: 40, height: 40 }} />
+                  <Image source={{ uri: avatarUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                 ) : (
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>{getInitials(message.contactName)}</Text>
+                  <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                 )}
               </Reanimated.View>
             </TouchableOpacity>
@@ -223,11 +250,16 @@ export default function MessageSwipeableBubble({
           >
             {!message.fromMe && <View style={{ width: 40, height: 40 }} />}
             <View style={{ marginLeft: isOutgoing ? 0 : 12, alignItems: isOutgoing ? 'flex-end' : 'flex-start' }}>
+              {showSenderName && (
+                <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 4 }} numberOfLines={1}>
+                  {resolvedSenderName}
+                </Text>
+              )}
               {message.edited && (
                 <Text style={{ color: colors.tint, fontSize: 12, fontWeight: '500', marginBottom: 2 }}>Đã chỉnh sửa</Text>
               )}
               <View style={{ position: 'relative', alignItems: isOutgoing ? 'flex-end' : 'flex-start', zIndex: 10 }}>
-                <RNAnimated.View
+                  <RNAnimated.View
                   ref={bubbleRef}
                   style={[
                     {
@@ -237,7 +269,7 @@ export default function MessageSwipeableBubble({
                           : message.type === 'call' && (JSON.parse(message.content || '{}').status === 'missed' && !message.fromMe)
                           ? 'rgba(255, 59, 48, 0.1)'
                           : bubbleBg,
-                      borderWidth: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : 1.2,
+                      borderWidth: 0,
                       padding: (message.type === 'image' || message.type === 'image_group' || message.type === 'video' || message.type === 'location' || message.type === 'contact') ? 0 : message.type === 'call' ? 14 : 12,
                       borderRadius: 18,
                       marginBottom: (message.reactions && message.reactions.length > 0) || (isThreadLast && !message.isRevoked && message.type !== 'call' && message.type !== 'separator' && message.type !== 'system' && !message.fromMe) ? 8 : (isLastInGroup ? 0 : -8),

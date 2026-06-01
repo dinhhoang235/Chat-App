@@ -1,7 +1,11 @@
 import React from 'react';
-import { View, FlatList, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, GiphySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal, ReactionSheet, ReactionsDetailSheet } from '@/components';
+import { getMessageSize } from '@/utils/messageSizeCache';
+import AntDesign from '@expo/vector-icons/AntDesign';
+import { View, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform, useWindowDimensions } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { GallerySheet, EmojiSheet, GiphySheet, GiphySearchSheet, TypingDots, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal, ReactionSheet, ReactionsDetailSheet } from '@/components';
+import { resolveMediaUri } from '@/components/chat/messageParts/messageHelpers';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
 import { useGroupCallAction } from '@/hooks/useGroupCallAction';
@@ -11,11 +15,34 @@ import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
 import { checkFriendshipStatus, sendFriendRequest } from '@/services/friendship';
 import { chatThreadCache } from '@/utils/chatThreadCache';
+import { getChatItemType, computeChatItemSize } from '@/utils/chatThread';
+import prefetchQueue from '@/utils/prefetchQueue';
+import { getCachedPath } from '@/utils/imageCache';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { getDefaultAvatarUrl } from '@/utils/avatar';
+import useRenderChatItem from '@/hooks/useRenderChatItem';
+import useViewability from '@/hooks/useViewability';
+import useMediaPrefetch from '@/hooks/useMediaPrefetch';
+import useChatItemLayout from '@/hooks/useChatItemLayout';
+import ChatHeader from './ChatHeader';
+
+
 
 export default function ChatThread() {
   const DEFAULT_COMPOSER_HEIGHT = 74;
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  
+  // mountedAtRef intentionally removed (timing/logging removed)
+  const loggedFirstLayoutRef = React.useRef(false);
+  const loggedChatListReadyRef = React.useRef(false);
+  const loggedDeferredChromeReadyRef = React.useRef(false);
+  const loggedFlashListLayoutRef = React.useRef(false);
+  const loggedFirstItemRenderRef = React.useRef(false);
+  const richChromeReadyTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const thumbnailPrefetchRunRef = React.useRef<string | null>(null);
+  const mediaPrefetchRunRef = React.useRef<string | null>(null);
+  const prefetchTimeoutsRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
   const [micTextMode, setMicTextMode] = React.useState(false);
   const [micOutsideCloseLocked, setMicOutsideCloseLocked] = React.useState(false);
   const [micVoiceFlowActive, setMicVoiceFlowActive] = React.useState(false);
@@ -30,6 +57,10 @@ export default function ChatThread() {
   const [deleteSheetVisible, setDeleteSheetVisible] = React.useState(false);
   const [locationModalVisible, setLocationModalVisible] = React.useState(false);
   const [shareContactModalVisible, setShareContactModalVisible] = React.useState(false);
+  const hasUserScrolledRef = React.useRef(false);
+  const lastLoadMoreAtRef = React.useRef(0);
+  const [isAtBottom, setIsAtBottom] = React.useState(true);
+  
 
   const [forwardSheetVisible, setForwardSheetVisible] = React.useState(false);
   
@@ -38,6 +69,26 @@ export default function ChatThread() {
   const [reactionsDetailVisible, setReactionsDetailVisible] = React.useState(false);
 
   const [gifVisible, setGifVisible] = React.useState(false);
+  const [gifSearchVisible, setGifSearchVisible] = React.useState(false);
+  const [, setRichMessageChromeReady] = React.useState(false);
+  const [chatListReady, setChatListReady] = React.useState(false);
+  const visibleMessageIdSetRef = React.useRef<Set<string>>(new Set());
+  const [backgroundMediaWarmupEnabled, setBackgroundMediaWarmupEnabled] = React.useState(false);
+
+  const scheduleLowPriorityTask = React.useCallback((task: () => void) => {
+    const requestIdle = (globalThis as any).requestIdleCallback;
+    if (typeof requestIdle === 'function') {
+      const handle = requestIdle(task, { timeout: 500 });
+      return () => {
+        try {
+          (globalThis as any).cancelIdleCallback?.(handle);
+        } catch {}
+      };
+    }
+
+    const timeoutId = setTimeout(task, 0);
+    return () => clearTimeout(timeoutId);
+  }, []);
   const {
     colors,
     params,
@@ -53,7 +104,6 @@ export default function ChatThread() {
     creatingConversation,
     isTyping,
     displayTypingAvatar,
-    typingUserInitials,
     flatListRef,
     inputRef,
     searchMode,
@@ -77,6 +127,7 @@ export default function ChatThread() {
     handleBackspace,
     insets,
     animatedContentStyle,
+    animatedSheetStyle,
     fetchMessages,
     attachments,
     addAttachments,
@@ -88,6 +139,7 @@ export default function ChatThread() {
     targetUser,
     isGroup,
     groupAvatars,
+    groupDetails,
     membersCount,
     lastKeyboardHeight,
     processedMessages,
@@ -112,6 +164,7 @@ export default function ChatThread() {
     startGroupVideoCall,
     handleGroupVideoHeaderPress,
     allMedia,
+    fetchAllMedia,
     deleteMessage
   } = useChatThread({
     gifVisible,
@@ -119,6 +172,54 @@ export default function ChatThread() {
       setGroupVideoCallVisible(true);
     }, []),
   });
+
+  React.useEffect(() => {
+    setRichMessageChromeReady(false);
+    setChatListReady(false);
+
+    if (richChromeReadyTimerRef.current) {
+      clearTimeout(richChromeReadyTimerRef.current);
+      richChromeReadyTimerRef.current = null;
+    }
+
+    const requestFrame = (globalThis as any).requestAnimationFrame;
+    const cancelFrame = (globalThis as any).cancelAnimationFrame;
+
+    const frameId =
+      typeof requestFrame === 'function'
+        ? requestFrame(() => {
+            setChatListReady(true);
+            richChromeReadyTimerRef.current = setTimeout(() => {
+              setRichMessageChromeReady(true);
+              richChromeReadyTimerRef.current = null;
+            }, 240);
+          })
+        : setTimeout(() => {
+            setChatListReady(true);
+            richChromeReadyTimerRef.current = setTimeout(() => {
+              setRichMessageChromeReady(true);
+              richChromeReadyTimerRef.current = null;
+            }, 240);
+          }, 0);
+
+    return () => {
+      if (richChromeReadyTimerRef.current) {
+        clearTimeout(richChromeReadyTimerRef.current);
+        richChromeReadyTimerRef.current = null;
+      }
+      if (typeof cancelFrame === 'function' && typeof frameId === 'number') {
+        cancelFrame(frameId);
+      } else {
+        clearTimeout(frameId as ReturnType<typeof setTimeout>);
+      }
+    };
+  }, [conversationId]);
+
+  
+
+  // Run a small prewarm for visible thumbnails in background to improve
+  // perceived load time. Do NOT block rendering; FlashList should mount
+  // immediately to avoid spinner/blank issues.
 
   const handleReactMessage = React.useCallback(async (message: any, emoji: string) => {
     if (!conversationId) return;
@@ -191,10 +292,10 @@ export default function ChatThread() {
       try {
         const res = await checkFriendshipStatus(Number(targetUserIdState));
         if (!mounted) return;
-        
+
         let mappedStatus = 'NONE';
         const s = res;
-        
+
         if (s.status === 'request_received') {
           mappedStatus = 'PENDING_RECEIVED';
         } else if (s.status === 'request_sent') {
@@ -204,16 +305,20 @@ export default function ChatThread() {
         } else if (s.status) {
           mappedStatus = s.status.toUpperCase();
         }
-        
+
         setFriendshipStatus(mappedStatus);
       } catch (err) {
         console.log(err);
       }
     };
-    
-    checkStatus();
-    return () => { mounted = false; };
-  }, [isGroup, targetUserIdState]);
+
+    // Defer network call so it doesn't compete with first paint.
+    const cancel = scheduleLowPriorityTask(() => {
+      void checkStatus();
+    });
+
+    return () => { mounted = false; cancel(); };
+  }, [isGroup, targetUserIdState, scheduleLowPriorityTask]);
 
   const handleSendFriendRequest = async () => {
     if (!targetUserIdState) return;
@@ -335,15 +440,19 @@ export default function ChatThread() {
       }
     };
 
-    checkGroupCall();
+    // Defer the group-call probe to avoid blocking mount.
+    const cancel = scheduleLowPriorityTask(() => {
+      void checkGroupCall();
+    });
 
     return () => {
       mounted = false;
+      cancel();
     };
-  }, [id, isGroup]);
+  }, [id, isGroup, scheduleLowPriorityTask]);
 
   // unified sheet control (gallery/composer) moved to hook
-  const { openSheet, closeAll, sheetHeight } = useSheetControl(
+  const { openSheet, closeAll } = useSheetControl(
     inputRef,
     composerVisible,
     setComposerVisible,
@@ -356,69 +465,188 @@ export default function ChatThread() {
     lastKeyboardHeight
   );
 
-  const renderItem = React.useCallback(({ item, index }: any) => {
-    if (item.type === 'date_separator') {
-      return (
-        <View className="items-center my-4">
-          <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '500' }}>
-            {item.date}
-          </Text>
-        </View>
-      );
-    }
+  const sheetHeight = lastKeyboardHeight;
 
-    const nextMessage = processedMessages[index - 1]; 
-    const isLastInConsecutiveGroup = !nextMessage || nextMessage.senderId !== item.senderId;
-    const isThreadLast = index === 0;
+  const renderItem = useRenderChatItem({
+    processedMessages,
+    colors,
+    searchQuery,
+    composerVisible,
+    closeAll,
+    gifVisible,
+    setGifVisible,
+    router,
+    highlightedMessageId,
+    uploadProgress,
+    setReplyingTo,
+    scrollToMessageId,
+    allMedia,
+    startVoiceCall,
+    startVideoCall,
+    handleCallAction,
+    isGroup,
+    targetUser,
+    paramsObj: params,
+    paramName,
+    handleRetryMessage,
+    setSelectedMessage,
+    setMessageMenuPos,
+    setShowMoreMenuActions,
+    setMessageMenuVisible,
+    setReactionSheetVisible,
+    setReactionsDetailVisible,
+    user,
+    groupDetails,
+  });
 
-    return (
-      <MessageBubble
-        message={item}
-        highlightQuery={searchQuery}
-        isLastInGroup={isLastInConsecutiveGroup}
-        isThreadLast={isThreadLast}
-        contactAvatarFallback={!isGroup ? (targetUser?.avatar || (params.avatar as string | undefined)) : undefined}
-        onPress={() => {
-          if (composerVisible) closeAll();
-          if (gifVisible) setGifVisible(false);
-        }}
-        onAvatarPress={() => {
-          if (item.fromMe) return router.push('/profile/me');
-          router.push(`/profile/${item.senderId}`);
-        }}
-        onReply={() => setReplyingTo(item)}
-        isHighlighted={item.id?.toString() === highlightedMessageId}
-        onReplyPress={(replyId: string) => scrollToMessageId(replyId)}
-        progress={uploadProgress[item.id]}
-        allMedia={allMedia}
-        onVoiceCall={startVoiceCall}
-        onVideoCall={startVideoCall}
-        onCallAction={handleCallAction}
-        isGroupThread={isGroup}
-        onRetry={handleRetryMessage}
-        onLongPress={(msg, x, y, w, h) => {
-          setSelectedMessage(msg);
-          setMessageMenuPos({ x, y, w, h });
-          setShowMoreMenuActions(false);
-          setMessageMenuVisible(true);
-        }}
-        onReactPress={(msg) => {
-          setSelectedMessage(msg);
-          if (msg.reactions && msg.reactions.length > 0) {
-            setReactionsDetailVisible(true);
-          } else {
-            setReactionSheetVisible(true);
-          }
-        }}
-      />
-    );
-  }, [processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, params.avatar, handleRetryMessage, setReactionSheetVisible, setReactionsDetailVisible]);
+  const { onViewableItemsChanged } = useViewability({
+    backgroundMediaWarmupEnabled,
+    prefetchQueue,
+    resolveMediaUri,
+    visibleMessageIdSetRef,
+  });
+
+  useMediaPrefetch({
+    backgroundMediaWarmupEnabled,
+    processedMessages,
+    conversationId,
+    thumbnailPrefetchRunRef,
+    mediaPrefetchRunRef,
+    scheduleLowPriorityTask,
+    getCachedPath,
+    prefetchQueue,
+    resolveMediaUri,
+    prefetchTimeoutsRef,
+  });
+
+  const overrideChatItemLayout = useChatItemLayout({
+    getMessageSize,
+    getChatItemType,
+    computeChatItemSize,
+    windowWidth,
+    windowHeight,
+  });
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
     closeAll();
     if (gifVisible) setGifVisible(false);
   }, [micOutsideCloseLocked, closeAll, gifVisible]);
+
+  const renderDeferredChrome =
+    chatListReady ||
+    groupVideoCallVisible ||
+    messageMenuVisible ||
+    locationModalVisible ||
+    forwardSheetVisible ||
+    deleteSheetVisible ||
+    shareContactModalVisible ||
+    reactionSheetVisible ||
+    reactionsDetailVisible ||
+    galleryVisible ||
+    emojiVisible ||
+    composerVisible ||
+    gifVisible ||
+    micVisible;
+
+  React.useEffect(() => {
+    if (!__DEV__ || loggedChatListReadyRef.current) return;
+    if (!chatListReady) return;
+    loggedChatListReadyRef.current = true;
+    // log removed
+  }, [chatListReady, conversationId, processedMessages.length]);
+
+  React.useEffect(() => {
+    if (!__DEV__ || loggedDeferredChromeReadyRef.current) return;
+    if (!renderDeferredChrome) return;
+    loggedDeferredChromeReadyRef.current = true;
+    // log removed
+  }, [chatListReady, composerVisible, conversationId, deleteSheetVisible, emojiVisible, forwardSheetVisible, gifVisible, galleryVisible, locationModalVisible, messageMenuVisible, reactionSheetVisible, reactionsDetailVisible, renderDeferredChrome, shareContactModalVisible, micVisible]);
+
+  
+
+  const viewabilityConfig = React.useMemo(() => ({ itemVisiblePercentThreshold: 5, waitForInteraction: false }), []);
+
+  // Debug: log processedMessages duplicate IDs and blank area events
+  const processedMessagesJsonRef = React.useRef('');
+  React.useEffect(() => {
+    if (!__DEV__ || !processedMessages.length) return;
+    // Check for duplicate keys
+    const keys = new Set<string>();
+    const dupes: string[] = [];
+    for (const msg of processedMessages) {
+      const k = msg.id != null ? msg.id.toString() : '';
+      if (k && keys.has(k)) dupes.push(k);
+      keys.add(k);
+    }
+    if (dupes.length > 0) {
+      console.warn(`[ChatThread] 🔴 Duplicate processedMessages IDs:`, dupes);
+    }
+
+    const json = processedMessages.map(m => `${m.type}:${m.id}`).join(',');
+    if (json !== processedMessagesJsonRef.current) {
+      // log removed
+      processedMessagesJsonRef.current = json;
+    }
+  }, [processedMessages]);
+
+  const handleBlankArea = React.useCallback(() => {}, []);
+
+  // Debug: log size cache state for first few items
+
+  // Prefetch thumbnails and a few full images to improve perceived load times.
+  // Keep the list small to avoid triggering too much work on open.
+  React.useEffect(() => {
+    if (!backgroundMediaWarmupEnabled) return;
+    let mounted = true;
+    const cancel = scheduleLowPriorityTask(() => {
+      void (async () => {
+        if (!processedMessages || processedMessages.length === 0) return;
+        if (mediaPrefetchRunRef.current === conversationId) return;
+        mediaPrefetchRunRef.current = conversationId;
+        // timing removed
+        const toPrefetch: string[] = [];
+
+        for (const item of processedMessages) {
+          try {
+            if (item.type === 'image' && item.fileInfo) {
+              const thumb = item.fileInfo.thumbnailUrl || item.fileInfo.thumbnail || item.fileInfo.thumb;
+              if (thumb) toPrefetch.push(resolveMediaUri(thumb));
+              else if (item.fileInfo.url) toPrefetch.push(resolveMediaUri(item.fileInfo.url));
+            }
+            if (toPrefetch.length >= 3) break;
+          } catch {}
+        }
+
+        const timeouts: ReturnType<typeof setTimeout>[] = [];
+        for (let i = 0; i < toPrefetch.length && mounted; i++) {
+          const uri = toPrefetch[i];
+          const id = setTimeout(() => {
+            try {
+              if (mounted) prefetchQueue.enqueue(uri).catch(() => {});
+            } catch {}
+          }, i * 220);
+          timeouts.push(id);
+        }
+        prefetchTimeoutsRef.current = timeouts;
+        // log removed
+      })();
+    });
+    return () => {
+      mounted = false;
+      cancel();
+      prefetchTimeoutsRef.current.forEach(clearTimeout);
+      prefetchTimeoutsRef.current = [];
+    };
+  }, [backgroundMediaWarmupEnabled, conversationId, processedMessages, scheduleLowPriorityTask]);
+
+  // Fetch all media for the image viewer on mount
+  const mediaFetchedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!conversationId || mediaFetchedRef.current === conversationId) return;
+    mediaFetchedRef.current = conversationId;
+    fetchAllMedia();
+  }, [conversationId, fetchAllMedia]);
 
   const micSheetHeight = micVoiceFlowActive
     ? Math.round(sheetHeight + composerHeight)
@@ -430,7 +658,15 @@ export default function ChatThread() {
   const showBodyLoading = (loading || (!isGroup && !!targetUserIdState && targetUserStatus === null)) && processedMessages.length === 0;
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.surface, paddingTop: insets.top }}>
+    <View
+      className="flex-1"
+      style={{ backgroundColor: colors.surface, paddingTop: insets.top }}
+      onLayout={() => {
+        if (!__DEV__ || loggedFirstLayoutRef.current) return;
+        loggedFirstLayoutRef.current = true;
+        // log removed
+      }}
+    >
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={{ flex: 1 }} >
           {searchMode ? (
@@ -447,113 +683,27 @@ export default function ChatThread() {
             />
           ) : (
             <View onTouchStart={maybeCloseAll}>
-              <Header
-                showBack
-              leftElement={
-                <TouchableOpacity
-                  onPress={() => {
-                    const finalTargetUserId = targetUserIdState;
-                    if (isGroup) {
-                      router.push({
-                        pathname: '/chat/[id]/options',
-                        params: {
-                          id,
-                          name: paramName || targetUser?.fullName,
-                          avatar: targetUser?.avatar || params.avatar,
-                          targetUserId: targetUserId,
-                          status: targetUserStatus?.status,
-                          isGroup: 'true',
-                          membersCount: membersCount,
-                          avatars: Array.isArray(groupAvatars) ? groupAvatars.join(',') : groupAvatars
-                        }
-                      } as any);
-                    } else if (finalTargetUserId) {
-                      router.push(`/profile/${finalTargetUserId}`);
-                    }
-                  }}
-                  activeOpacity={1}
-                  className="flex-row items-center"
-                >
-                  {isGroup ? (
-                    <GroupAvatar
-                      avatars={groupAvatars}
-                      size={44}
-                      membersCount={membersCount}
-                      borderColor={colors.header}
-                    />
-                  ) : (
-                    <ChatAvatar
-                      avatar={targetUser?.avatar || (params.avatar as string)}
-                      name={paramName || targetUser?.fullName}
-                      online={!isGroup && targetUserStatus?.status === 'online'}
-                      size={44}
-                      tintColor={colors.tint}
-                      borderColor={colors.header}
-                    />
-                  )}
-                  <View style={{ marginLeft: 8 }}>
-                    <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }} numberOfLines={1}>
-                      {paramName || targetUser?.fullName || 'Chat'}
-                    </Text>
-                    {isGroup ? (
-                      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>
-                        {membersCount} thành viên
-                      </Text>
-                    ) : statusText && (
-                      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>
-                        {statusText}
-                      </Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              }
-              onBackPress={() => {
-                if ((params as any)?.fromProfile === 'true') {
-                  router.replace('/(tabs)');
-                } else {
-                  router.back();
-                }
-              }}
-              rightActions={isGroup ? [
-                { icon: 'video', onPress: handleGroupVideoHeaderPress, active: isActiveGroupCall },
-                { icon: 'search', onPress: () => setSearchMode(true) },
-                {
-                  icon: 'bars',
-                  onPress: () => router.push({
-                    pathname: '/chat/[id]/options',
-                    params: {
-                      id,
-                      name: paramName || targetUser?.fullName,
-                      avatar: targetUser?.avatar || params.avatar,
-                      targetUserId: targetUserId,
-                      status: targetUserStatus?.status,
-                      isGroup: isGroup ? 'true' : 'false',
-                      membersCount: membersCount,
-                      avatars: Array.isArray(groupAvatars) ? groupAvatars.join(',') : groupAvatars
-                    }
-                  } as any)
-                },
-              ] : [
-                { icon: 'call-outline', onPress: startVoiceCall },
-                { icon: 'video', onPress: startVideoCall },
-                {
-                  icon: 'bars',
-                  onPress: () => router.push({
-                    pathname: '/chat/[id]/options',
-                    params: {
-                      id,
-                      name: paramName || targetUser?.fullName,
-                      avatar: targetUser?.avatar || params.avatar,
-                      targetUserId: targetUserId,
-                      status: targetUserStatus?.status,
-                      isGroup: isGroup ? 'true' : 'false',
-                      membersCount: membersCount,
-                      avatars: Array.isArray(groupAvatars) ? groupAvatars.join(',') : groupAvatars
-                    }
-                  } as any)
-                },
-              ]}
-            />
+              <ChatHeader
+              maybeCloseAll={maybeCloseAll}
+              isGroup={isGroup}
+              router={router}
+              paramName={paramName}
+              targetUser={targetUser}
+              params={params}
+              targetUserIdState={targetUserIdState}
+              membersCount={membersCount}
+              groupAvatars={groupAvatars}
+              colors={colors}
+              targetUserStatus={targetUserStatus}
+              statusText={statusText}
+              handleGroupVideoHeaderPress={handleGroupVideoHeaderPress}
+              isActiveGroupCall={isActiveGroupCall}
+              setSearchMode={setSearchMode}
+              id={id}
+              targetUserId={targetUserId}
+              startVoiceCall={startVoiceCall}
+              startVideoCall={startVideoCall}
+              />
             </View>
           )}
 
@@ -577,18 +727,18 @@ export default function ChatThread() {
             </View>
           )}
 
-          {isGroup && id && (
+          {renderDeferredChrome && isGroup && id && (
             <GroupVideoCallModal
               visible={groupVideoCallVisible}
               conversationId={id}
               onClose={() => setGroupVideoCallVisible(false)}
               onStart={(selectedMembers) => {
                 startGroupVideoCall(selectedMembers);
-              }}
-            />
-          )}
+                    }}
+                  />
+                )}
 
-          {/* Wrapper for messages and composer that pushes up with keyboard */}
+          {/* Wrapper cho messages + sheet + composer (cả khối trượt lên) */}
             <Animated.View style={[{ flex: 1 }, animatedContentStyle]}>
               {showBodyLoading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -599,11 +749,13 @@ export default function ChatThread() {
                   style={{ flex: 1, marginBottom: 2 }}
                   onTouchStart={maybeCloseAll}
                 >
-                  <FlatList
+                  <FlashList
+                    extraData={{ groupDetails, targetUser, colors, searchQuery, highlightedMessageId }}
+                    initialNumToRender={8}
                     ref={flatListRef}
                     data={processedMessages}
-                    extraData={[messages, isTyping ? displayTypingAvatar || true : false]}
                     inverted
+                    showsVerticalScrollIndicator={false} 
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
                     keyExtractor={(i, idx) => {
@@ -617,27 +769,44 @@ export default function ChatThread() {
                       // the backend returns a message with a missing id.
                       return `msg-${idx}`;
                     }}
-                    // Tuned for smoother UI: lower initial render + smaller window
-                    // reduces JS work during navigation/scroll. Increase batching
-                    // period so renders are grouped and less likely to block frames.
-                    initialNumToRender={6}
-                    maxToRenderPerBatch={6}
-                    windowSize={5}
-                    updateCellsBatchingPeriod={50}
-                    removeClippedSubviews={true}
-                    scrollEventThrottle={16}
-                    maintainVisibleContentPosition={{
-                      minIndexForVisible: 0,
-                      autoscrollToTopThreshold: 10,
+                    estimatedItemSize={300}
+                    estimatedListSize={{ height: windowHeight, width: windowWidth }}
+                    getItemType={getChatItemType}
+                    overrideItemLayout={overrideChatItemLayout}
+                    onLayout={() => {
+                      if (!__DEV__ || loggedFlashListLayoutRef.current) return;
+                      loggedFlashListLayoutRef.current = true;
+                      // log removed
                     }}
+                    drawDistance={Math.round(windowHeight * 10)}
+                    onBlankArea={handleBlankArea}
+                    removeClippedSubviews={false}
+                    scrollEventThrottle={16}
+                    onScroll={(event) => {
+                      const offsetY = event.nativeEvent.contentOffset.y;
+                      setIsAtBottom(offsetY <= 50);
+                      if (!hasUserScrolledRef.current && offsetY > 24) {
+                        hasUserScrolledRef.current = true;
+                        if (!backgroundMediaWarmupEnabled) {
+                          setBackgroundMediaWarmupEnabled(true);
+                        }
+                      }
+                    }}
+                    onViewableItemsChanged={onViewableItemsChanged}
+                    viewabilityConfig={viewabilityConfig}
                     contentContainerStyle={{
                       paddingVertical: 12,
                       paddingBottom: 0
                     }}
                     onEndReached={() => {
-                      if (hasMore && !loadingMore) {
-                        fetchMessages(true);
-                      }
+                      if (!hasUserScrolledRef.current) return;
+                      if (loadingMore || !hasMore) return;
+
+                      const now = Date.now();
+                      if (now - lastLoadMoreAtRef.current < 1200) return;
+                      lastLoadMoreAtRef.current = now;
+
+                      fetchMessages(true);
                     }}
                     ListEmptyComponent={() => null}
                     ListHeaderComponent={() => isTyping ? (
@@ -652,9 +821,7 @@ export default function ChatThread() {
                               className="w-10 h-10 rounded-full"
                             />
                           ) : (
-                            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>
-                              {typingUserInitials}
-                            </Text>
+                            <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                           )}
                         </View>
                         <View
@@ -674,9 +841,41 @@ export default function ChatThread() {
                     ListFooterComponent={() => loadingMore ? (
                       <ActivityIndicator style={{ marginVertical: 10 }} color={colors.tint} />
                     ) : null}
-                    onEndReachedThreshold={0.5}
-                    renderItem={renderItem}
+                    onEndReachedThreshold={0.15}
+                    renderItem={(info) => {
+                      if (__DEV__ && !loggedFirstItemRenderRef.current) {
+                        loggedFirstItemRenderRef.current = true;
+                        // log removed
+                      }
+                      return renderItem(info);
+                    }}
                   />
+                  {!isAtBottom && (
+                    <Animated.View entering={SlideInDown} exiting={SlideOutDown.duration(120)} style={{ position: 'absolute', bottom: 24, alignSelf: 'center' }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          flatListRef.current?.scrollToIndex({ index: 0, animated: true, viewPosition: 1 });
+                          setIsAtBottom(true);
+                        }}
+                        activeOpacity={0.7}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: colors.surface,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 4,
+                          elevation: 5,
+                        }}
+                      >
+                        <AntDesign name="arrow-down" size={22} color={colors.text} />
+                      </TouchableOpacity>
+                    </Animated.View>
+                  )}
                 </View>
               )}
 
@@ -694,6 +893,95 @@ export default function ChatThread() {
                   renderMode="bottom"
                 />
               )}
+
+              {/* Sheet content absolute ở bottom, trượt từ dưới lên */}
+              <Animated.View style={[animatedSheetStyle, { backgroundColor: colors.surface }]}>
+                {/* Chỉ 1 sheet được render tại 1 thời điểm */}
+                {composerVisible && (
+                  <ComposerActionsSheet
+                    inline
+                    visible={composerVisible}
+                    onClose={() => setComposerVisible(false)}
+                    loadingAction={isSendingLocation ? 'location' : null}
+                    onAction={(key) => {
+                      if (key === 'document') {
+                        closeAll();
+                        pickDocument();
+                      } else if (key === 'location') {
+                        setComposerVisible(false);
+                        setLocationModalVisible(true);
+                      } else if (key === 'gif') {
+                        if (galleryVisible) setGalleryVisible(false);
+                        if (emojiVisible) setEmojiVisible(false);
+                        if (micVisible) setMicVisible(false);
+                        setComposerVisible(false);
+                        setGifVisible(true);
+                      } else if (key === 'contact') {
+                        closeAll();
+                        setShareContactModalVisible(true);
+                      }
+                    }}
+                    height={sheetHeight}
+                  />
+                )}
+                {emojiVisible && (
+                  <EmojiSheet
+                    inline
+                    visible={emojiVisible}
+                    onClose={() => setEmojiVisible(false)}
+                    onEmojiSelected={(emoji) => handleEmojiSelect(emoji.emoji)}
+                    onBackspacePress={handleBackspace}
+                    height={sheetHeight}
+                  />
+                )}
+                {galleryVisible && (
+                  <GallerySheet
+                    inline
+                    visible={galleryVisible}
+                    onClose={() => { setGalleryVisible(false); clearAttachments(); }}
+                    attachments={attachments}
+                    addAttachment={(file) => addAttachments([file])}
+                    removeAttachment={removeAttachment}
+                    height={sheetHeight}
+                  />
+                )}
+                {micVisible && (
+                  <ComposerMicSheet
+                    inline
+                    visible={micVisible}
+                    onClose={() => setMicVisible(false)}
+                    onLockOutsideCloseChange={setMicOutsideCloseLocked}
+                    onVoiceFlowChange={setMicVoiceFlowActive}
+                    textMode={micTextMode}
+                    height={micSheetHeight}
+                    onSendAudio={async (file) => { await handleSendAttachment(file as any); }}
+                    onTranscriptChange={onTextChange}
+                    onSubmitTranscript={async (text) => { await sendTextDirect(text); setMicVisible(false); }}
+                    onRequestEditTranscript={() => {
+                      inputRef.current?.focus?.();
+                      setTimeout(() => setMicVisible(false), 0);
+                    }}
+                    onAction={(key) => {
+                      if (key === 'send_audio') setMicTextMode(false);
+                      else if (key === 'send_text') setMicTextMode(true);
+                    }}
+                  />
+                )}
+                {gifVisible && (
+                  <GiphySheet
+                    inline
+                    visible={gifVisible}
+                    onClose={() => setGifVisible(false)}
+                    height={sheetHeight}
+                    sending={isSendingGif}
+                    onSelectGif={async (gif) => {
+                      await handleSendGif(gif);
+                      setGifVisible(false);
+                    }}
+                    onSearchFocus={() => setGifSearchVisible(true)}
+                  />
+                )}
+              </Animated.View>
 
               {/* Composer: hidden when search mode is active */}
               {!searchMode && !micVoiceFlowActive && (
@@ -727,6 +1015,7 @@ export default function ChatThread() {
                     onClearAttachments={clearAttachments}
                     replyingTo={replyingTo}
                     onCancelReply={() => setReplyingTo(null)}
+                    currentUserName={user?.fullName}
                     onFocus={() => {
                       if (galleryVisible) setGalleryVisible(false);
                       if (composerVisible) setComposerVisible(false);
@@ -744,266 +1033,185 @@ export default function ChatThread() {
               )}
           </Animated.View>
 
-          <GallerySheet
-            visible={galleryVisible}
-            onClose={() => {
-              setGalleryVisible(false);
-              clearAttachments();
-            }}
-            attachments={attachments}
-            addAttachment={(file: any) => addAttachments([file])}
-            removeAttachment={removeAttachment}
-            height={sheetHeight}
-          />
-
-          <EmojiSheet
-            visible={emojiVisible}
-            onClose={() => setEmojiVisible(false)}
-            onEmojiSelected={(emoji) => {
-              handleEmojiSelect(emoji.emoji);
-            }}
-            onBackspacePress={handleBackspace}
-            height={sheetHeight}
-          />
-
-          <ComposerActionsSheet
-            visible={composerVisible}
-            onClose={() => {
-              setComposerVisible(false);
-            }}
-            height={sheetHeight}
-            loadingAction={isSendingLocation ? 'location' : null}
-            onAction={(key) => {
-              if (key === 'document') {
-                closeAll();
-                pickDocument();
-              } else if (key === 'location') {
-                setComposerVisible(false);
-                setLocationModalVisible(true);
-              } else if (key === 'gif') {
-                if (galleryVisible) setGalleryVisible(false);
-                if (emojiVisible) setEmojiVisible(false);
-                if (micVisible) setMicVisible(false);
-
-                setComposerVisible(false);
-                setGifVisible(true);
-              } else if (key === 'contact') {
-                closeAll();
-                setShareContactModalVisible(true);
-              }
-            }}
-          />
-
-          <GiphySheet
-            visible={gifVisible}
-            onClose={() => setGifVisible(false)}
-            height={sheetHeight}
-            sending={isSendingGif}
-            onSelectGif={async (gif) => {
-              await handleSendGif(gif);
-              setGifVisible(false);
-            }}
-          />
-
-          <ComposerMicSheet
-            visible={micVisible}
-            onClose={() => {
-              setMicVisible(false);
-            }}
-            onLockOutsideCloseChange={setMicOutsideCloseLocked}
-            onVoiceFlowChange={setMicVoiceFlowActive}
-            textMode={micTextMode}
-            height={micSheetHeight}
-            onSendAudio={async (file) => {
-              await handleSendAttachment(file as any);
-            }}
-            onTranscriptChange={(text) => {
-              onTextChange(text);
-            }}
-            onSubmitTranscript={async (text) => {
-              await sendTextDirect(text);
-              setMicVisible(false);
-            }}
-            onRequestEditTranscript={() => {
-              inputRef.current?.focus?.();
-              // Close mic sheet after requesting focus so keyboard appears immediately.
-              setTimeout(() => {
-                setMicVisible(false);
-              }, 0);
-            }}
-            onAction={(key) => {
-              if (key === 'send_audio') {
-                // audio mode handled inside ComposerMicSheet
-                setMicTextMode(false);
-              } else if (key === 'send_text') {
-                setMicTextMode(true);
-              }
-            }}
-          />
-          
-          <MessageMenuModal
-            visible={messageMenuVisible}
-            menuPos={messageMenuPos}
-            message={selectedMessage}
-            isOutgoing={!!selectedMessage?.fromMe}
-            onClose={() => setMessageMenuVisible(false)}
-            onAction={(action) => {
-              if (action.startsWith('react_')) {
-                const emoji = action.replace('react_', '');
-                if (emoji === 'more') {
-                  setReactionSheetVisible(true);
-                } else {
-                  handleReactMessage(selectedMessage, emoji);
-                }
-                setMessageMenuVisible(false);
-                return;
-              }
-              
-              switch (action) {
-                case 'more':
-                  setShowMoreMenuActions(true);
-                  break;
-                case 'less':
-                  setShowMoreMenuActions(false);
-                  break;
-                case 'reply':
-                  setReplyingTo(selectedMessage);
-                  break;
-                case 'copy':
-                  Clipboard.setStringAsync(selectedMessage?.text || selectedMessage?.content || '');
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  break;
-                case 'edit':
-                  setEditingMessage(selectedMessage);
-                  setMessageText(selectedMessage?.text || selectedMessage?.content || '');
-                  setReplyingTo(null);
-                  setMessageMenuVisible(false);
-                  setTimeout(() => {
-                    inputRef.current?.focus?.();
-                  }, 0);
-                  break;
-                case 'forward':
-                  setForwardSheetVisible(true);
-                  setMessageMenuVisible(false);
-                  break;
-                case 'delete':
-                  setDeleteSheetVisible(true);
-                  break;
-                case 'pin':
-                  // TODO: implement pin
-                  break;
-              }
-            }}
-            items={!showMoreMenuActions ? [
-              ...(selectedMessage?.fromMe && selectedMessage?.type === 'text' ? [{ key: 'edit', label: 'Chỉnh sửa', icon: 'edit' }] : []),
-              { key: 'reply', label: 'Trả lời', icon: 'arrow-undo', ionicon: true },
-              { key: 'copy', label: 'Sao chép', icon: 'content-copy' },
-              { key: 'more', label: 'Khác', icon: 'more-horiz' },
-            ] : [
-              ...(canForwardMessage ? [{ key: 'forward', label: 'Chuyển tiếp', icon: 'arrow-redo', ionicon: true }] : []),
-              { key: 'pin', label: 'Ghim', icon: 'push-pin' },
-              ...(selectedMessage?.fromMe ? [{ key: 'delete', label: 'Thu hồi', icon: 'delete', destructive: true }] : []),
-              { key: 'less', label: 'Khác', icon: 'more-horiz' },
-            ]}
-          >
-            {selectedMessage && (
-              <MessageBubble
-                message={selectedMessage}
-                isLastInGroup={true}
-                isThreadLast={false}
-                contactAvatarFallback={!isGroup ? (targetUser?.avatar || (params.avatar as string | undefined)) : undefined}
-                isGroupThread={isGroup}
-                // Pass dummy props to avoid interactions
-                onPress={() => {}}
-                onLongPress={() => {}}
-                simple={true}
+          {renderDeferredChrome && (
+            <>
+              <GiphySearchSheet
+                visible={gifSearchVisible}
+                onClose={() => setGifSearchVisible(false)}
+                sending={isSendingGif}
+                onSelectGif={async (gif) => {
+                  await handleSendGif(gif);
+                  setGifVisible(false);
+                  setGifSearchVisible(false);
+                }}
               />
-            )}
-          </MessageMenuModal>
+              <MessageMenuModal
+                visible={messageMenuVisible}
+                menuPos={messageMenuPos}
+                message={selectedMessage}
+                isOutgoing={!!selectedMessage?.fromMe}
+                onClose={() => setMessageMenuVisible(false)}
+                onAction={(action) => {
+                  if (action.startsWith('react_')) {
+                    const emoji = action.replace('react_', '');
+                    if (emoji === 'more') {
+                      setReactionSheetVisible(true);
+                    } else {
+                      handleReactMessage(selectedMessage, emoji);
+                    }
+                    setMessageMenuVisible(false);
+                    return;
+                  }
 
-          <LocationPreviewModal
-            visible={locationModalVisible}
-            onClose={() => setLocationModalVisible(false)}
-            onConfirm={(lat, lng) => {
-              setLocationModalVisible(false);
-              handleSendLocationData(lat, lng);
-            }}
-          />
+                  switch (action) {
+                    case 'more':
+                      setShowMoreMenuActions(true);
+                      break;
+                    case 'less':
+                      setShowMoreMenuActions(false);
+                      break;
+                    case 'reply':
+                      setReplyingTo(selectedMessage);
+                      break;
+                    case 'copy':
+                      Clipboard.setStringAsync(selectedMessage?.text || selectedMessage?.content || '');
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      break;
+                    case 'edit':
+                      setEditingMessage(selectedMessage);
+                      setMessageText(selectedMessage?.text || selectedMessage?.content || '');
+                      setReplyingTo(null);
+                      setMessageMenuVisible(false);
+                      setTimeout(() => {
+                        inputRef.current?.focus?.();
+                      }, 0);
+                      break;
+                    case 'forward':
+                      setForwardSheetVisible(true);
+                      setMessageMenuVisible(false);
+                      break;
+                    case 'delete':
+                      setDeleteSheetVisible(true);
+                      break;
+                    case 'pin':
+                      // TODO: implement pin
+                      break;
+                  }
+                }}
+                items={!showMoreMenuActions ? [
+                  ...(selectedMessage?.fromMe && selectedMessage?.type === 'text' ? [{ key: 'edit', label: 'Chỉnh sửa', icon: 'edit' }] : []),
+                  { key: 'reply', label: 'Trả lời', icon: 'arrow-undo', ionicon: true },
+                  { key: 'copy', label: 'Sao chép', icon: 'content-copy' },
+                  { key: 'more', label: 'Khác', icon: 'more-horiz' },
+                ] : [
+                  ...(canForwardMessage ? [{ key: 'forward', label: 'Chuyển tiếp', icon: 'arrow-redo', ionicon: true }] : []),
+                  { key: 'pin', label: 'Ghim', icon: 'push-pin' },
+                  ...(selectedMessage?.fromMe ? [{ key: 'delete', label: 'Thu hồi', icon: 'delete', destructive: true }] : []),
+                  { key: 'less', label: 'Khác', icon: 'more-horiz' },
+                ]}
+              >
+                {selectedMessage && (
+                  <MessageBubble
+                    message={selectedMessage}
+                    isLastInGroup={true}
+                    isThreadLast={false}
+                    senderName={selectedMessage.sender?.fullName || selectedMessage.contactName}
+                    contactAvatarFallback={!isGroup ? (targetUser?.avatar || (params.avatar as string | undefined)) : undefined}
+                    isGroupThread={isGroup}
+                    // Pass dummy props to avoid interactions
+                    onPress={() => {}}
+                    onLongPress={() => {}}
+                    simple={true}
+                    inModal={true}
+                  />
+                )}
+              </MessageMenuModal>
 
-          <ForwardMessageSheet
-            visible={forwardSheetVisible}
-            currentConversationId={conversationId}
-            onClose={() => setForwardSheetVisible(false)}
-            message={selectedMessage}
-            onForward={async (conversationIds) => {
-              if (!selectedMessage || !selectedMessage.id) return;
+              <LocationPreviewModal
+                visible={locationModalVisible}
+                onClose={() => setLocationModalVisible(false)}
+                onConfirm={(lat, lng) => {
+                  setLocationModalVisible(false);
+                  handleSendLocationData(lat, lng);
+                }}
+              />
 
-              const sourceConversationId =
-                selectedMessage.conversationId ?? conversationId;
+              <ForwardMessageSheet
+                visible={forwardSheetVisible}
+                currentConversationId={conversationId}
+                onClose={() => setForwardSheetVisible(false)}
+                message={selectedMessage}
+                onForward={async (conversationIds) => {
+                  if (!selectedMessage || !selectedMessage.id) return;
 
-              if (!sourceConversationId) return;
+                  const sourceConversationId =
+                    selectedMessage.conversationId ?? conversationId;
 
-              try {
-                await chatApi.forwardMessage(
-                  sourceConversationId,
-                  selectedMessage.id,
-                  conversationIds,
-                );
-              } catch (error) {
-                console.error('Forward message failed', {
-                  sourceConversationId,
-                  messageId: selectedMessage.id,
-                  conversationIds,
-                  error,
-                });
-              }
-            }}
-          />
+                  if (!sourceConversationId) return;
 
-          <DeleteMessageSheet
-            visible={deleteSheetVisible}
-            onClose={() => setDeleteSheetVisible(false)}
-            onDeleteForMe={() => {
-              if (selectedMessage) {
-                deleteMessage(selectedMessage.id, 'deleteForMe');
-              }
-            }}
-            onUnsend={() => {
-              if (selectedMessage) {
-                deleteMessage(selectedMessage.id, 'unsend');
-              }
-            }}
-          />
+                  try {
+                    await chatApi.forwardMessage(
+                      sourceConversationId,
+                      selectedMessage.id,
+                      conversationIds,
+                    );
+                  } catch (error) {
+                    console.error('Forward message failed', {
+                      sourceConversationId,
+                      messageId: selectedMessage.id,
+                      conversationIds,
+                      error,
+                    });
+                  }
+                }}
+              />
 
-          <ShareContactModal
-            visible={shareContactModalVisible}
-            onClose={() => setShareContactModalVisible(false)}
-            conversationId={id}
-          />
+              <DeleteMessageSheet
+                visible={deleteSheetVisible}
+                onClose={() => setDeleteSheetVisible(false)}
+                onDeleteForMe={() => {
+                  if (selectedMessage) {
+                    deleteMessage(selectedMessage.id, 'deleteForMe');
+                  }
+                }}
+                onUnsend={() => {
+                  if (selectedMessage) {
+                    deleteMessage(selectedMessage.id, 'unsend');
+                  }
+                }}
+              />
 
-          <ReactionSheet
-            visible={reactionSheetVisible}
-            onClose={() => setReactionSheetVisible(false)}
-            onReact={(emoji) => {
-              if (selectedMessage) {
-                handleReactMessage(selectedMessage, emoji);
-              }
-            }}
-            message={selectedMessage}
-            userId={user?.id}
-          />
+              <ShareContactModal
+                visible={shareContactModalVisible}
+                onClose={() => setShareContactModalVisible(false)}
+                conversationId={id}
+              />
 
-          <ReactionsDetailSheet
-            visible={reactionsDetailVisible}
-            onClose={() => setReactionsDetailVisible(false)}
-            message={selectedMessage}
-            userId={user?.id}
-            onRemoveReaction={(emoji) => {
-              if (selectedMessage) {
-                handleReactMessage(selectedMessage, emoji);
-              }
-            }}
-          />
+              <ReactionSheet
+                visible={reactionSheetVisible}
+                onClose={() => setReactionSheetVisible(false)}
+                onReact={(emoji) => {
+                  if (selectedMessage) {
+                    handleReactMessage(selectedMessage, emoji);
+                  }
+                }}
+                message={selectedMessage}
+                userId={user?.id}
+              />
+
+              <ReactionsDetailSheet
+                visible={reactionsDetailVisible}
+                onClose={() => setReactionsDetailVisible(false)}
+                message={selectedMessage}
+                userId={user?.id}
+                onRemoveReaction={(emoji) => {
+                  if (selectedMessage) {
+                    handleReactMessage(selectedMessage, emoji);
+                  }
+                }}
+              />
+            </>
+          )}
 
         </View>
       </View>

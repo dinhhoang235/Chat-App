@@ -11,6 +11,7 @@ type EmojiSheetProps = {
   onEmojiSelected: (emoji: any) => void;
   onBackspacePress?: () => void;
   height?: number;
+  inline?: boolean;
 };
 
 export default function EmojiSheet({
@@ -19,22 +20,75 @@ export default function EmojiSheet({
   onEmojiSelected,
   onBackspacePress,
   height,
+  inline,
 }: EmojiSheetProps) {
   const { colors } = useTheme();
   const sheetRef = useRef<BottomSheet>(null);
 
   useEffect(() => {
+    if (inline) return;
     if (visible) {
       sheetRef.current?.snapToIndex(0);
     } else {
       sheetRef.current?.close();
     }
-  }, [visible]);
+  }, [visible, inline]);
 
   const snapPoints = useMemo(() => {
     const h = height ?? Math.round(Dimensions.get('window').height * 0.45);
     return [h];
   }, [height]);
+
+  const content = (
+    <View className="flex-1" style={{ height: '100%' }}>
+      <EmojiKeyboard
+        onEmojiSelected={onEmojiSelected}
+        categoryPosition="top"
+        theme={{
+          container: colors.surface,
+          header: colors.text,
+          search: {
+            background: colors.surfaceVariant,
+            text: colors.text,
+            placeholder: colors.textSecondary,
+            icon: colors.icon,
+          },
+          category: {
+            icon: colors.icon,
+            iconActive: colors.tint,
+            container: colors.surface,
+            containerActive: colors.surfaceVariant,
+          },
+        }}
+        styles={{
+          container: {
+            flex: 1,
+            borderRadius: 0,
+          },
+        }}
+      />
+      
+      {onBackspacePress && (
+        <TouchableOpacity
+          onPress={onBackspacePress}
+          activeOpacity={0.7}
+          className="absolute right-4 bottom-10 w-12 h-12 rounded-full justify-center items-center elevation-5 z-50 shadow-black"
+          style={{ 
+            backgroundColor: colors.surfaceVariant,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 4,
+          }}
+        >
+          <MaterialIcons name="backspace" size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  if (inline) {
+    return content;
+  }
 
   return (
     <BottomSheet
@@ -50,51 +104,7 @@ export default function EmojiSheet({
       enableDynamicSizing={false}
       containerStyle={{ pointerEvents: 'box-none' }}
     >
-      <View className="flex-1">
-        <EmojiKeyboard
-          onEmojiSelected={onEmojiSelected}
-          categoryPosition="top"
-          theme={{
-            container: colors.surface,
-            header: colors.text,
-            search: {
-              background: colors.surfaceVariant,
-              text: colors.text,
-              placeholder: colors.textSecondary,
-              icon: colors.icon,
-            },
-            category: {
-              icon: colors.icon,
-              iconActive: colors.tint,
-              container: colors.surface,
-              containerActive: colors.surfaceVariant,
-            },
-          }}
-          styles={{
-            container: {
-              flex: 1,
-              borderRadius: 0,
-            },
-          }}
-        />
-        
-        {/* Nút Xóa (Backspace) dùng NativeWind */}
-        {onBackspacePress && (
-          <TouchableOpacity
-            onPress={onBackspacePress}
-            activeOpacity={0.7}
-            className="absolute right-4 bottom-10 w-12 h-12 rounded-full justify-center items-center elevation-5 z-50 shadow-black"
-            style={{ 
-              backgroundColor: colors.surfaceVariant,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
-            }}
-          >
-            <MaterialIcons name="backspace" size={24} color={colors.textSecondary} />
-          </TouchableOpacity>
-        )}
-      </View>
+      {content}
     </BottomSheet>
   );
 }

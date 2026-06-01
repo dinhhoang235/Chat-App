@@ -7,7 +7,7 @@ import { useTabBar } from '@/context/tabBarContext';
 import { useFocusEffect } from 'expo-router';
 import { getPendingFriendRequests, getSentFriendRequests, acceptFriendRequest, rejectFriendRequest, cancelFriendRequest } from '@/services/friendship';
 import type { FriendRequest } from '@/services/friendship';
-import { getInitials } from '@/utils/initials';
+// initials removed: using default avatar image instead
 import { error as logErro } from '@/utils/logger';
 
 
@@ -154,7 +154,6 @@ export default function FriendRequests() {
           renderItem={({ item }) => {
             const request = item as FriendRequest;
             const user = tab === 'received' ? request.sender : request.receiver;
-            const initials = getInitials(user?.fullName, user?.id?.toString());
             const time = new Date(request.createdAt).toLocaleDateString('vi-VN');
             
             return (
@@ -164,7 +163,6 @@ export default function FriendRequests() {
                   name: user?.fullName || '', 
                   phone: user?.phone || '', 
                   time,
-                  initials,
                   color: colors.tint
                 }}
                 avatar={user?.avatar}

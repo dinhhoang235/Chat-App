@@ -1,5 +1,4 @@
 import { getAvatarUrl } from "@/utils/avatar";
-import { getInitials } from "@/utils/initials";
 
 const parseJson = (value: any) => {
   if (typeof value === "string") {
@@ -37,12 +36,13 @@ export const formatConversationLastMessage = (
     const latestReaction = lastMsg.reactions[lastMsg.reactions.length - 1];
     const isReactorMe = user && latestReaction.userId === user.id;
     const isMessageSenderMe = user && lastMsg.senderId === user.id;
-    const shouldShowReaction = !isReactorMe && (!conv?.isGroup || isMessageSenderMe);
+    const shouldShowReaction =
+      !isReactorMe && (!conv?.isGroup || isMessageSenderMe);
 
     if (shouldShowReaction) {
       const emoji = latestReaction.reaction;
       if (conv?.isGroup) {
-        const reactorName = latestReaction.user?.fullName || 'Ai đó';
+        const reactorName = latestReaction.user?.fullName || "Ai đó";
         return `${reactorName} đã bày tỏ cảm xúc ${emoji} về tin nhắn bạn`;
       } else {
         return `Đã bày tỏ cảm xúc ${emoji} về tin nhắn bạn`;
@@ -51,7 +51,9 @@ export const formatConversationLastMessage = (
   }
 
   if (lastMsg.isRevoked) {
-    return isFromMe ? "Bạn đã thu hồi một tin nhắn" : "Tin nhắn đã được thu hồi";
+    return isFromMe
+      ? "Bạn đã thu hồi một tin nhắn"
+      : "Tin nhắn đã được thu hồi";
   }
 
   if (lastMsg.type === "image") {
@@ -146,7 +148,9 @@ export const formatConversationLastMessage = (
     try {
       const content = parseJson(lastMsg.content);
       const fullName = content?.fullName || "người dùng";
-      return isFromMe ? `Bạn: [Danh thiếp] ${fullName}` : `[Danh thiếp] ${fullName}`;
+      return isFromMe
+        ? `Bạn: [Danh thiếp] ${fullName}`
+        : `[Danh thiếp] ${fullName}`;
     } catch {
       return isFromMe ? "Bạn: [Danh thiếp]" : "[Danh thiếp]";
     }
@@ -209,7 +213,6 @@ export const mapConversationResponse = (conv: any, user: any, colors: any) => {
     .map((p: any) => ({
       url: p.user.avatar ? getAvatarUrl(p.user.avatar) : null,
       name: p.user.fullName,
-      initials: getInitials(p.user.fullName),
     }));
 
   const updatedAt = lastMsg
@@ -231,17 +234,23 @@ export const mapConversationResponse = (conv: any, user: any, colors: any) => {
         })
       : "",
     unread: conv._count?.messages || 0,
-    initials: getInitials(conv.name || otherParticipant?.user.fullName),
+    // initials removed; UI will use default avatar image when needed
     color: conv.isGroup
       ? colors.tint
       : otherParticipant?.user.avatar
         ? undefined
         : colors.tint,
-    avatar: conv.avatar
-      ? getAvatarUrl(conv.avatar)
-      : otherParticipant?.user.avatar
-        ? getAvatarUrl(otherParticipant.user.avatar)
-        : undefined,
+    // Prefer server-side composite avatar when available
+    compositeAvatarUrl: conv.compositeAvatarUrl
+      ? getAvatarUrl(conv.compositeAvatarUrl)
+      : undefined,
+    avatar: conv.compositeAvatarUrl
+      ? getAvatarUrl(conv.compositeAvatarUrl)
+      : conv.avatar
+        ? getAvatarUrl(conv.avatar)
+        : otherParticipant?.user.avatar
+          ? getAvatarUrl(otherParticipant.user.avatar)
+          : undefined,
     avatars,
     membersCount: conv.membersCount || conv.participants.length,
     isGroup: conv.isGroup,

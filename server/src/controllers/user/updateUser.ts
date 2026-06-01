@@ -1,8 +1,12 @@
-import { Request, Response } from 'express';
-import prisma from '../../db.js';
-import { uploadFile } from '../../utils/minio.js';
+import { Request, Response } from "express";
+import prisma from "../../db.js";
+import { uploadFile } from "../../utils/minio.js";
+import { addCompositeJob } from "../../workers/compositeQueue.js";
 
-export const updateUser = async (req: Request, res: Response): Promise<void> => {
+export const updateUser = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = parseInt(id as string);
@@ -14,10 +18,13 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
 
     // Only include fields that are provided
     const data: any = {};
-    if (fullName !== undefined && fullName !== null && fullName !== '') data.fullName = fullName;
+    if (fullName !== undefined && fullName !== null && fullName !== "")
+      data.fullName = fullName;
     if (bio !== undefined && bio !== null) data.bio = bio;
-    if (gender !== undefined && gender !== null && gender !== '') data.gender = gender;
-    if (dateOfBirth !== undefined && dateOfBirth !== null) data.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+    if (gender !== undefined && gender !== null && gender !== "")
+      data.gender = gender;
+    if (dateOfBirth !== undefined && dateOfBirth !== null)
+      data.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
     if (pushToken !== undefined) {
       console.log(`updating pushToken for user ${userId}:`, pushToken);
       data.pushToken = pushToken; // allow clearing by passing null
@@ -43,17 +50,45 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
         gender: true,
         dateOfBirth: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     res.json(user);
+
+    // If avatar changed, enqueue composite regeneration for all groups this user belongs to
+    if (data.avatar) {
+      try {
+        const convs = await prisma.conversationParticipant.findMany({
+          where: { userId: userId },
+          select: {
+            conversationId: true,
+            conversation: { select: { isGroup: true } },
+          },
+          include: { conversation: true } as any,
+        });
+        for (const c of convs) {
+          if (c.conversation?.isGroup) {
+            addCompositeJob(c.conversationId).catch((e) =>
+              console.error("enqueue composite job error", e),
+            );
+          }
+        }
+      } catch (err) {
+        console.error(
+          "Error enqueueing composite jobs after avatar update",
+          err,
+        );
+      }
+    }
   } catch (err) {
-    console.error('Error updating user:', err);
+    console.error("Error updating user:", err);
     if (err instanceof Error) {
-      res.status(500).json({ error: 'Failed to update user', details: err.message });
+      res
+        .status(500)
+        .json({ error: "Failed to update user", details: err.message });
     } else {
-      res.status(500).json({ error: 'Failed to update user' });
+      res.status(500).json({ error: "Failed to update user" });
     }
   }
 };

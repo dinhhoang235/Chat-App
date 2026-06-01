@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import { InteractionManager } from "react-native";
+import { InteractionManager, Image as RNImage } from "react-native";
+import { getAvatarUrl } from "@/utils/avatar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   setActiveConversationId,
@@ -13,23 +14,90 @@ import {
   mapThreadMedia,
   mapThreadMessage,
 } from "@/utils/chatThread";
+import { chatThreadCache } from "@/utils/chatThreadCache";
+import prefetchQueue from "@/utils/prefetchQueue";
+import { getCachedPath } from "@/utils/imageCache";
 import { log, error } from "@/utils/logger";
+import { resolveMediaUri } from "@/components/chat/messageParts/messageHelpers";
+import { setImageMetadata } from "@/utils/imageMetadataCache";
+
+// Schedule a low-priority task without blocking render. Returns a cancel function.
+const scheduleLowPriorityTask = (task: () => void) => {
+  try {
+    const ric = (globalThis as any).requestIdleCallback;
+    if (typeof ric === "function") {
+      const id = ric(() => task());
+      return () => (globalThis as any).cancelIdleCallback?.(id);
+    }
+  } catch {}
+  const t = setTimeout(task, 50);
+  return () => clearTimeout(t);
+};
 
 const MESSAGE_CACHE_PREFIX = "chat_messages_cache:";
 const messageCacheMemory = new Map<string, any[]>();
+
+const messageFileInfoKey = (message: any) => {
+  const fileInfo = message?.fileInfo || {};
+  return [
+    fileInfo.url || "",
+    fileInfo.thumbnailUrl || fileInfo.thumbnail || fileInfo.thumb || "",
+    fileInfo.width || "",
+    fileInfo.height || "",
+    fileInfo.duration || "",
+  ].join("|");
+};
+
+const areMessageListsEffectivelyEqual = (prev: any[], next: any[]) => {
+  if (prev === next) return true;
+  if (prev.length !== next.length) return false;
+
+  for (let i = 0; i < prev.length; i++) {
+    const prevMessage = prev[i];
+    const nextMessage = next[i];
+    if (prevMessage === nextMessage) continue;
+    if (!prevMessage || !nextMessage) return false;
+    if (prevMessage.id?.toString() !== nextMessage.id?.toString()) return false;
+    if (prevMessage.type !== nextMessage.type) return false;
+    if (prevMessage.status !== nextMessage.status) return false;
+    if (prevMessage.isRevoked !== nextMessage.isRevoked) return false;
+    if (prevMessage.text !== nextMessage.text) return false;
+    if (prevMessage.content !== nextMessage.content) return false;
+    if (prevMessage.fromMe !== nextMessage.fromMe) return false;
+    if (prevMessage.edited !== nextMessage.edited) return false;
+    if (prevMessage.senderId !== nextMessage.senderId) return false;
+    if (prevMessage.createdAt !== nextMessage.createdAt) return false;
+    if (prevMessage.updatedAt !== nextMessage.updatedAt) return false;
+    if (prevMessage.reactions?.length !== nextMessage.reactions?.length)
+      return false;
+    if (prevMessage.seenBy?.length !== nextMessage.seenBy?.length) return false;
+    if (messageFileInfoKey(prevMessage) !== messageFileInfoKey(nextMessage))
+      return false;
+  }
+
+  return true;
+};
 
 /**
  * Update a specific message in the module-level cache as revoked.
  * Called by global socket handlers (e.g. useConversations) when the
  * chat screen is NOT mounted so the cache stays accurate.
  */
-export const revokeMessageInCache = (conversationId: string | number, messageId: number) => {
+export const revokeMessageInCache = (
+  conversationId: string | number,
+  messageId: number,
+) => {
   const key = conversationId.toString();
   const cached = messageCacheMemory.get(key);
   if (cached) {
     const updated = cached.map((m) =>
       m.id === messageId
-        ? { ...m, type: 'revoked', content: 'Tin nhắn đã được thu hồi', isRevoked: true }
+        ? {
+            ...m,
+            type: "revoked",
+            content: "Tin nhắn đã được thu hồi",
+            isRevoked: true,
+          }
         : m,
     );
     messageCacheMemory.set(key, updated);
@@ -116,6 +184,39 @@ export function useChatThreadRuntime({
   setGroupDetails,
   flatListRef,
 }: RuntimeArgs) {
+  const initialFetchInFlightRef = useRef<string | null>(null);
+  const initialMediaRefreshScheduledRef = useRef<string | null>(null);
+  const initialVisibleMediaWarmupRef = useRef<string | null>(null);
+  const initialCachedMediaWarmupRef = useRef<string | null>(null);
+
+  const warmMediaUris = useCallback(async (uris: string[]) => {
+    const seen = new Set<string>();
+
+    // log removed
+
+    const tasks = uris.map(async (uri) => {
+      if (!uri || seen.has(uri)) return;
+      seen.add(uri);
+
+      try {
+        const cached = await getCachedPath(uri);
+        if (cached) {
+          // log removed
+          return;
+        }
+      } catch {}
+
+      try {
+        // log removed
+        await prefetchQueue.enqueue(uri).catch(() => null);
+      } catch {}
+    });
+
+    await Promise.all(tasks);
+
+    // log removed
+  }, []);
+
   const getMessageCacheKey = useCallback((conversationIdValue: string) => {
     return `${MESSAGE_CACHE_PREFIX}${conversationIdValue}`;
   }, []);
@@ -150,20 +251,15 @@ export function useChatThreadRuntime({
   const persistMessagesCache = useCallback(
     (conversationIdValue: string, nextMessages: any[]) => {
       try {
-        // OPTIMIZATION #5: Keep a memory cache immediately for quick access
-        // and defer heavy serialization + AsyncStorage write until after
-        // UI interactions complete so it doesn't block navigation animations.
         messageCacheMemory.set(conversationIdValue, nextMessages.slice(0, 200));
 
-        InteractionManager.runAfterInteractions(async () => {
-          try {
-            await AsyncStorage.setItem(
-              getMessageCacheKey(conversationIdValue),
-              JSON.stringify(nextMessages.slice(0, 200)),
-            );
-          } catch (err) {
+        InteractionManager.runAfterInteractions(() => {
+          AsyncStorage.setItem(
+            getMessageCacheKey(conversationIdValue),
+            JSON.stringify(nextMessages.slice(0, 200)),
+          ).catch((err) => {
             error("Persist messages cache error:", err);
-          }
+          });
         });
       } catch (err) {
         error("Persist messages cache error:", err);
@@ -262,52 +358,113 @@ export function useChatThreadRuntime({
   );
 
   const fetchGroupDetails = useCallback(async () => {
-    if (!id || params.isGroup !== "true") return;
+    const activeId = conversationId || id;
+    if (!activeId || activeId === "new" || params.isGroup !== "true") return;
+
     try {
-      const response = await chatApi.getConversationDetails(id);
+      const response = await chatApi.getConversationDetails(activeId);
       setGroupDetails(response.data);
+      chatThreadCache.setGroupDetails(activeId, response.data);
     } catch (err) {
       error("Fetch group details error:", err);
     }
-  }, [id, params.isGroup, setGroupDetails]);
+  }, [id, conversationId, params.isGroup, setGroupDetails]);
+
+  const fetchGroupDetailsRef = useRef(fetchGroupDetails);
+  useEffect(() => {
+    fetchGroupDetailsRef.current = fetchGroupDetails;
+  }, [fetchGroupDetails]);
 
   const fetchMessages = useCallback(
     async (isLoadMore = false) => {
       if (!conversationId) return;
       if (isLoadMore && (!hasMore || loadingMore)) return;
+      if (!isLoadMore && initialFetchInFlightRef.current === conversationId) {
+        return;
+      }
+
+      // timing removed
 
       try {
         if (isLoadMore) setLoadingMore(true);
+        else initialFetchInFlightRef.current = conversationId;
 
         const cursor =
           isLoadMore && messagesRef.current.length > 0
             ? messagesRef.current[messagesRef.current.length - 1].id
             : undefined;
 
+        // const networkStartedAt = globalThis?.performance?.now?.() ?? Date.now();
+
         const response = await chatApi.getMessages(
           Number(conversationId),
           cursor,
           20,
         );
+
+        // log removed
+
         const newMessages = response.data;
 
+        // const mappingStartedAt = globalThis?.performance?.now?.() ?? Date.now();
         const mapped = newMessages.map((m: any) =>
           mapThreadMessage(m, userId, { includeSeenBy: true }),
         );
 
+        // log removed
+
+        if (
+          !isLoadMore &&
+          initialVisibleMediaWarmupRef.current !== conversationId
+        ) {
+          initialVisibleMediaWarmupRef.current = conversationId;
+
+          const warmUris: string[] = [];
+          const warmMessages: any[] = [];
+          for (const message of mapped) {
+            if (message?.type !== "image" && message?.type !== "video")
+              continue;
+            warmMessages.push(message);
+            if (warmMessages.length >= 4) break;
+          }
+
+          for (const message of warmMessages) {
+            const fileInfo = message.fileInfo || {};
+            const uri =
+              fileInfo.thumbnailUrl ||
+              fileInfo.thumbnail ||
+              fileInfo.thumb ||
+              fileInfo.url;
+            if (!uri) continue;
+            warmUris.push(resolveMediaUri(uri));
+          }
+
+          if (warmUris.length > 0) {
+            void warmMediaUris(warmUris);
+          }
+        }
+
         if (isLoadMore) {
-          setMessages((prev) => dedupeById([...prev, ...mapped]));
+          setMessages((prev) => {
+            const next = dedupeById([...prev, ...mapped]);
+            return next;
+          });
         } else {
-          setMessages(dedupeById(mapped));
+          const nextMessages = dedupeById(mapped);
+          setMessages((prev) =>
+            areMessageListsEffectivelyEqual(prev, nextMessages)
+              ? prev
+              : nextMessages,
+          );
           setInitialFetchDone(true);
         }
 
         setHasMore(newMessages.length >= 20);
 
         if (!targetUserIdState && mapped.length > 0) {
-          const otherMessage = mapped.find((m: any) => m.senderId !== userId);
+          const otherMessage = mapped.find((m: any) => String(m.senderId) !== String(userId));
           if (otherMessage) {
-            setTargetUserIdState(otherMessage.senderId.toString());
+              setTargetUserIdState(otherMessage.senderId.toString());
           }
         }
       } catch (err) {
@@ -315,6 +472,9 @@ export function useChatThreadRuntime({
       } finally {
         setLoading(false);
         setLoadingMore(false);
+        if (!isLoadMore && initialFetchInFlightRef.current === conversationId) {
+          initialFetchInFlightRef.current = null;
+        }
       }
     },
     [
@@ -330,42 +490,9 @@ export function useChatThreadRuntime({
       setLoadingMore,
       setMessages,
       setTargetUserIdState,
+      warmMediaUris,
     ],
   );
-
-  const markAsReadWithRetryRef = useRef(markAsReadWithRetry);
-  useEffect(() => {
-    markAsReadWithRetryRef.current = markAsReadWithRetry;
-  }, [markAsReadWithRetry]);
-
-  const fetchMessagesRef = useRef(fetchMessages);
-  useEffect(() => {
-    fetchMessagesRef.current = fetchMessages;
-  }, [fetchMessages]);
-
-  const fetchGroupDetailsRef = useRef(fetchGroupDetails);
-  useEffect(() => {
-    fetchGroupDetailsRef.current = fetchGroupDetails;
-  }, [fetchGroupDetails]);
-
-  useEffect(() => {
-    fetchGroupDetails();
-  }, [fetchGroupDetails]);
-
-  useEffect(() => {
-    if (params.isGroup !== "true") return;
-
-    const handleUpdate = (data: any) => {
-      if (data.conversationId?.toString() === id?.toString()) {
-        fetchGroupDetails();
-      }
-    };
-
-    socketService.on("conversation_updated", handleUpdate);
-    return () => {
-      socketService.off("conversation_updated", handleUpdate);
-    };
-  }, [id, params.isGroup, fetchGroupDetails]);
 
   const getTargetUserStatus = useCallback(async () => {
     if (!targetUserIdState) return;
@@ -374,6 +501,18 @@ export function useChatThreadRuntime({
       if (data) {
         setTargetUserStatus({ status: data.status, lastSeen: data.lastSeen });
         setTargetUser(data);
+        // Update contactName on messages from this user (same as groupDetails effect)
+        setMessages((prev: any[]) => {
+          let changed = false;
+          const next = prev.map((m: any) => {
+            if (m.fromMe) return m;
+            if (String(m.senderId) !== String(targetUserIdState)) return m;
+            if (m.contactName === data.fullName) return m;
+            changed = true;
+            return { ...m, contactName: data.fullName, contactAvatar: data.avatar ? getAvatarUrl(data.avatar) ?? undefined : undefined };
+          });
+          return changed ? next : prev;
+        });
       }
     } catch (err) {
       error("Fetch target user status error:", err);
@@ -381,9 +520,11 @@ export function useChatThreadRuntime({
   }, [targetUserIdState, setTargetUserStatus, setTargetUser]);
 
   useEffect(() => {
-    if (isFocused && targetUserIdState) {
-      getTargetUserStatus();
-    }
+    if (!(isFocused && targetUserIdState)) return;
+    const cancel = scheduleLowPriorityTask(() => {
+      void getTargetUserStatus();
+    });
+    return () => cancel();
   }, [isFocused, targetUserIdState, getTargetUserStatus]);
 
   useEffect(() => {
@@ -425,29 +566,40 @@ export function useChatThreadRuntime({
       // but ALWAYS fetch fresh data from the server in the background so that
       // revoked / deleted messages are corrected without a flash.
       if (!hasPreloadedMessages) {
-        setLoading(true);
+        // Delay showing a loading spinner briefly so that a fast cache
+        // read does not show a spinner unnecessarily. If cache is slow
+        // to read or missing, the spinner will appear after `loadingDelayMs`.
+        const loadingDelayMs = 300;
+        let loadingTimeout: NodeJS.Timeout | null = setTimeout(() => {
+          if (!cancelled) setLoading(true);
+        }, loadingDelayMs);
 
-        // Defer cache read until after interactions so it doesn't block
-        // navigation/animations. If cache exists we'll still set it, but
-        // we continue to fetch fresh messages in the background.
-        InteractionManager.runAfterInteractions(() => {
-          loadMessagesCache(conversationId)
-            .then((cachedMessages) => {
-              if (
-                !cancelled &&
-                cachedMessages.length > 0 &&
-                messagesRef.current.length === 0
-              ) {
-                setMessages(cachedMessages);
-                setInitialFetchDone(true);
-                setLoading(false);
-                // do not return early; still fetch fresh messages below
-              }
-            })
-            .catch(() => {});
-        });
+        // Try to read cache as soon as possible (do not defer to interactions)
+        // so we can render cached messages immediately on open.
+        // timing removed
+        loadMessagesCache(conversationId)
+          .then((cachedMessages) => {
+            // log removed
+            if (
+              !cancelled &&
+              cachedMessages.length > 0 &&
+              messages.length === 0 &&
+              messagesRef.current.length === 0
+            ) {
+              setMessages(cachedMessages);
+              setInitialFetchDone(true);
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            if (loadingTimeout) {
+              clearTimeout(loadingTimeout);
+              loadingTimeout = null;
+            }
+          });
 
-        // Set aggressive timeout to ensure loading is cleared
+        // Set aggressive timeout to ensure loading is cleared even if cache and
+        // network are both slow.
         timeout = setTimeout(() => {
           if (!cancelled) {
             setLoading(false);
@@ -490,6 +642,147 @@ export function useChatThreadRuntime({
   }, [conversationId, initialFetchDone, messages, persistMessagesCache]);
 
   useEffect(() => {
+    if (!messages || messages.length === 0) return;
+
+    let cancelled = false;
+
+    const missingMetadata = messages
+      .filter((message) => {
+        if (message?.type !== "image") return false;
+        const fileInfo = message.fileInfo || {};
+        return !fileInfo.thumbnailUrl || !fileInfo.width || !fileInfo.height;
+      })
+      .slice(0, 6);
+
+    if (missingMetadata.length === 0) return;
+
+    for (const message of missingMetadata) {
+      const fileInfo = message.fileInfo || {};
+      const thumbnailUrl =
+        fileInfo.thumbnailUrl ||
+        fileInfo.thumbnail ||
+        fileInfo.thumb ||
+        fileInfo.url;
+
+      if (message.id != null) {
+        setImageMetadata(message.id, {
+          ...(thumbnailUrl ? { thumbnailUrl } : {}),
+        });
+      }
+    }
+
+    InteractionManager.runAfterInteractions(() => {
+      (async () => {
+        const updates = await Promise.all(
+          missingMetadata.map(async (message) => {
+            const fileInfo = message.fileInfo || {};
+            if (fileInfo.width && fileInfo.height) return null;
+
+            const sourceUri = fileInfo.url
+              ? resolveMediaUri(fileInfo.url)
+              : null;
+            if (!sourceUri) return null;
+
+            const size = await new Promise<{
+              width: number;
+              height: number;
+            } | null>((resolve) => {
+              const timeout = setTimeout(() => resolve(null), 4000);
+
+              RNImage.getSize(
+                sourceUri,
+                (width, height) => {
+                  clearTimeout(timeout);
+                  if (width > 0 && height > 0) {
+                    resolve({ width, height });
+                  } else {
+                    resolve(null);
+                  }
+                },
+                () => {
+                  clearTimeout(timeout);
+                  resolve(null);
+                },
+              );
+            });
+
+            if (!size) return null;
+            return { id: message.id, width: size.width, height: size.height };
+          }),
+        );
+
+        if (cancelled) return;
+
+        const byId = new Map<string, { width: number; height: number }>();
+        for (const update of updates) {
+          if (update?.id != null) {
+            byId.set(update.id.toString(), {
+              width: update.width,
+              height: update.height,
+            });
+          }
+        }
+
+        if (byId.size === 0) return;
+
+        for (const [key, update] of byId.entries()) {
+          setImageMetadata(key, {
+            width: update.width,
+            height: update.height,
+          });
+        }
+      })();
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messages, setMessages]);
+
+  useEffect(() => {
+    if (!conversationId || !isFocused) return;
+    if (!messages || messages.length === 0) return;
+    if (initialCachedMediaWarmupRef.current === conversationId) return;
+    initialCachedMediaWarmupRef.current = conversationId;
+
+    const cancel = scheduleLowPriorityTask(() => {
+      void (async () => {
+        try {
+          const toWarm: string[] = [];
+          const seen = new Set<string>();
+
+          for (const message of messages.slice(0, 10)) {
+            if (message?.type !== "image" && message?.type !== "video")
+              continue;
+            const fileInfo = message.fileInfo || {};
+            const uri =
+              fileInfo.thumbnailUrl ||
+              fileInfo.thumbnail ||
+              fileInfo.thumb ||
+              fileInfo.url;
+            if (!uri) continue;
+            const resolved = resolveMediaUri(uri);
+            if (seen.has(resolved)) continue;
+            seen.add(resolved);
+            toWarm.push(resolved);
+            if (toWarm.length >= 3) break;
+          }
+
+          for (const uri of toWarm) {
+            const cached = await getCachedPath(uri).catch(() => null);
+            if (cached) continue;
+            await prefetchQueue.enqueue(uri).catch(() => null);
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    });
+
+    return () => cancel();
+  }, [conversationId, isFocused, messages]);
+
+  useEffect(() => {
     if (!isFocused || !conversationId || conversationId === "new") return;
 
     const conversationIdNum = parseInt(conversationId, 10);
@@ -507,16 +800,53 @@ export function useChatThreadRuntime({
   useEffect(() => {
     if (!isFocused || !conversationId) return;
     if (initialFetchDone) return;
+    if (initialMediaRefreshScheduledRef.current === conversationId) return;
 
     fetchMessages(false);
-    fetchAllMedia();
-  }, [
-    conversationId,
-    isFocused,
-    initialFetchDone,
-    fetchMessages,
-    fetchAllMedia,
-  ]);
+  }, [conversationId, isFocused, initialFetchDone, fetchMessages]);
+
+  useEffect(() => {
+    if (isFocused && isGroup && conversationId) {
+      fetchGroupDetails();
+    }
+  }, [isFocused, isGroup, conversationId, fetchGroupDetails]);
+
+  // When groupDetails loads (after the initial render), FlashList won't re-render
+  // existing cells unless the data items themselves change. Patch each message
+  // with the sender's name + avatar so the FlashList data array is updated and
+  // bubbles re-render with correct initials instead of the 'U' fallback.
+  useEffect(() => {
+    if (!groupDetails?.participants || !setMessages) return;
+
+    const participantMap = new Map<string, { fullName: string; avatar: string | null }>();
+    for (const p of groupDetails.participants) {
+      if (p.user?.id != null) {
+        participantMap.set(String(p.user.id), {
+          fullName: p.user.fullName,
+          avatar: p.user.avatar ?? null,
+        });
+      }
+    }
+
+    setMessages((prev: any[]) => {
+      let changed = false;
+      const next = prev.map((m: any) => {
+        if (!m.senderId || m.fromMe) return m;
+        const participant = participantMap.get(String(m.senderId));
+        if (!participant) return m;
+
+        const newContactName = participant.fullName;
+        const newContactAvatar = participant.avatar
+          ? getAvatarUrl(participant.avatar) ?? undefined
+          : undefined;
+
+        if (m.contactName === newContactName && m.contactAvatar === newContactAvatar) return m;
+        changed = true;
+        return { ...m, contactName: newContactName, contactAvatar: newContactAvatar };
+      });
+      return changed ? next : prev;
+    });
+  }, [groupDetails, setMessages]);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -573,7 +903,7 @@ export function useChatThreadRuntime({
           `[ChatThread] 💬 New message received in conversation ${conversationId}:`,
           message,
         );
-        if (message.senderId !== userId) {
+        if (String(message.senderId) !== String(userId)) {
           // Mark as read with retry (fire and forget)
           markAsReadWithRetryRef.current(message.conversationId);
         }
@@ -647,6 +977,22 @@ export function useChatThreadRuntime({
           includeSeenBy: true,
         });
 
+        // Background-prefetch thumbnail for incoming image messages
+        (async () => {
+          try {
+            if (mappedMessage?.type === "image" && mappedMessage.fileInfo) {
+              const t =
+                mappedMessage.fileInfo.thumbnailUrl ||
+                mappedMessage.fileInfo.thumbnail ||
+                mappedMessage.fileInfo.thumb;
+              if (t) {
+                // Use shared prefetch queue to avoid parallel duplicate downloads
+                prefetchQueue.enqueue(resolveMediaUri(t)).catch(() => null);
+              }
+            }
+          } catch {}
+        })();
+
         if (tempIdx !== -1) {
           const newMessages = [...prev];
           newMessages[tempIdx] = mappedMessage;
@@ -673,14 +1019,20 @@ export function useChatThreadRuntime({
     };
 
     socketService.on("conversation_updated", handleConversationUpdated);
-    
-    const handleMessageEdited = (data: { message: any; conversationId: number }) => {
+
+    const handleMessageEdited = (data: {
+      message: any;
+      conversationId: number;
+    }) => {
       if (data.conversationId.toString() === conversationId?.toString()) {
         setMessages((prev) => {
           const next = prev.map((m) =>
             m.id?.toString() === data.message.id?.toString()
-              ? mapThreadMessage(data.message, userId, { status: m.status === 'sending' ? 'sending' : 'sent', includeSeenBy: true })
-              : m
+              ? mapThreadMessage(data.message, userId, {
+                  status: m.status === "sending" ? "sending" : "sent",
+                  includeSeenBy: true,
+                })
+              : m,
           );
           persistMessagesCache(data.conversationId.toString(), next);
           return next;
@@ -688,13 +1040,21 @@ export function useChatThreadRuntime({
       }
     };
 
-    const handleMessageRevoked = (data: { messageId: number, conversationId: number }) => {
+    const handleMessageRevoked = (data: {
+      messageId: number;
+      conversationId: number;
+    }) => {
       if (data.conversationId.toString() === conversationId?.toString()) {
         setMessages((prev) => {
           const next = prev.map((m) =>
             m.id?.toString() === data.messageId?.toString()
-              ? { ...m, type: 'revoked', content: 'Tin nhắn đã được thu hồi', isRevoked: true }
-              : m
+              ? {
+                  ...m,
+                  type: "revoked",
+                  content: "Tin nhắn đã được thu hồi",
+                  isRevoked: true,
+                }
+              : m,
           );
           // Immediately persist updated cache so stale messages don't
           // flash back when the user re-enters this conversation.
@@ -704,13 +1064,17 @@ export function useChatThreadRuntime({
       }
     };
 
-    const handleMessageReaction = (data: { messageId: number; conversationId: number; reactions: any[] }) => {
+    const handleMessageReaction = (data: {
+      messageId: number;
+      conversationId: number;
+      reactions: any[];
+    }) => {
       if (data.conversationId.toString() === conversationId?.toString()) {
         setMessages((prev) => {
           const next = prev.map((m) =>
             m.id?.toString() === data.messageId?.toString()
               ? { ...m, reactions: data.reactions }
-              : m
+              : m,
           );
           persistMessagesCache(data.conversationId.toString(), next);
           return next;
@@ -730,7 +1094,15 @@ export function useChatThreadRuntime({
       socketService.off("message_revoked", handleMessageRevoked);
       socketService.off("message_reaction", handleMessageReaction);
     };
-  }, [conversationId, userId, isFocused, isGroup, flatListRef, setMessages, persistMessagesCache]);
+  }, [
+    conversationId,
+    userId,
+    isFocused,
+    isGroup,
+    flatListRef,
+    setMessages,
+    persistMessagesCache,
+  ]);
 
   useEffect(() => {
     setActiveConversationId(conversationId);

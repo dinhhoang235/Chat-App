@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Image, InteractionManager } from "react-native";
 import { useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useTheme } from "@/context/themeContext";
@@ -14,6 +15,65 @@ import { useConversationSelection } from "@/hooks/useConversations/useConversati
 import { useConversationActions } from "@/hooks/useConversations/useConversationActions";
 import { revokeMessageInCache } from "@/hooks/useChatThread/useChatThreadRuntime";
 import { chatThreadCache } from "@/utils/chatThreadCache";
+import prefetchQueue from "@/utils/prefetchQueue";
+import { prefetchComposite } from "@/utils/groupCompositeCache";
+import { resolveMediaUri } from "@/components/chat/messageParts/messageHelpers";
+
+// Schedule a low-priority task without blocking render. Returns a cancel function.
+const scheduleLowPriorityTask = (task: () => void) => {
+  try {
+    const ric = (globalThis as any).requestIdleCallback;
+    if (typeof ric === "function") {
+      const id = ric(() => task());
+      return () => (globalThis as any).cancelIdleCallback?.(id);
+    }
+  } catch {}
+  const t = setTimeout(task, 50);
+  return () => clearTimeout(t);
+};
+
+const warmConversationInitialMedia = (conversation: any) => {
+  if (!conversation || !Array.isArray(conversation.initialMessages)) return;
+
+  const seen = new Set<string>();
+  const uris: string[] = [];
+
+  for (const message of conversation.initialMessages) {
+    if (!message || (message.type !== "image" && message.type !== "video"))
+      continue;
+
+    let content: any = message.content;
+    if (typeof content === "string") {
+      try {
+        content = JSON.parse(content);
+      } catch {
+        content = null;
+      }
+    }
+
+    const uri =
+      content?.thumbnailUrl ||
+      content?.thumbnail ||
+      content?.thumb ||
+      content?.url;
+
+    if (!uri) continue;
+
+    const resolved = resolveMediaUri(uri);
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+    uris.push(resolved);
+
+    if (uris.length >= 3) break;
+  }
+
+  if (uris.length === 0) return;
+  // log removed
+
+  for (const uri of uris) {
+    void prefetchQueue.enqueue(uri).catch(() => null);
+  }
+};
 
 export function useConversations() {
   const { colors } = useTheme();
@@ -23,6 +83,9 @@ export function useConversations() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cacheReadyUserId, setCacheReadyUserId] = useState<number | null>(null);
+  const lastFetchRef = useRef(0);
+  const isFetchingRef = useRef(false);
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     selectionMode,
     setSelectionMode,
@@ -67,6 +130,12 @@ export function useConversations() {
       if (cancelled || cached.length === 0) return;
 
       setData(cached);
+
+      scheduleLowPriorityTask(() => {
+        cached.slice(0, 1).forEach((conversation: any) => {
+          warmConversationInitialMedia(conversation);
+        });
+      });
     };
 
     hydrateCache().finally(() => {
@@ -81,11 +150,12 @@ export function useConversations() {
   }, [user, colors]);
 
   const fetchConversations = useCallback(async () => {
-    // don't attempt to hit the API if we don't have a logged-in user yet
     if (!user) {
       setLoading(false);
       return;
     }
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
 
     try {
       const response = await chatApi.getConversations();
@@ -97,12 +167,46 @@ export function useConversations() {
           return b.updatedAt - a.updatedAt;
         });
       setData(mapped);
+
+      scheduleLowPriorityTask(() => {
+        mapped.slice(0, 1).forEach((conversation: any) => {
+          warmConversationInitialMedia(conversation);
+        });
+      });
+
+      // Prefetch avatar images so they appear immediately in the list
+      try {
+        const urls = mapped
+          .map((c: any) => c.avatar)
+          .filter((u: any) => typeof u === "string" && u.length > 0);
+        if (urls.length > 0) {
+          // Prefetch avatars in background without blocking the main flow.
+          scheduleLowPriorityTask(() => {
+            Promise.all(urls.map((u: string) => Image.prefetch(u))).catch(
+              () => {},
+            );
+          });
+        }
+      } catch (e) {
+        // ignore prefetch errors — doesn't block rendering
+        console.warn("Avatar prefetch failed", e);
+      }
+      // Prefetch composite avatars to local cache (file://) for fast render
+      scheduleLowPriorityTask(() => {
+        mapped.forEach((conv: any) => {
+          const convId = conv.id;
+          const compositeUrl = conv.compositeAvatarUrl;
+          if (compositeUrl) {
+            void prefetchComposite(convId, compositeUrl).catch(() => null);
+          }
+        });
+      });
     } catch (err: any) {
-      // 401 may occur if auth isn't ready; we already guard but log others
       if (err?.response?.status !== 401) {
         console.error("Fetch conversations error:", err);
       }
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
     }
   }, [user, colors]);
@@ -126,18 +230,32 @@ export function useConversations() {
     );
   }, [colors]);
 
+  const debouncedFetchConversations = useCallback(() => {
+    const now = Date.now();
+    if (now - lastFetchRef.current < 5000 || isFetchingRef.current) return;
+    if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    fetchDebounceRef.current = setTimeout(() => {
+      fetchConversations();
+    }, 300);
+  }, [fetchConversations]);
+
   useEffect(() => {
     if (isFocused && user) {
-      fetchConversations();
+      const now = Date.now();
+      if (now - lastFetchRef.current > 30000) {
+        InteractionManager.runAfterInteractions(() => {
+          lastFetchRef.current = Date.now();
+          fetchConversations();
+        });
+      }
     }
 
     const handleUpdate = (data: any) => {
-      fetchConversations();
+      debouncedFetchConversations();
     };
 
     const handleNewMessage = (message: any) => {
-      // Trigger a re-fetch to get the latest order and message text
-      fetchConversations();
+      debouncedFetchConversations();
     };
 
     const handleStatusChanged = (data: { userId: number; status: string }) => {
@@ -165,13 +283,18 @@ export function useConversations() {
         if (cached.length > 0) {
           const updated = cached.map((m: any) =>
             m.id === data.messageId
-              ? { ...m, type: 'revoked', content: 'Tin nhắn đã được thu hồi', isRevoked: true }
+              ? {
+                  ...m,
+                  type: "revoked",
+                  content: "Tin nhắn đã được thu hồi",
+                  isRevoked: true,
+                }
               : m,
           );
           chatThreadCache.setMessages(convId, updated);
         }
       }
-      fetchConversations();
+      debouncedFetchConversations();
     };
 
     socketService.on("conversation_updated", handleUpdate);
@@ -184,8 +307,9 @@ export function useConversations() {
       socketService.off("new_message", handleNewMessage);
       socketService.off("message_revoked", handleMessageRevoked);
       socketService.off("user_status_changed", handleStatusChanged);
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
     };
-  }, [fetchConversations, isFocused, user]);
+  }, [debouncedFetchConversations, fetchConversations, isFocused, user]);
 
   return {
     data,

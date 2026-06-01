@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   Modal,
   View,
-  Image,
   TouchableOpacity,
   FlatList,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   Pressable,
   StyleSheet,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -263,7 +263,8 @@ const ZoomableImage = ({
             <Image
               source={{ uri }}
               style={{ width: '100%', height: '100%' }}
-              resizeMode="contain"
+              contentFit="contain"
+              cachePolicy="memory-disk"
             />
           )}
         </View>
@@ -402,18 +403,16 @@ export default function FullscreenImageViewer({
     }
   }, [currentIndex, visible, isLandscape, scrollFooterToCenter]);
 
-  if (!visible) return null;
-
-  const onViewableItemsChanged = ({ viewableItems }: any) => {
+  const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index);
       setIsZoomed(false);
     }
-  };
+  }, []);
 
-  const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
+  const viewabilityConfig = useMemo(() => ({ itemVisiblePercentThreshold: 50 }), []);
 
-  const renderItem = ({ item, index }: { item: string; index: number }) => (
+  const renderItem = useCallback(({ item, index }: { item: string; index: number }) => (
     <ZoomableImage
       uri={item}
       width={width}
@@ -428,7 +427,9 @@ export default function FullscreenImageViewer({
       isActive={index === currentIndex}
       showControls={showControls}
     />
-  );
+  ), [width, height, insets, isLandscape, isZoomed, onClose, nativeGesture, currentIndex, showControls]);
+
+  if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -482,6 +483,10 @@ export default function FullscreenImageViewer({
             initialScrollIndex={displayInitial}
             getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
             scrollEnabled={!isZoomed}
+            removeClippedSubviews={true}
+            windowSize={3}
+            maxToRenderPerBatch={1}
+            initialNumToRender={2}
           />
         </GestureDetector>
 
@@ -524,7 +529,7 @@ export default function FullscreenImageViewer({
                   <VideoThumbnail uri={uri} style={{ width: 48, height: 48 }} />
                 ) : (
                   <View style={{ width: 48, height: 48 }}>
-                    <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" cachePolicy="memory-disk" />
                   </View>
                 )}
               </TouchableOpacity>

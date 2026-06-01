@@ -8,10 +8,17 @@ type MessageReplyPreviewProps = {
   onReplyPress?: (id: string) => void;
   isOutgoing: boolean;
   colors: any;
+  currentUserName?: string;
+  contactNameFallback?: string;
+  replyToSenderName?: string;
 };
 
-export default function MessageReplyPreview({ replyTo, onReplyPress, isOutgoing, colors }: MessageReplyPreviewProps) {
+export default function MessageReplyPreview({ replyTo, onReplyPress, isOutgoing, colors, currentUserName, contactNameFallback, replyToSenderName }: MessageReplyPreviewProps) {
   if (!replyTo) return null;
+
+  const displayName = replyTo.fromMe
+    ? (replyTo.sender?.fullName || replyTo.contactName || currentUserName || 'Trả lời chính mình')
+    : (replyTo.sender?.fullName || replyTo.contactName || replyToSenderName || contactNameFallback);
 
   const getThumbnailUri = () => {
     let url = replyTo.type === 'image_group' ? replyTo.images?.[0]?.fileInfo?.url : replyTo.fileInfo?.url;
@@ -54,7 +61,7 @@ export default function MessageReplyPreview({ replyTo, onReplyPress, isOutgoing,
       )}
       <View style={{ flexShrink: 1, justifyContent: 'center' }}>
         <Text style={{ fontSize: 13, fontWeight: '700', color: isOutgoing ? colors.bubbleMeText : colors.bubbleOtherText, marginBottom: 2 }}>
-          {replyTo.sender?.fullName || 'Người dùng'}
+          {displayName}
         </Text>
         <Text style={{ fontSize: 13, color: isOutgoing ? colors.textSecondary : colors.textSecondary }} numberOfLines={1} ellipsizeMode="tail">
           {replyTo.type === 'text'

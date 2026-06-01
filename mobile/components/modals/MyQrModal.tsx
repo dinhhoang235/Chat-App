@@ -5,7 +5,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { useTheme } from '@/context/themeContext';
-import { getInitials } from '@/utils/initials';
 import { getAvatarUrl } from '@/utils/avatar';
 
 type Props = {
@@ -79,9 +78,7 @@ export default function MyQrModal({ visible, onClose, name, phone, avatarUri, da
                 {avatarUri && getAvatarUrl(avatarUri) ? (
                   <Image source={{ uri: getAvatarUrl(avatarUri) || undefined }} style={{ width: 60, height: 60, borderRadius: 30, marginBottom: 6 }} />
                 ) : (
-                  <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
-                    <Text style={{ color: colors.textSecondary }}>{getInitials(name)}</Text>
-                  </View>
+                  <Image source={{ uri: getAvatarUrl('/storage/chatapp/default_avatar.png') || undefined }} style={{ width: 60, height: 60, borderRadius: 30, marginBottom: 6 }} />
                 )}
 
                 <Text style={{ color: colors.text, fontWeight: '700' }}>{name ?? 'Người dùng'}</Text>

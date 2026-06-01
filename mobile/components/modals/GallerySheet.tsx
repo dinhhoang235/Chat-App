@@ -29,8 +29,8 @@ type GallerySheetProps = {
   attachments: FileObject[];
   addAttachment: (file: FileObject) => void;
   removeAttachment: (arg: number | string) => void;
-  /** Chiều cao sheet — bằng chiều cao bàn phím */
   height?: number;
+  inline?: boolean;
 };
 
 export default function GallerySheet({
@@ -40,6 +40,7 @@ export default function GallerySheet({
   addAttachment,
   removeAttachment,
   height,
+  inline,
 }: GallerySheetProps) {
   const { colors } = useTheme();
   const sheetRef = useRef<BottomSheet>(null);
@@ -50,14 +51,14 @@ export default function GallerySheet({
   const [after, setAfter] = useState<string | undefined>(undefined);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
-  // Snap to open or close when visible changes
   useEffect(() => {
+    if (inline) return;
     if (visible) {
       sheetRef.current?.snapToIndex(0);
     } else {
       sheetRef.current?.close();
     }
-  }, [visible]);
+  }, [visible, inline]);
 
   const snapPoints = useMemo(() => {
     const h = height ?? Math.round(Dimensions.get('window').height * 0.35);
@@ -117,7 +118,6 @@ export default function GallerySheet({
     if (existing) {
       removeAttachment(uri);
     } else if (attachments.length < 10) {
-      // Fetch full info to get fileSize
       let size = (asset as any).fileSize;
       if (!size) {
         try {
@@ -128,7 +128,6 @@ export default function GallerySheet({
         }
       }
 
-      // Detect GIF files by extension
       const isGif = asset.filename?.toLowerCase().endsWith('.gif');
       let mimeType: string | undefined;
       if (asset.mediaType === 'video') {
@@ -237,6 +236,26 @@ export default function GallerySheet({
     );
   }, [attachments, toggleAsset, colors, openCamera, styles]);
 
+  const content = (
+    <FlatList
+      data={data}
+      keyExtractor={(item, idx) => (item === 'camera' ? 'camera' : (item as MediaLibrary.Asset).id)}
+      numColumns={COLUMN_COUNT}
+      renderItem={renderItem}
+      onEndReached={loadAssets}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={loading ? <ActivityIndicator style={{ margin: 12 }} color={colors.tint} /> : null}
+      initialNumToRender={12}
+      maxToRenderPerBatch={24}
+      windowSize={5}
+      removeClippedSubviews
+      getItemLayout={getItemLayout}
+    />
+  );
+
+  if (inline) {
+    return content;
+  }
 
   return (
     <BottomSheet
@@ -252,20 +271,7 @@ export default function GallerySheet({
       enableDynamicSizing={false}
       containerStyle={{ pointerEvents: 'box-none' }}
     >
-        <FlatList
-          data={data}
-          keyExtractor={(item, idx) => (item === 'camera' ? 'camera' : (item as MediaLibrary.Asset).id)}
-          numColumns={COLUMN_COUNT}
-          renderItem={renderItem}
-          onEndReached={loadAssets}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={loading ? <ActivityIndicator style={{ margin: 12 }} color={colors.tint} /> : null}
-          initialNumToRender={12}
-          maxToRenderPerBatch={24}
-          windowSize={5}
-          removeClippedSubviews
-          getItemLayout={getItemLayout}
-        />
+      {content}
     </BottomSheet>
   );
 }

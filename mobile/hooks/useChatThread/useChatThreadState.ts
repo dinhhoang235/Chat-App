@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { chatThreadCache } from "@/utils/chatThreadCache";
 
 interface UseChatThreadStateParams {
   id: string | null;
@@ -42,7 +43,10 @@ export function useChatThreadState({
   const [targetUser, setTargetUser] = useState<any>(null);
   const [replyingTo, setReplyingTo] = useState<any>(null);
 
-  const [groupDetails, setGroupDetails] = useState<any>(null);
+  const [groupDetails, setGroupDetails] = useState<any>(() => {
+    if (id) return chatThreadCache.getGroupDetails(id);
+    return null;
+  });
   const [allMedia, setAllMedia] = useState<any[]>([]);
   const [loadingMoreMedia, setLoadingMoreMedia] = useState(false);
   const [hasMoreMedia, setHasMoreMedia] = useState(true);

@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 type SearchUser = {
   id: number;
@@ -43,8 +42,8 @@ export default function SearchHistory({ history, onSelect, onRemove, onClear, co
                 style={{ width: 44, height: 44, borderRadius: 22, marginRight: 12 }} 
               />
             ) : (
-              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.tint, marginRight: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{getInitials(user.fullName)}</Text>
+              <View style={{ width: 44, height: 44, borderRadius: 22, marginRight: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 44, height: 44, borderRadius: 22 }} />
               </View>
             )}
             <View>

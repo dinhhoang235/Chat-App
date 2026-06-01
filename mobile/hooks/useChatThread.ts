@@ -1,4 +1,5 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect } from "react";
+import { useWindowDimensions } from "react-native";
 import { useTheme } from "@/context/themeContext";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
@@ -19,7 +20,12 @@ import { useChatThreadRuntime } from "./useChatThread/useChatThreadRuntime";
 import { useChatThreadGroupCall } from "./useChatThread/useChatThreadGroupCall";
 import { useChatThreadLocation } from "./useChatThread/useChatThreadLocation";
 import { useChatThreadGif } from "./useChatThread/useChatThreadGif";
-import { buildProcessedMessages, mapThreadMessage } from "@/utils/chatThread";
+import {
+  buildProcessedMessages,
+  mapThreadMessage,
+  computeChatItemSize,
+} from "@/utils/chatThread";
+import { getMessageSize, setMessageSize } from "@/utils/messageSizeCache";
 import { chatThreadCache } from "@/utils/chatThreadCache";
 import { chatApi } from "@/services/chat";
 import { error } from "@/utils/logger";
@@ -30,6 +36,7 @@ type UseChatThreadOptions = {
 };
 
 export function useChatThread(options?: UseChatThreadOptions) {
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { colors } = useTheme();
   const { user } = useAuth();
   const params = useLocalSearchParams();
@@ -40,25 +47,37 @@ export function useChatThread(options?: UseChatThreadOptions) {
   const paramStatus = params.status as string | undefined;
   const paramLastSeen = params.lastSeen as string | undefined;
   const initialMessages = useMemo(() => {
+    // timing removed
     if (id && chatThreadCache.hasMessages(id)) {
-      return chatThreadCache
+      const cachedMessages = chatThreadCache
         .getMessages(id)
         .map((message: any) =>
           mapThreadMessage(message, user?.id, { includeSeenBy: true }),
         );
+      // log removed
+      return cachedMessages;
     }
 
     const raw = params.initialMessages as string | undefined;
-    if (!raw) return [] as any[];
+    if (!raw) {
+      // log removed
+      return [] as any[];
+    }
 
     try {
       const parsed = JSON.parse(decodeURIComponent(raw));
-      if (!Array.isArray(parsed)) return [] as any[];
+      if (!Array.isArray(parsed)) {
+        // log removed
+        return [] as any[];
+      }
 
-      return parsed.map((message: any) =>
+      const mapped = parsed.map((message: any) =>
         mapThreadMessage(message, user?.id, { includeSeenBy: true }),
       );
+      // log removed
+      return mapped;
     } catch {
+      // log removed
       return [] as any[];
     }
   }, [id, params.initialMessages, user?.id]);
@@ -168,21 +187,16 @@ export function useChatThread(options?: UseChatThreadOptions) {
   const fetchMessages = runtimeFetchMessages;
   const fetchAllMedia = runtimeFetchAllMedia;
 
-  const {
-    displayTypingAvatar,
-    typingUserInitials,
-    groupAvatars,
-    membersCount,
-    statusText,
-  } = useChatThreadMeta({
-    typingUser,
-    groupDetails,
-    paramsAvatars: params.avatars,
-    paramAvatar: params.avatar,
-    paramsMembersCount: params.membersCount,
-    isGroup,
-    targetUserStatus,
-  });
+  const { displayTypingAvatar, groupAvatars, membersCount, statusText } =
+    useChatThreadMeta({
+      typingUser,
+      groupDetails,
+      paramsAvatars: params.avatars,
+      paramAvatar: params.avatar,
+      paramsMembersCount: params.membersCount,
+      isGroup,
+      targetUserStatus,
+    });
 
   const { startCall } = useCall();
   const {
@@ -204,10 +218,35 @@ export function useChatThread(options?: UseChatThreadOptions) {
     openGroupVideoCallModal: options?.openGroupVideoCallModal ?? (() => {}),
   });
 
-  const processedMessages = useMemo(
-    () => buildProcessedMessages(messages),
-    [messages],
-  );
+  const processedMessages = useMemo(() => {
+    const processed = buildProcessedMessages(messages, user?.id);
+    // Prefill size cache synchronously — runs before FlashList renders
+    for (const item of processed) {
+      if (item.id == null) continue;
+      if (getMessageSize(item.id)) continue;
+      const size = computeChatItemSize(item, windowWidth, windowHeight);
+      setMessageSize(item.id, size);
+      if (__DEV__) {
+        // log removed
+      }
+    }
+    return processed;
+  }, [messages, user?.id, windowWidth, windowHeight]);
+
+  useEffect(() => {
+    // log removed
+  }, [
+    conversationId,
+    id,
+    messages.length,
+    processedMessages.length,
+    loading,
+    loadingMore,
+    initialFetchDone,
+    isFocused,
+    isGroup,
+    hasMore,
+  ]);
 
   const { highlightedMessageId, scrollToMessageId } =
     useChatThreadMessageNavigation({
@@ -253,13 +292,13 @@ export function useChatThread(options?: UseChatThreadOptions) {
     handleBackspace,
   } = useChatThreadComposer({ handleType });
 
-  const { insets, lastKeyboardHeight, animatedContentStyle } =
+  const { insets, lastKeyboardHeight, animatedContentStyle, animatedSheetStyle } =
     useChatThreadSheetAnimation({
       composerVisible,
       galleryVisible,
       emojiVisible,
       micVisible,
-      gifVisible: options?.gifVisible,
+      gifVisible: options?.gifVisible ?? false,
       inputRef,
     });
 
@@ -320,18 +359,19 @@ export function useChatThread(options?: UseChatThreadOptions) {
     [conversationId, setMessages],
   );
 
-  const { handleSendLocation, handleSendLocationData, isSendingLocation } = useChatThreadLocation({
-    flatListRef,
-    replyingTo,
-    setReplyingTo,
-    userId: user?.id,
-    conversationId,
-    isNewConversation,
-    targetUserIdState,
-    setMessages,
-    setCreatingConversation,
-    setConversationId,
-  });
+  const { handleSendLocation, handleSendLocationData, isSendingLocation } =
+    useChatThreadLocation({
+      flatListRef,
+      replyingTo,
+      setReplyingTo,
+      userId: user?.id,
+      conversationId,
+      isNewConversation,
+      targetUserIdState,
+      setMessages,
+      setCreatingConversation,
+      setConversationId,
+    });
 
   const { handleSendGif, isSendingGif } = useChatThreadGif({
     flatListRef,
@@ -364,7 +404,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     creatingConversation,
     isTyping,
     displayTypingAvatar,
-    typingUserInitials,
+
     flatListRef,
     inputRef,
     searchMode,
@@ -393,6 +433,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     handleBackspace,
     insets,
     animatedContentStyle,
+    animatedSheetStyle,
     fetchMessages,
     handleSend,
     handleSendLocation,
@@ -413,6 +454,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     targetUserStatus,
     isGroup,
     groupAvatars,
+    groupDetails,
     membersCount,
     allMedia,
     fetchAllMedia,

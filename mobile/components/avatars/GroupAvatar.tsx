@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { getDefaultAvatarUrl } from '@/utils/avatar';
 import { useTheme } from '@/context/themeContext';
-import { getInitials } from '@/utils/initials';
-import { getAvatarColor } from '@/utils/avatar';
 
 interface AvatarInfo {
   url?: string | null;
@@ -37,25 +36,17 @@ const GroupAvatar = ({
 
   const renderAvatarItem = (item: string | AvatarInfo | undefined, itemSize: number) => {
     if (!item) {
-      return <MaterialIcons name="person" size={itemSize * 0.6} color={colors.textSecondary} />;
+      return <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: itemSize, height: itemSize }} />;
     }
 
     const url = typeof item === 'string' ? item : item.url;
-    const initials = typeof item === 'object' ? (item.initials || (item.name ? getInitials(item.name) : '?')) : '';
-    const name = typeof item === 'object' ? item.name : '';
 
     if (url) {
-      return <Image source={{ uri: url }} style={styles.image} />;
+      return <Image source={{ uri: url }} style={styles.image} onError={(e) => console.log('[DEBUG GroupAvatar] Image load error:', e.nativeEvent.error)} />;
     }
 
-    // Modern initial-style placeholder
-    const bgColor = name ? getAvatarColor(name) : '#E5E7EB';
-    
-    return (
-      <View style={{ width: '100%', height: '100%', backgroundColor: bgColor, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: itemSize * 0.45 }}>{initials}</Text>
-      </View>
-    );
+    // Placeholder: render default avatar full-size (no colored background)
+    return <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: itemSize, height: itemSize }} />;
   };
 
   if (avatars.length === 1 && countToDisplay <= 1) {
@@ -81,8 +72,7 @@ const GroupAvatar = ({
             bottom: 0, 
             left: size * 0.225, 
             zIndex: 1,
-            backgroundColor: '#F3F4F6',
-            borderColor
+            backgroundColor: 'transparent'
           }]}>
             {renderAvatarItem(avatars[2], size * 0.55)}
           </View>
@@ -96,8 +86,7 @@ const GroupAvatar = ({
             bottom: 0, 
             left: 0, 
             zIndex: 1,
-            backgroundColor: '#F3F4F6',
-            borderColor
+            backgroundColor: 'transparent'
           }]}>
             {renderAvatarItem(avatars[2], size * 0.55)}
           </View>
@@ -111,9 +100,8 @@ const GroupAvatar = ({
             bottom: 0,
             right: 0,
             zIndex: 2,
-            backgroundColor: showCount ? '#E5E7EB' : '#F3F4F6',
-            borderColor
-          }]}>
+            backgroundColor: showCount ? '#E5E7EB' : 'transparent'
+          }]}> 
             {showCount ? (
               <Text style={[styles.countText, { fontSize: size * 0.22, color: '#4B5563' }]}>+{countToDisplay - 3 > 99 ? '99' : countToDisplay - 3}</Text>
             ) : (
@@ -129,8 +117,7 @@ const GroupAvatar = ({
           top: 0, 
           left: 0, 
           zIndex: 3,
-          backgroundColor: '#F3F4F6',
-          borderColor
+          backgroundColor: 'transparent'
         }]}>
           {renderAvatarItem(avatars[0], size * 0.55)}
         </View>
@@ -143,9 +130,8 @@ const GroupAvatar = ({
             top: 0, 
             right: 0, 
             zIndex: 4,
-            backgroundColor: '#F3F4F6',
-            borderColor
-          }]}>
+            backgroundColor: 'transparent'
+          }]}> 
             {renderAvatarItem(avatars[1], size * 0.55)}
           </View>
         )}
@@ -171,7 +157,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 0,
   },
   image: {
     width: '100%',

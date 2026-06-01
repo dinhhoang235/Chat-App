@@ -6,6 +6,8 @@ import FullscreenImageViewer from '../../modals/FullscreenImageViewer';
 import InlineVideoPlayer from './InlineVideoPlayer';
 import { CircularProgress } from '../CircularProgress';
 import { resolveMediaUri } from './messageHelpers';
+import { getCachedPath, peekCachedPath } from '../../../utils/imageCache';
+import prefetchQueue from '../../../utils/prefetchQueue';
 import { warn } from '@/utils/logger';
 
 
@@ -18,10 +20,14 @@ type MessageVideoBubbleProps = {
   onLongPress?: () => void;
 };
 
-export default function MessageVideoBubble({ message, screenWidth, colors, allMedia, progress, onLongPress }: MessageVideoBubbleProps) {
+function MessageVideoBubble({ message, screenWidth, colors, allMedia, progress, onLongPress }: MessageVideoBubbleProps) {
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [localThumb, setLocalThumb] = useState<string | null>(null);
+  const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(() => {
+    if (!message.fileInfo?.url) return null;
+    return peekCachedPath(resolveMediaUri(message.fileInfo.url));
+  });
 
   const { threadImageUris, threadImageIds } = useMemo(() => {
     const uris: string[] = [];
@@ -48,6 +54,37 @@ export default function MessageVideoBubble({ message, screenWidth, colors, allMe
     }
     return localThumb;
   }, [message.fileInfo, localThumb]);
+
+  useEffect(() => {
+    let mounted = true;
+    try {
+      if (!videoUrl) return;
+
+      const memoryHit = peekCachedPath(videoUrl);
+      if (memoryHit) {
+        if (mounted) setLocalVideoUrl(memoryHit);
+      } else {
+        getCachedPath(videoUrl)
+          .then((cached) => {
+            if (mounted && cached) setLocalVideoUrl(cached);
+            else {
+              prefetchQueue.enqueue(videoUrl).then((p) => {
+                if (mounted && p) setLocalVideoUrl(p);
+              }).catch(() => {});
+            }
+          })
+          .catch(() => {
+            prefetchQueue.enqueue(videoUrl).then((p) => {
+              if (mounted && p) setLocalVideoUrl(p);
+            }).catch(() => {});
+          });
+      }
+    } catch {}
+
+    return () => {
+      mounted = false;
+    };
+  }, [videoUrl]);
 
   useEffect(() => {
     if (message.status === 'sending' && message.fileInfo?.url) {
@@ -95,7 +132,7 @@ export default function MessageVideoBubble({ message, screenWidth, colors, allMe
           {message.status === 'sending' ? (
             <Image source={{ uri: displayThumb || videoUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
           ) : (
-            <InlineVideoPlayer url={videoUrl} />
+            <InlineVideoPlayer url={localVideoUrl || videoUrl} />
           )}
 
           {message.status === 'sending' && (
@@ -129,6 +166,34 @@ export default function MessageVideoBubble({ message, screenWidth, colors, allMe
     </>
   );
 }
+
+function areMessageVideoBubblePropsEqual(prevProps: MessageVideoBubbleProps, nextProps: MessageVideoBubbleProps) {
+  if (prevProps.allMedia === nextProps.allMedia && prevProps.message === nextProps.message) return true;
+  const prev = prevProps.message;
+  const next = nextProps.message;
+  if (!prev || !next) return false;
+  return (
+    prev.id === next.id &&
+    prev.type === next.type &&
+    prev.status === next.status &&
+    prev.fromMe === next.fromMe &&
+    prev.isRevoked === next.isRevoked &&
+    prev.content === next.content &&
+    prev.fileInfo?.url === next.fileInfo?.url &&
+    prev.fileInfo?.thumbnailUrl === next.fileInfo?.thumbnailUrl &&
+    prev.fileInfo?.thumbnail === next.fileInfo?.thumbnail &&
+    prev.fileInfo?.thumb === next.fileInfo?.thumb &&
+    prev.fileInfo?.width === next.fileInfo?.width &&
+    prev.fileInfo?.height === next.fileInfo?.height &&
+    prev.fileInfo?.duration === next.fileInfo?.duration &&
+    prevProps.progress === nextProps.progress &&
+    prevProps.onLongPress === nextProps.onLongPress &&
+    prevProps.allMedia === nextProps.allMedia
+  );
+}
+
+const MemoizedMessageVideoBubble = React.memo(MessageVideoBubble, areMessageVideoBubblePropsEqual);
+export default MemoizedMessageVideoBubble;
 
 const styles = StyleSheet.create({
   overlay: {

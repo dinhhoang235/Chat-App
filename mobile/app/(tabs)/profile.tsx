@@ -5,8 +5,7 @@ import { useAuth } from '@/context/authContext';
 import { Header } from '@/components';
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from '@/context/themeContext';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 const items = [
   { title: 'Tài khoản và bảo mật', subtitle: 'Cài đặt mật khẩu, 2 bước xác thực', icon: 'security', href: '/settings/account' },
@@ -41,14 +40,14 @@ export default function Profile() {
         <View style={{ overflow: 'hidden', backgroundColor: colors.card, borderColor: colors.border }}>
           {user && (
             <TouchableOpacity onPress={() => router.push('/profile/me')} className="flex-row items-center" style={{ padding: 12, backgroundColor: colors.card }}>
-              <View style={{ width: 56, height: 56, backgroundColor: colors.tint, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16, overflow: 'hidden' }}>
                 {user.avatar ? (
                   <Image
                     source={{ uri: getAvatarUrl(user.avatar) || undefined }}
                     style={{ width: 56, height: 56, borderRadius: 28 }}
                   />
                 ) : (
-                  <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>{getInitials(user.fullName)}</Text>
+                  <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 56, height: 56, borderRadius: 28 }} />
                 )}
               </View>
               <View style={{ flex: 1 }}>

@@ -3,6 +3,7 @@ import { Server } from "socket.io";
 import prisma from "../../db.js";
 import { AuthRequest } from "../../middleware/auth.js";
 import { clearCachedMessages } from "../../utils/redis.js";
+import { addCompositeJob } from "../../workers/compositeQueue.js";
 
 type ConversationParticipantWithUser = {
   id: number;
@@ -58,12 +59,9 @@ export const addMembers =
       }
 
       if (participant.role !== "owner" && participant.role !== "admin") {
-        return res
-          .status(403)
-          .json({
-            message:
-              "Permission denied. Only owners or admins can add members.",
-          });
+        return res.status(403).json({
+          message: "Permission denied. Only owners or admins can add members.",
+        });
       }
 
       // Filter out existing participants
@@ -172,6 +170,11 @@ export const addMembers =
               newMemberIds: newUserIds,
             });
           },
+        );
+
+        // Enqueue composite regeneration for this conversation
+        addCompositeJob(convId).catch((e) =>
+          console.error("enqueue composite job error", e),
         );
       }
 

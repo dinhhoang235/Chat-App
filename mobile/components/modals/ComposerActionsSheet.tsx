@@ -19,12 +19,14 @@ export default function ComposerActionsSheet({
   onAction,
   height,
   loadingAction,
+  inline,
 }: {
   visible: boolean;
   onClose: () => void;
   onAction: (key: string) => void;
   height?: number;
   loadingAction?: string | null;
+  inline?: boolean;
 }) {
   const { colors } = useTheme();
   const sheetRef = useRef<BottomSheet>(null);
@@ -35,13 +37,53 @@ export default function ComposerActionsSheet({
   }, [height]);
 
   useEffect(() => {
+    if (inline) return;
     if (visible) {
       sheetRef.current?.snapToIndex(0);
     } else {
       sheetRef.current?.close();
     }
-  }, [visible]);
+  }, [visible, inline]);
 
+  const content = (
+    <View style={{ paddingHorizontal: 18, paddingTop: 8, paddingBottom: 18 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+        {ACTIONS.map((a) => {
+          const isLoading = loadingAction === a.key;
+          return (
+          <TouchableOpacity
+            key={a.key}
+            onPress={() => onAction(a.key)}
+            disabled={isLoading}
+            style={{ width: '33.33%', alignItems: 'center', paddingVertical: 10 }}
+          >
+            <View style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: a.color || '#EEE',
+              marginBottom: 8,
+              opacity: isLoading ? 0.75 : 1,
+            }}>
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialIcons name={a.icon as any} size={22} color="#fff" />
+              )}
+            </View>
+            <Text style={{ color: colors.text, fontSize: 12, textAlign: 'center' }}>{a.label}</Text>
+          </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  if (inline) {
+    return content;
+  }
 
   return (
     <BottomSheet
@@ -58,39 +100,7 @@ export default function ComposerActionsSheet({
       containerStyle={{ pointerEvents: 'box-none' }}
     >
       <BottomSheetView>
-        <View style={{ paddingHorizontal: 18, paddingTop: 8, paddingBottom: 18 }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-            {ACTIONS.map((a) => {
-              const isLoading = loadingAction === a.key;
-              return (
-              <TouchableOpacity
-                key={a.key}
-                onPress={() => onAction(a.key)}
-                disabled={isLoading}
-                style={{ width: '33.33%', alignItems: 'center', paddingVertical: 10 }}
-              >
-                <View style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 28,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: a.color || '#EEE',
-                  marginBottom: 8,
-                  opacity: isLoading ? 0.75 : 1,
-                }}>
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <MaterialIcons name={a.icon as any} size={22} color="#fff" />
-                  )}
-                </View>
-                <Text style={{ color: colors.text, fontSize: 12, textAlign: 'center' }}>{a.label}</Text>
-              </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+        {content}
       </BottomSheetView>
     </BottomSheet>
   );

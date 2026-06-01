@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 type Contact = {
   id: string;
@@ -57,14 +56,14 @@ export default function ResultsList({ contactResults, messageResults, query, sen
             return (
               <TouchableOpacity key={c.id} style={{ paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} onPress={() => (typeof onOpenProfile === 'function' ? onOpenProfile(c.id) : onOpenChat(c.id))}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', marginRight: 12, overflow: 'hidden' }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12, overflow: 'hidden' }}>
                     {resultData?.avatar ? (
                       <Image
                         source={{ uri: getAvatarUrl(resultData.avatar) || undefined }}
                         style={{ width: 40, height: 40, borderRadius: 20 }}
                       />
                     ) : (
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>{getInitials(c.name)}</Text>
+                      <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                     )}
                   </View>
                   <View style={{ flex: 1 }}>

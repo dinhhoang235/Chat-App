@@ -4,8 +4,7 @@ import BottomSheet, { BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom
 import { useTheme } from '@/context/themeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 type ReactionsDetailSheetProps = {
   visible: boolean;
@@ -159,21 +158,12 @@ export default function ReactionsDetailSheet({
                       source={{ uri: avatarUri }}
                       style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
                     />
-                  ) : (
-                    <View style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      backgroundColor: colors.tint,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 12,
-                    }}>
-                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
-                        {getInitials(userName)}
-                      </Text>
-                    </View>
-                  );
+                    ) : (
+                      <Image
+                        source={{ uri: getDefaultAvatarUrl() }}
+                        style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12 }}
+                      />
+                    );
                 })()}
 
                 {/* Name & Subtext */}

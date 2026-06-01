@@ -15,4 +15,12 @@ export function getAvatarColor(name?: string): string {
   return "#0084FF";
 }
 
+export function getDefaultAvatarUrl(): string {
+  // Allow overriding via EXPO public env var, otherwise use server path
+  const defaultPath =
+    process.env.EXPO_PUBLIC_DEFAULT_AVATAR ||
+    "/storage/chatapp/default_avatar.png";
+  return getAvatarUrl(defaultPath) || defaultPath;
+}
+
 export default getAvatarUrl;

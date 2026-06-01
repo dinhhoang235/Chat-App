@@ -15,8 +15,7 @@ import { useCall } from '@/context/callContext';
 import { useAuth } from '@/context/authContext';
 import { webrtcService } from '@/services/webrtc';
 import { socketService } from '@/services/socket';
-import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 import { log, error } from '@/utils/logger';
 import SwitchToVideoSheet from '@/components/modals/SwitchToVideoSheet';
 
@@ -30,7 +29,6 @@ export default function CallScreen() {
 
   const remoteName = activeCall?.remoteName || '';
   const avatarUrl = getAvatarUrl(activeCall?.remoteAvatar);
-  const initials = getInitials(remoteName);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
@@ -408,9 +406,7 @@ export default function CallScreen() {
               {avatarUrl ? (
                 <Image source={{ uri: avatarUrl }} className="w-[140px] h-[140px] rounded-[70px] border-[3px] border-white/90" />
               ) : (
-                <View className="w-[140px] h-[140px] rounded-[70px] border-[3px] border-white/90 bg-blue-600 items-center justify-center">
-                  <Text className="text-white text-[36px] font-bold">{initials}</Text>
-                </View>
+                <Image source={{ uri: getDefaultAvatarUrl() }} className="w-[140px] h-[140px] rounded-[70px] border-[3px] border-white/90" />
               )}
             </View>
 

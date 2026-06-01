@@ -11,6 +11,19 @@ import { useCall } from '@/context/callContext';
 import { useRouter } from 'expo-router';
 import { log, warn, error } from '@/utils/logger';
 
+// Schedule a low-priority task without blocking render. Returns a cancel function.
+const scheduleLowPriorityTask = (task: () => void) => {
+  try {
+    const ric = (globalThis as any).requestIdleCallback;
+    if (typeof ric === 'function') {
+      const id = ric(() => task());
+      return () => (globalThis as any).cancelIdleCallback?.(id);
+    }
+  } catch {}
+  const t = setTimeout(task, 50);
+  return () => clearTimeout(t);
+};
+
 // Register notification categories at the top level for reliability
 Notifications.setNotificationCategoryAsync('call', [
   {
@@ -189,10 +202,11 @@ export default function NotificationHandler() {
 
   // cold start should only be handled once ever
   useEffect(() => {
-    if (user && !coldHandled.current) {
-      (async () => {
+    if (!(user && !coldHandled.current)) return;
+    const cancel = scheduleLowPriorityTask(() => {
+      void (async () => {
         const lastResponse = await Notifications.getLastNotificationResponseAsync();
-          if (lastResponse) {
+        if (lastResponse) {
           const data: any = lastResponse.notification.request.content.data;
           log('cold start notification data', data);
           const convId = data?.conversationId;
@@ -232,7 +246,8 @@ export default function NotificationHandler() {
         }
         coldHandled.current = true;
       })();
-    }
+    });
+    return () => cancel();
   }, [router, activeCall, setCallStatus, setIncomingCall, user]);
 
   // Setup: preload sound asset + create Android channel
@@ -271,19 +286,22 @@ export default function NotificationHandler() {
     if (!user) return;
 
     Notifications.setAutoServerRegistrationEnabledAsync(false).catch(() => {});
-
-    registerForPushNotificationsAsync().then(async token => {
-      if (!token) {
-        warn('No push token obtained');
-        return;
-      }
-      try {
-        await userAPI.updatePushToken(user.id, token);
-        log('Push token saved to backend');
-      } catch (err) {
-        error('Failed to save push token:', err);
-      }
+    const cancel = scheduleLowPriorityTask(() => {
+      void (async () => {
+        const token = await registerForPushNotificationsAsync();
+        if (!token) {
+          warn('No push token obtained');
+          return;
+        }
+        try {
+          await userAPI.updatePushToken(user.id, token);
+          log('Push token saved to backend');
+        } catch (err) {
+          error('Failed to save push token:', err);
+        }
+      })();
     });
+    return () => cancel();
   }, [user]);
 
   // Listen for incoming socket messages and fire local notifications

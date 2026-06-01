@@ -7,8 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/context/authContext';
 import { userAPI } from '@/services/user';
 import type { User } from '@/services/friendship';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 export default function ProfileInfo() {
   const { colors } = useTheme();
@@ -51,13 +50,12 @@ export default function ProfileInfo() {
   const displayProfile = {
     name: profile?.fullName || 'Người dùng',
     phone: profile?.phone || '',
-    initials: getInitials(profile?.fullName, profile?.id?.toString()),
     gender: profile?.gender ?? undefined,
     dob: formatDate(profile?.dateOfBirth),
     avatar: profile?.avatar,
   };
 
-  const avatarUri = getAvatarUrl(displayProfile.avatar);
+  const avatarUri = getAvatarUrl(displayProfile.avatar) || getDefaultAvatarUrl();
 
   const isOwn = isMeRoute || (profile?.phone && user?.phone && profile.phone === user.phone);
   const [editVisible, setEditVisible] = React.useState(false);
@@ -77,14 +75,10 @@ export default function ProfileInfo() {
       <View style={{ padding: 16 }}>
         <View style={{ alignItems: 'center', marginBottom: 12 }}>
           <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-            {avatarUri ? (
-              <Image
-                source={{ uri: avatarUri }}
-                style={{ width: 88, height: 88, borderRadius: 44 }}
-              />
-            ) : (
-              <Text style={{ color: colors.text, fontWeight: '700', fontSize: 28 }}>{displayProfile.initials}</Text>
-            )}
+            <Image
+              source={{ uri: avatarUri }}
+              style={{ width: 88, height: 88, borderRadius: 44 }}
+            />
           </View>
           <Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>{displayProfile.name}</Text>
         </View>

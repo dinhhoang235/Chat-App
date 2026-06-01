@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { getAvatarUrl } from "@/utils/avatar";
-import { getInitials } from "@/utils/initials";
 import { getThreadStatusText } from "@/utils/chatThread";
 
 interface UseChatThreadMetaParams {
@@ -29,9 +28,7 @@ export function useChatThreadMeta({
       ? getAvatarUrl(avatarParam)
       : undefined;
 
-  const typingUserInitials = typingUser?.fullName
-    ? getInitials(typingUser.fullName)
-    : "?";
+  const typingUserInitials = "?";
 
   const groupAvatars = useMemo(() => {
     if (groupDetails?.participants) {
@@ -40,7 +37,6 @@ export function useChatThreadMeta({
         .map((p: any) => ({
           url: p.user.avatar ? getAvatarUrl(p.user.avatar) : null,
           name: p.user.fullName,
-          initials: getInitials(p.user.fullName),
         }));
     }
 

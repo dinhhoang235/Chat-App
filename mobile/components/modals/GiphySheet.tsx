@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Dimensions,
+  FlatList,
   Text,
   TouchableOpacity,
   View,
@@ -21,6 +22,8 @@ type GiphySheetProps = {
   onSelectGif: (gif: GiphyGif) => void | Promise<void>;
   height?: number;
   sending?: boolean;
+  inline?: boolean;
+  onSearchFocus?: () => void;
 };
 
 export default function GiphySheet({
@@ -29,6 +32,8 @@ export default function GiphySheet({
   onSelectGif,
   height,
   sending,
+  inline,
+  onSearchFocus,
 }: GiphySheetProps) {
   const { colors } = useTheme();
   const sheetRef = useRef<BottomSheet>(null);
@@ -71,6 +76,7 @@ export default function GiphySheet({
   }, []);
 
   useEffect(() => {
+    if (inline) return;
     if (visible && !wasVisible.current) {
       wasVisible.current = true;
       sheetRef.current?.snapToIndex(0);
@@ -80,7 +86,15 @@ export default function GiphySheet({
       wasVisible.current = false;
       sheetRef.current?.close();
     }
-  }, [loadGifs, query, visible]);
+  }, [loadGifs, query, visible, inline]);
+
+  // Load GIFs on first open (inline mode)
+  useEffect(() => {
+    if (!visible || wasVisible.current) return;
+    wasVisible.current = true;
+    skipNextQueryLoad.current = true;
+    void loadGifs(query);
+  }, [visible, loadGifs, query]);
 
   useEffect(() => {
     if (!visible) return;
@@ -120,35 +134,112 @@ export default function GiphySheet({
     [onSelectGif, sending],
   );
 
-  return (
-    <BottomSheet
-      ref={sheetRef}
-      index={-1}
-      snapPoints={snapPoints}
-      enablePanDownToClose={true}
-      enableContentPanningGesture={false}
-      enableHandlePanningGesture={true}
-      onClose={onClose}
-      backgroundStyle={{ backgroundColor: colors.surface }}
-      enableDynamicSizing={false}
-      containerStyle={{ pointerEvents: "box-none" }}
-      keyboardBehavior="extend"
-      keyboardBlurBehavior="restore"
-      android_keyboardInputMode="adjustResize"
-      handleIndicatorStyle={{ backgroundColor: colors.textSecondary, width: 40 }}
-    >
-      <View style={{ flex: 1, backgroundColor: colors.surface }}>
-        <View
+  const renderGifItem = useCallback(
+    ({ item }: { item: GiphyGif }) => {
+      const isSelected = selectedId === item.id;
+      return (
+        <TouchableOpacity
+          onPress={() => void handleSelect(item)}
+          activeOpacity={0.85}
+          disabled={sending}
           style={{
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border || colors.surfaceVariant,
+            width: itemWidth,
+            height: itemWidth,
+            borderRadius: 8,
+            overflow: "hidden",
+            backgroundColor: colors.surfaceVariant,
           }}
         >
-          <MaterialIcons name="gif" size={28} color={colors.tint} />
+          {!loadedIds[item.id] && (
+            <Image
+              source={{ uri: item.stillPreviewUrl || item.previewUrl }}
+              style={{ width: "100%", height: "100%", position: "absolute" }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          )}
+          <Image
+            source={{ uri: item.previewUrl }}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={item.id}
+            transition={80}
+            onLoadEnd={() =>
+              setLoadedIds((prev) =>
+                prev[item.id] ? prev : { ...prev, [item.id]: true },
+              )
+            }
+          />
+          {!loadedIds[item.id] && !isSelected && (
+            <View
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+                backgroundColor: "rgba(255,255,255,0.08)",
+              }}
+            />
+          )}
+          {isSelected && (
+            <View
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "rgba(0,0,0,0.25)",
+              }}
+            >
+              <ActivityIndicator color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
+      );
+    },
+    [itemWidth, selectedId, sending, colors, loadedIds, handleSelect],
+  );
+
+  const panelContent = (
+    <View style={{ flex: 1, backgroundColor: colors.surface }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border || colors.surfaceVariant,
+        }}
+      >
+        <MaterialIcons name="gif" size={28} color={colors.tint} />
+        {inline ? (
+          <TouchableOpacity
+            onPress={() => onSearchFocus?.()}
+            activeOpacity={0.7}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              marginLeft: 8,
+              paddingVertical: 4,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontSize: 18,
+              }}
+            >
+              {query || "Tim GIF tu GIPHY"}
+            </Text>
+          </TouchableOpacity>
+        ) : (
           <BottomSheetTextInput
             value={query}
             onChangeText={setQuery}
@@ -166,106 +257,78 @@ export default function GiphySheet({
               paddingVertical: 4,
             }}
           />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery("")} hitSlop={10}>
-              <MaterialIcons name="close" size={28} color={colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-
-
-        {loading && gifs.length === 0 ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <ActivityIndicator color={colors.tint} />
-          </View>
-        ) : errorText ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ color: colors.textSecondary }}>{errorText}</Text>
-          </View>
-        ) : (
-          <BottomSheetFlatList<GiphyGif>
-            data={gifs}
-            keyExtractor={(item: GiphyGif) => item.id}
-            numColumns={3}
-            keyboardShouldPersistTaps="never"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: 12,
-              paddingBottom: 120,
-            }}
-            columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
-            renderItem={({ item }: { item: GiphyGif }) => {
-              const isSelected = selectedId === item.id;
-              return (
-                <TouchableOpacity
-                  onPress={() => void handleSelect(item)}
-                  activeOpacity={0.85}
-                  disabled={sending}
-                  style={{
-                    width: itemWidth,
-                    height: itemWidth,
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    backgroundColor: colors.surfaceVariant,
-                  }}
-                >
-                  {!loadedIds[item.id] && (
-                    <Image
-                      source={{ uri: item.stillPreviewUrl || item.previewUrl }}
-                      style={{ width: "100%", height: "100%", position: "absolute" }}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                    />
-                  )}
-                  <Image
-                    source={{ uri: item.previewUrl }}
-                    style={{ width: "100%", height: "100%" }}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    recyclingKey={item.id}
-                    transition={80}
-                    onLoadEnd={() =>
-                      setLoadedIds((prev) =>
-                        prev[item.id] ? prev : { ...prev, [item.id]: true },
-                      )
-                    }
-                  />
-                  {!loadedIds[item.id] && !isSelected && (
-                    <View
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        backgroundColor: "rgba(255,255,255,0.08)",
-                      }}
-                    />
-                  )}
-                  {isSelected && (
-                    <View
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: "rgba(0,0,0,0.25)",
-                      }}
-                    >
-                      <ActivityIndicator color="#fff" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            }}
-          />
+        )}
+        {!inline && query.length > 0 && (
+          <TouchableOpacity onPress={() => setQuery("")} hitSlop={10}>
+            <MaterialIcons name="close" size={28} color={colors.textSecondary} />
+          </TouchableOpacity>
         )}
       </View>
+
+      {loading && gifs.length === 0 ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.tint} />
+        </View>
+      ) : errorText ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ color: colors.textSecondary }}>{errorText}</Text>
+        </View>
+      ) : inline ? (
+        <FlatList<GiphyGif>
+          data={gifs}
+          keyExtractor={(item: GiphyGif) => item.id}
+          numColumns={3}
+          keyboardShouldPersistTaps="never"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 12,
+            paddingBottom: 120,
+          }}
+          columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
+          renderItem={renderGifItem}
+        />
+      ) : (
+        <BottomSheetFlatList<GiphyGif>
+          data={gifs}
+          keyExtractor={(item: GiphyGif) => item.id}
+          numColumns={3}
+          keyboardShouldPersistTaps="never"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 12,
+            paddingBottom: 120,
+          }}
+          columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
+          renderItem={renderGifItem}
+        />
+      )}
+    </View>
+  );
+
+  if (inline) {
+    return panelContent;
+  }
+
+  return (
+    <BottomSheet
+      ref={sheetRef}
+      index={-1}
+      snapPoints={snapPoints}
+      enablePanDownToClose={true}
+      enableContentPanningGesture={false}
+      enableHandlePanningGesture={true}
+      onClose={onClose}
+      backgroundStyle={{ backgroundColor: colors.surface }}
+      enableDynamicSizing={false}
+      containerStyle={{ pointerEvents: "box-none" }}
+      keyboardBehavior="extend"
+      keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
+      handleIndicatorStyle={{ backgroundColor: colors.textSecondary, width: 40 }}
+    >
+      {panelContent}
     </BottomSheet>
   );
 }

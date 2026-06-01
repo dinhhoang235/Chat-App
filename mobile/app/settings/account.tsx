@@ -6,8 +6,7 @@ import { useTheme } from '@/context/themeContext';
 import { MaterialIcons } from "@expo/vector-icons";
 import { useAuth } from '@/context/authContext';
 import { useRouter } from 'expo-router';
-import { getAvatarUrl } from '@/utils/avatar';
-import { getInitials } from '@/utils/initials';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 export default function AccountSettings() {
   const theme = useTheme();
@@ -33,7 +32,7 @@ export default function AccountSettings() {
                   style={{ width: 56, height: 56, borderRadius: 28 }}
                 />
               ) : (
-                <Text className={`${theme.scheme === 'dark' ? 'text-white' : 'text-gray-900'} font-bold text-lg`}>{getInitials(user?.fullName, user?.id?.toString())}</Text>
+                <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 48, height: 48, borderRadius: 24 }} />
               )}
             </View>
             <View>

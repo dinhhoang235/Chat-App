@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 
+const CALL_ITEM_MIN_HEIGHT = 110;
+
 type MessageCallBubbleProps = {
   message: any;
   onVoiceCall?: () => void;
@@ -67,8 +69,8 @@ export default function MessageCallBubble({
 
   if (isEndedGroupCall) {
     return (
-      <View className="w-full items-center my-2">
-        <View style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.surfaceVariant, maxWidth: '84%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+      <View className="w-full items-center my-2" style={{ minHeight: CALL_ITEM_MIN_HEIGHT, justifyContent: 'center' }}>
+        <View style={{ paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.surfaceVariant, maxWidth: '84%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
           <Feather name="video" size={16} color={colors.tint} style={{ marginRight: 8 }} />
           <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: '600', textAlign: 'center' }}>
             {label}

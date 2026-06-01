@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ActivityIndicator, Text } from 'react-native';
+import { View, TextInput, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
@@ -29,6 +29,7 @@ interface ChatComposerProps {
   onFocus?: () => void;
   replyingTo?: any;
   onCancelReply?: () => void;
+  currentUserName?: string;
   editingMessage?: any;
   onCancelEdit?: () => void;
   onSaveEdit?: () => void;
@@ -55,6 +56,7 @@ export default function ChatComposer({
   onFocus,
   replyingTo,
   onCancelReply,
+  currentUserName,
   editingMessage,
   onCancelEdit,
   onSaveEdit,
@@ -88,11 +90,12 @@ export default function ChatComposer({
         marginTop: -14,
       }}
     >
+
       {replyingTo && (
         <View className="flex-row items-center justify-between px-4 py-2" style={{ borderBottomColor: colors.surfaceVariant, borderBottomWidth: 1 }}>
           <View className="flex-1 mr-2">
             <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
-              Đang trả lời {replyingTo.contactName || replyingTo.sender?.fullName || 'Người dùng'}
+              Đang trả lời {replyingTo.fromMe ? (replyingTo.sender?.fullName || replyingTo.contactName || currentUserName || 'Trả lời chính mình') : (replyingTo.contactName || replyingTo.sender?.fullName || 'Người dùng')}
             </Text>
             <Text style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
               {(() => {
@@ -241,8 +244,6 @@ export default function ChatComposer({
               <TouchableOpacity
                 className="mr-4"
                 onPress={() => {
-                  inputRef.current?.blur?.();
-                  Keyboard.dismiss();
                   if (onOpenSheet) {
                     onOpenSheet('actions');
                   } else if (onMorePress) {

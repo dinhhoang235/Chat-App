@@ -140,6 +140,7 @@ export function useChatThreadAttachments({
           size: uploadSize,
           mime: uploadMime,
           waveform: file.waveform,
+          ...originalDimensions,
         },
       };
 

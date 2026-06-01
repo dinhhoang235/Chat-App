@@ -3,8 +3,7 @@ import { Modal, View, Text, TouchableOpacity, Pressable, ScrollView, Image } fro
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import type { User } from '@/services/friendship';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 type Props = {
   visible: boolean;
@@ -22,7 +21,6 @@ export default function MemberActionsSheet({ visible, onClose, member, isOwner, 
   const overlayColor = scheme === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.55)';
   if (!member) return null;
 
-  const initials = getInitials(member.fullName);
   const avatarUrl = getAvatarUrl(member.avatar);
 
   return (
@@ -34,11 +32,11 @@ export default function MemberActionsSheet({ visible, onClose, member, isOwner, 
 
           <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
             <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={{ width: 56, height: 56, borderRadius: 28 }} />
                 ) : (
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 18 }}>{initials}</Text>
+                  <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 56, height: 56, borderRadius: 28 }} />
                 )}
               </View>
               <Text style={{ color: colors.text, fontWeight: '700', marginTop: 8 }}>{member.fullName}</Text>

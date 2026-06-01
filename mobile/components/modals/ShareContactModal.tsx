@@ -6,8 +6,7 @@ import { useTheme } from '@/context/themeContext';
 import { getFriendsList, searchFriendByPhone } from '@/services/friendship';
 import { chatApi } from '@/services/chat';
 import { ContactItem } from '@/components/lists/ContactRow';
-import { getInitials } from '@/utils/initials';
-import { getAvatarUrl } from '@/utils/avatar';
+import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 type ShareContactModalProps = {
   visible: boolean;
@@ -144,14 +143,14 @@ export default function ShareContactModal({ visible, onClose, conversationId }: 
           backgroundColor: colors.background,
         }}
       >
-        <View style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.tint }}>
+        <View style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
           {item.avatar ? (
             <Image
               source={{ uri: getAvatarUrl(item.avatar) || undefined }}
               style={{ width: 42, height: 42, borderRadius: 21 }}
             />
           ) : (
-            <Text style={{ color: '#fff', fontWeight: '700' }}>{getInitials(item.fullName)}</Text>
+            <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 42, height: 42, borderRadius: 21 }} />
           )}
         </View>
 

@@ -8,6 +8,8 @@ import { useConversations } from '@/hooks/useConversations';
 import { useSocketStatus } from '@/hooks/useSocketStatus';
 import { useTheme } from '@/context/themeContext';
 import { chatThreadCache } from '@/utils/chatThreadCache';
+import prefetchQueue from '@/utils/prefetchQueue';
+import { resolveMediaUri } from '@/components/chat/messageParts/messageHelpers';
 
 export default function Messages() {
   const { toggle, setAddLayout, setHeaderLayout } = useAddMenu();
@@ -93,6 +95,60 @@ export default function Messages() {
 
   const handleAdd = () => {
     toggle();
+  };
+
+  const debugChatOpenTap = (conversationId: string, extra?: Record<string, any>) => {
+    const startedAt = globalThis?.performance?.now?.() ?? Date.now();
+    (globalThis as any).__chatOpenTapAt = startedAt;
+    (globalThis as any).__chatOpenTapConversationId = conversationId;
+    // log removed
+  };
+
+  const warmConversationMedia = (conversationId: string, initialMessages?: any[]) => {
+    if (!Array.isArray(initialMessages) || initialMessages.length === 0) return;
+
+    const seen = new Set<string>();
+    const mediaUris: string[] = [];
+
+    for (const message of initialMessages) {
+      if (!message || (message.type !== 'image' && message.type !== 'video')) continue;
+
+      const content = typeof message.content === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(message.content);
+            } catch {
+              return null;
+            }
+          })()
+        : message.content;
+
+      const uri =
+        content?.thumbnailUrl ||
+        content?.thumbnail ||
+        content?.thumb ||
+        content?.url;
+
+      if (!uri) continue;
+
+      const resolved = resolveMediaUri(uri);
+      if (seen.has(resolved)) continue;
+      seen.add(resolved);
+      mediaUris.push(resolved);
+
+      if (mediaUris.length >= 3) break;
+    }
+
+    if (mediaUris.length === 0) return;
+
+    // log removed
+
+    const idle = (globalThis as any).requestIdleCallback || ((cb: any) => setTimeout(cb, 0));
+    idle(() => {
+      for (const uri of mediaUris) {
+        void prefetchQueue.enqueue(uri).catch(() => null);
+      }
+    });
   };
 
   const handleRowAction = (action: string, id: string, payload?: any) => {
@@ -198,8 +254,13 @@ export default function Messages() {
           renderItem={({ item }) => (
             <MessageRow
               message={item}
+              onPressIn={() => {
+                warmConversationMedia(item.id, item.initialMessages);
+              }}
               onPress={() => { 
                 if (!selectionMode) {
+                  debugChatOpenTap(item.id, { from: 'conversations-list', isGroup: item.isGroup });
+                  warmConversationMedia(item.id, item.initialMessages);
                   // Optimistically clear unread count
                   setData(prev => prev.map(m => m.id === item.id ? { ...m, unread: 0 } : m));
                   if (item.initialMessages?.length) {

@@ -11,7 +11,6 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function NewGroup() {
   const { colors } = useTheme();

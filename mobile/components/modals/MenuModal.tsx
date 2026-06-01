@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions, Image, Platform, StatusBar } from 'react-native';
+import { Modal, Pressable, View, TouchableOpacity, Text, useWindowDimensions, Platform, StatusBar } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/themeContext';
 import { GroupAvatar, ChatAvatar } from '@/components/avatars';

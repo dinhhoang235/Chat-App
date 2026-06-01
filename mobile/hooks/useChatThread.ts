@@ -20,7 +20,11 @@ import { useChatThreadRuntime } from "./useChatThread/useChatThreadRuntime";
 import { useChatThreadGroupCall } from "./useChatThread/useChatThreadGroupCall";
 import { useChatThreadLocation } from "./useChatThread/useChatThreadLocation";
 import { useChatThreadGif } from "./useChatThread/useChatThreadGif";
-import { buildProcessedMessages, mapThreadMessage, computeChatItemSize } from "@/utils/chatThread";
+import {
+  buildProcessedMessages,
+  mapThreadMessage,
+  computeChatItemSize,
+} from "@/utils/chatThread";
 import { getMessageSize, setMessageSize } from "@/utils/messageSizeCache";
 import { chatThreadCache } from "@/utils/chatThreadCache";
 import { chatApi } from "@/services/chat";
@@ -72,7 +76,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
       );
       // log removed
       return mapped;
-    } catch (error) {
+    } catch {
       // log removed
       return [] as any[];
     }
@@ -227,7 +231,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
       }
     }
     return processed;
-  }, [id, messages, user?.id, windowWidth, windowHeight]);
+  }, [messages, user?.id, windowWidth, windowHeight]);
 
   useEffect(() => {
     // log removed

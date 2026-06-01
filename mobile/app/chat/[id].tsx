@@ -4,7 +4,7 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import { View, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
-import { Header, GallerySheet, EmojiSheet, GiphySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal, ReactionSheet, ReactionsDetailSheet } from '@/components';
+import { GallerySheet, EmojiSheet, GiphySheet, TypingDots, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal, ReactionSheet, ReactionsDetailSheet } from '@/components';
 import { resolveMediaUri } from '@/components/chat/messageParts/messageHelpers';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
@@ -21,6 +21,11 @@ import { getCachedPath } from '@/utils/imageCache';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { getDefaultAvatarUrl } from '@/utils/avatar';
+import useRenderChatItem from '@/hooks/useRenderChatItem';
+import useViewability from '@/hooks/useViewability';
+import useMediaPrefetch from '@/hooks/useMediaPrefetch';
+import useChatItemLayout from '@/hooks/useChatItemLayout';
+import ChatHeader from './ChatHeader';
 
 
 
@@ -68,7 +73,6 @@ export default function ChatThread() {
   const [chatListReady, setChatListReady] = React.useState(false);
   const visibleMessageIdSetRef = React.useRef<Set<string>>(new Set());
   const [backgroundMediaWarmupEnabled, setBackgroundMediaWarmupEnabled] = React.useState(false);
-  const DEBUG_CHAT_UI = __DEV__ && !!(globalThis as any).__CHAT_DEBUG_UI;
 
   const scheduleLowPriorityTask = React.useCallback((task: () => void) => {
     const requestIdle = (globalThis as any).requestIdleCallback;
@@ -166,19 +170,6 @@ export default function ChatThread() {
     }, []),
   });
 
-
-
-  if (__DEV__ && DEBUG_CHAT_UI) {
-    try {
-      // log removed
-    } catch {}
-  }
-
-  React.useEffect(() => {
-    if (!__DEV__) return;
-    // log removed
-  }, [conversationId]);
-
   React.useEffect(() => {
     setRichMessageChromeReady(false);
     setChatListReady(false);
@@ -221,10 +212,7 @@ export default function ChatThread() {
     };
   }, [conversationId]);
 
-  React.useEffect(() => {
-    if (!__DEV__) return;
-    // log removed
-  }, [conversationId, messages.length, processedMessages.length, loading, loadingMore, hasMore]);
+  
 
   // Run a small prewarm for visible thumbnails in background to improve
   // perceived load time. Do NOT block rendering; FlashList should mount
@@ -474,102 +462,65 @@ export default function ChatThread() {
     lastKeyboardHeight
   );
 
-  const renderItem = React.useCallback(({ item, index }: any) => {
-    if (item.type === 'date_separator') {
-      return (
-        <View key={`sep-${item.id}`} className="items-center my-4">
-          <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '500' }}>
-            {item.date}
-          </Text>
-        </View>
-      );
-    }
+  const renderItem = useRenderChatItem({
+    processedMessages,
+    colors,
+    searchQuery,
+    composerVisible,
+    closeAll,
+    gifVisible,
+    setGifVisible,
+    router,
+    highlightedMessageId,
+    uploadProgress,
+    setReplyingTo,
+    scrollToMessageId,
+    allMedia,
+    startVoiceCall,
+    startVideoCall,
+    handleCallAction,
+    isGroup,
+    targetUser,
+    paramsObj: params,
+    paramName,
+    handleRetryMessage,
+    setSelectedMessage,
+    setMessageMenuPos,
+    setShowMoreMenuActions,
+    setMessageMenuVisible,
+    setReactionSheetVisible,
+    setReactionsDetailVisible,
+    user,
+    groupDetails,
+  });
 
-    const nextMessage = processedMessages[index - 1]; 
-    const isLastInConsecutiveGroup = !nextMessage || nextMessage.senderId !== item.senderId;
-    const isThreadLast = index === 0;
-    const shouldUseSimpleMode = true;
+  const { onViewableItemsChanged } = useViewability({
+    backgroundMediaWarmupEnabled,
+    prefetchQueue,
+    resolveMediaUri,
+    visibleMessageIdSetRef,
+  });
 
-    let groupSenderAvatar: string | undefined = undefined;
-    let groupSenderName: string | undefined = undefined;
-    let replyToSenderName: string | undefined = undefined;
+  useMediaPrefetch({
+    backgroundMediaWarmupEnabled,
+    processedMessages,
+    conversationId,
+    thumbnailPrefetchRunRef,
+    mediaPrefetchRunRef,
+    scheduleLowPriorityTask,
+    getCachedPath,
+    prefetchQueue,
+    resolveMediaUri,
+    prefetchTimeoutsRef,
+  });
 
-    if (isGroup && groupDetails?.participants) {
-      const senderObj = groupDetails.participants.find((p: any) => {
-        const pUserId = p.user?.id;
-        const matches = pUserId != null && String(pUserId) === String(item.senderId);
-        return matches;
-      });
-      const sender = senderObj?.user;
-      if (sender) {
-        groupSenderAvatar = sender.avatar || undefined;
-        groupSenderName = sender.fullName || undefined;
-      }
-
-      if (item.replyTo?.senderId != null) {
-        const repliedSenderObj = groupDetails.participants.find((p: any) => {
-          const pUserId = p.user?.id;
-          return pUserId != null && String(pUserId) === String(item.replyTo.senderId);
-        });
-        replyToSenderName = repliedSenderObj?.user?.fullName || undefined;
-      }
-    } else if (!isGroup && item.replyTo?.senderId != null) {
-      const repliedSenderId = String(item.replyTo.senderId);
-      const isCurrentUser = String(user?.id) === repliedSenderId;
-      replyToSenderName = isCurrentUser ? user?.fullName : (targetUser?.fullName || (paramName as string | undefined));
-    }
-
-    const finalSenderName = item.sender?.fullName || item.contactName || groupSenderName;
-
-    return (
-      <MessageBubble key={`msg-${item.id}`}
-        message={item}
-        simple={shouldUseSimpleMode}
-        highlightQuery={searchQuery}
-        isLastInGroup={isLastInConsecutiveGroup}
-        isThreadLast={isThreadLast}
-        senderName={finalSenderName}
-        contactAvatarFallback={isGroup ? groupSenderAvatar : (targetUser?.avatar || (params.avatar as string | undefined))}
-        contactNameFallback={isGroup ? groupSenderName : (targetUser?.fullName || (paramName as string | undefined))}
-        onPress={() => {
-          if (composerVisible) closeAll();
-          if (gifVisible) setGifVisible(false);
-        }}
-        onAvatarPress={() => {
-          if (item.fromMe) return router.push('/profile/me');
-          router.push(`/profile/${item.senderId}`);
-        }}
-        onReply={() => {
-          setReplyingTo(item);
-        }}
-        isHighlighted={item.id?.toString() === highlightedMessageId}
-        onReplyPress={(replyId: string) => scrollToMessageId(replyId)}
-        progress={uploadProgress[item.id]}
-        allMedia={allMedia}
-        onVoiceCall={startVoiceCall}
-        onVideoCall={startVideoCall}
-        onCallAction={handleCallAction}
-        isGroupThread={isGroup}
-        onRetry={handleRetryMessage}
-        onLongPress={(msg, x, y, w, h) => {
-          setSelectedMessage(msg);
-          setMessageMenuPos({ x, y, w, h });
-          setShowMoreMenuActions(false);
-          setMessageMenuVisible(true);
-        }}
-        onReactPress={(msg) => {
-          setSelectedMessage(msg);
-          if (msg.reactions && msg.reactions.length > 0) {
-            setReactionsDetailVisible(true);
-          } else {
-            setReactionSheetVisible(true);
-          }
-        }}
-        currentUserName={user?.fullName}
-        replyToSenderName={replyToSenderName}
-      />
-    );
-  }, [processedMessages, colors, searchQuery, composerVisible, gifVisible, router, highlightedMessageId, uploadProgress, closeAll, setReplyingTo, scrollToMessageId, allMedia, startVoiceCall, startVideoCall, handleCallAction, isGroup, targetUser?.avatar, targetUser?.fullName, user?.fullName, user?.id, params.avatar, paramName, handleRetryMessage, setReactionSheetVisible, setReactionsDetailVisible, groupDetails]);
+  const overrideChatItemLayout = useChatItemLayout({
+    getMessageSize,
+    getChatItemType,
+    computeChatItemSize,
+    windowWidth,
+    windowHeight,
+  });
 
   const maybeCloseAll = React.useCallback(() => {
     if (micOutsideCloseLocked) return;
@@ -607,151 +558,7 @@ export default function ChatThread() {
     // log removed
   }, [chatListReady, composerVisible, conversationId, deleteSheetVisible, emojiVisible, forwardSheetVisible, gifVisible, galleryVisible, locationModalVisible, messageMenuVisible, reactionSheetVisible, reactionsDetailVisible, renderDeferredChrome, shareContactModalVisible, micVisible]);
 
-  const overrideChatItemLayout = React.useCallback((layout: { size?: number }, item: any, index?: number) => {
-    if (!item) {
-      layout.size = 96;
-      return;
-    }
-
-    // prefer measured sizes when available
-    try {
-      const measured = getMessageSize(item.id);
-      if (measured && measured > 0) {
-        layout.size = measured;
-        return;
-      }
-    } catch {
-      // ignore
-    }
-
-    // log estimate for first few items in dev
-    if (__DEV__ && index != null && index < 10 && blankAreaCountRef.current < 1) {
-      const type = getChatItemType(item);
-      console.warn(`[Layout] idx=${index} type=${type} id=${item.id} NO_MEASURED_SIZE`);
-    }
-
-    layout.size = computeChatItemSize(item, windowWidth, windowHeight);
-  }, [windowHeight, windowWidth]);
-
-  const visibleItemsRef = React.useRef<any[]>([]);
-
-  const onViewableItemsChanged = React.useCallback(({ viewableItems }: { viewableItems: any[] }) => {
-    // log removed
-    visibleItemsRef.current = viewableItems;
-    try {
-      const nextVisibleIds = new Set<string>();
-      for (const v of viewableItems || []) {
-        const id = v?.item?.id;
-        if (id == null) continue;
-        nextVisibleIds.add(id.toString());
-      }
-      visibleMessageIdSetRef.current = nextVisibleIds;
-    } catch {}
-    if (!backgroundMediaWarmupEnabled) {
-      return;
-    }
-    try {
-      // throttle prefetching from viewable callback
-      const now = Date.now();
-      if (!(onViewableItemsChanged as any)._lastPrefetchAt) (onViewableItemsChanged as any)._lastPrefetchAt = 0;
-      const last = (onViewableItemsChanged as any)._lastPrefetchAt as number;
-      if (now - last < 800) return;
-      (onViewableItemsChanged as any)._lastPrefetchAt = now;
-
-      // collect URIs to prefetch
-      const toPrefetch: string[] = [];
-      for (const v of viewableItems || []) {
-        try {
-          const item = v.item;
-          if (!item) continue;
-          if (item.type === 'image' && item.fileInfo) {
-            const thumb = item.fileInfo.thumbnailUrl || item.fileInfo.thumbnail || item.fileInfo.thumb || item.fileInfo.url;
-            if (thumb) toPrefetch.push(resolveMediaUri(thumb));
-          } else if (item.type === 'image_group' && Array.isArray(item.images)) {
-            for (const img of item.images.slice(0, 6)) {
-              const u = img?.fileInfo?.thumbnailUrl || img?.fileInfo?.thumbnail || img?.fileInfo?.thumb || img?.fileInfo?.url;
-              if (u) toPrefetch.push(resolveMediaUri(u));
-            }
-          }
-        } catch {}
-      }
-
-      if (toPrefetch.length > 0) {
-        const seen = new Set<string>();
-        for (let i = 0; i < toPrefetch.length && i < 4; i++) {
-          const uri = toPrefetch[i];
-          if (!uri || seen.has(uri)) continue;
-          seen.add(uri);
-          setTimeout(() => { try { prefetchQueue.enqueue(uri).catch(()=>{}); } catch {} }, i * 150);
-        }
-      }
-    } catch {}
-  }, [backgroundMediaWarmupEnabled]);
-
-  // Pre-warm visible thumbnails after the first interaction frame so the
-  // chat shell mounts immediately and image hydration happens in the background.
-  React.useEffect(() => {
-    if (!backgroundMediaWarmupEnabled) {
-      return;
-    }
-    if (!processedMessages || processedMessages.length === 0) {
-      return;
-    }
-    if (thumbnailPrefetchRunRef.current === conversationId) {
-      return;
-    }
-    thumbnailPrefetchRunRef.current = conversationId;
-    let cancelled = false;
-
-    const cancelSchedule = scheduleLowPriorityTask(() => {
-      void (async () => {
-        try {
-          const toPrefetch: string[] = [];
-              for (const item of processedMessages) {
-            try {
-              if (item.type === 'image' && item.fileInfo) {
-                const thumb = item.fileInfo.thumbnailUrl || item.fileInfo.thumbnail || item.fileInfo.thumb || item.fileInfo.url;
-                if (thumb) toPrefetch.push(resolveMediaUri(thumb));
-              }
-            } catch {}
-            if (toPrefetch.length >= 4) break;
-          }
-
-          if (cancelled || toPrefetch.length === 0) {
-            // log removed
-            return;
-          }
-
-          const diskPromises = toPrefetch.map((u) => getCachedPath(u).catch(() => null));
-
-          for (const u of toPrefetch) {
-            try { prefetchQueue.enqueue(u).catch(() => {}); } catch {}
-          }
-
-          await Promise.race([
-            Promise.all(diskPromises),
-            new Promise((res) => setTimeout(res, 80)),
-          ]);
-
-          // log removed
-        } catch {
-          // ignore
-        }
-      })();
-    });
-
-    return () => {
-      cancelled = true;
-      cancelSchedule();
-    };
-  }, [backgroundMediaWarmupEnabled, conversationId, processedMessages, scheduleLowPriorityTask]);
-
-  React.useEffect(() => {
-    return () => {
-      prefetchQueue.clearPending();
-      if (id) chatThreadCache.clearMessages(id);
-    };
-  }, [id]);
+  
 
   const viewabilityConfig = React.useMemo(() => ({ itemVisiblePercentThreshold: 5, waitForInteraction: false }), []);
 
@@ -778,19 +585,7 @@ export default function ChatThread() {
     }
   }, [processedMessages]);
 
-  const blankAreaCountRef = React.useRef(0);
-  const handleBlankArea = React.useCallback((event: { offsetStart: number; offsetEnd: number; blankArea: number }) => {
-    if (event.blankArea <= 0) return;
-    blankAreaCountRef.current += 1;
-    if (__DEV__ && blankAreaCountRef.current <= 5) {
-      console.warn(
-        `[FlashList] Blank area #${blankAreaCountRef.current}: ${event.blankArea.toFixed(1)}px ` +
-        `(offset ${event.offsetStart.toFixed(1)} to ${event.offsetEnd.toFixed(1)}, ` +
-        `span ${(event.offsetEnd - event.offsetStart).toFixed(1)}px, ` +
-        `items=${processedMessages.length})`
-      );
-    }
-  }, [processedMessages.length]);
+  const handleBlankArea = React.useCallback(() => {}, []);
 
   // Debug: log size cache state for first few items
 
@@ -875,113 +670,27 @@ export default function ChatThread() {
             />
           ) : (
             <View onTouchStart={maybeCloseAll}>
-              <Header
-                showBack
-              leftElement={
-                <TouchableOpacity
-                  onPress={() => {
-                    const finalTargetUserId = targetUserIdState;
-                    if (isGroup) {
-                      router.push({
-                        pathname: '/chat/[id]/options',
-                        params: {
-                          id,
-                          name: paramName || targetUser?.fullName,
-                          avatar: targetUser?.avatar || params.avatar,
-                          targetUserId: targetUserId,
-                          status: targetUserStatus?.status,
-                          isGroup: 'true',
-                          membersCount: membersCount,
-                          avatars: Array.isArray(groupAvatars) ? groupAvatars.join(',') : groupAvatars
-                        }
-                      } as any);
-                    } else if (finalTargetUserId) {
-                      router.push(`/profile/${finalTargetUserId}`);
-                    }
-                  }}
-                  activeOpacity={1}
-                  className="flex-row items-center"
-                >
-                  {isGroup ? (
-                    <GroupAvatar
-                      avatars={groupAvatars}
-                      size={44}
-                      membersCount={membersCount}
-                      borderColor={colors.header}
-                    />
-                  ) : (
-                    <ChatAvatar
-                      avatar={targetUser?.avatar || (params.avatar as string)}
-                      name={paramName || targetUser?.fullName}
-                      online={!isGroup && targetUserStatus?.status === 'online'}
-                      size={44}
-                      tintColor={colors.tint}
-                      borderColor={colors.header}
-                    />
-                  )}
-                  <View style={{ marginLeft: 8 }}>
-                    <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }} numberOfLines={1}>
-                      {paramName || targetUser?.fullName || 'Chat'}
-                    </Text>
-                    {isGroup ? (
-                      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>
-                        {membersCount} thành viên
-                      </Text>
-                    ) : statusText && (
-                      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: -2 }} numberOfLines={1}>
-                        {statusText}
-                      </Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              }
-              onBackPress={() => {
-                if ((params as any)?.fromProfile === 'true') {
-                  router.replace('/(tabs)');
-                } else {
-                  router.back();
-                }
-              }}
-              rightActions={isGroup ? [
-                { icon: 'video', onPress: handleGroupVideoHeaderPress, active: isActiveGroupCall },
-                { icon: 'search', onPress: () => setSearchMode(true) },
-                {
-                  icon: 'bars',
-                  onPress: () => router.push({
-                    pathname: '/chat/[id]/options',
-                    params: {
-                      id,
-                      name: paramName || targetUser?.fullName,
-                      avatar: targetUser?.avatar || params.avatar,
-                      targetUserId: targetUserId,
-                      status: targetUserStatus?.status,
-                      isGroup: isGroup ? 'true' : 'false',
-                      membersCount: membersCount,
-                      avatars: Array.isArray(groupAvatars) ? groupAvatars.join(',') : groupAvatars
-                    }
-                  } as any)
-                },
-              ] : [
-                { icon: 'call-outline', onPress: startVoiceCall },
-                { icon: 'video', onPress: startVideoCall },
-                {
-                  icon: 'bars',
-                  onPress: () => router.push({
-                    pathname: '/chat/[id]/options',
-                    params: {
-                      id,
-                      name: paramName || targetUser?.fullName,
-                      avatar: targetUser?.avatar || params.avatar,
-                      targetUserId: targetUserId,
-                      status: targetUserStatus?.status,
-                      isGroup: isGroup ? 'true' : 'false',
-                      membersCount: membersCount,
-                      avatars: Array.isArray(groupAvatars) ? groupAvatars.join(',') : groupAvatars
-                    }
-                  } as any)
-                },
-              ]}
-            />
+              <ChatHeader
+              maybeCloseAll={maybeCloseAll}
+              isGroup={isGroup}
+              router={router}
+              paramName={paramName}
+              targetUser={targetUser}
+              params={params}
+              targetUserIdState={targetUserIdState}
+              membersCount={membersCount}
+              groupAvatars={groupAvatars}
+              colors={colors}
+              targetUserStatus={targetUserStatus}
+              statusText={statusText}
+              handleGroupVideoHeaderPress={handleGroupVideoHeaderPress}
+              isActiveGroupCall={isActiveGroupCall}
+              setSearchMode={setSearchMode}
+              id={id}
+              targetUserId={targetUserId}
+              startVoiceCall={startVoiceCall}
+              startVideoCall={startVideoCall}
+              />
             </View>
           )}
 

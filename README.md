@@ -109,12 +109,10 @@ cd server
 npm install
 docker compose up -d
 npx prisma db push
-npm run dev
 
 # Terminal 2
 cd mobile
 npm install
-npx expo prebuild
 npx expo run:android
 ```
 
@@ -125,7 +123,6 @@ cd server
 npm install
 docker compose up -d
 npx prisma db push
-npm run dev
 ```
 
 Backend mặc định chạy ở `http://localhost:3000`.
@@ -136,6 +133,11 @@ Backend mặc định chạy ở `http://localhost:3000`.
 cd mobile
 npm install
 npx expo start
+```
+# Build a production build of your app:
+
+```bash
+npx expo run:android --variant release
 ```
 
 ## Luồng Hoạt Động

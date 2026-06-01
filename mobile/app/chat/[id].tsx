@@ -14,6 +14,8 @@ import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
 import { checkFriendshipStatus, sendFriendRequest } from '@/services/friendship';
 import { chatThreadCache } from '@/utils/chatThreadCache';
+import prefetchQueue from '@/utils/prefetchQueue';
+import { getCachedPath } from '@/utils/imageCache';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { getDefaultAvatarUrl } from '@/utils/avatar';
@@ -34,6 +36,7 @@ export default function ChatThread() {
   const thumbnailPrefetchRunRef = React.useRef<string | null>(null);
   const sizePrefillRunRef = React.useRef<string | null>(null);
   const mediaPrefetchRunRef = React.useRef<string | null>(null);
+  const prefetchTimeoutsRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
   const [micTextMode, setMicTextMode] = React.useState(false);
   const [micOutsideCloseLocked, setMicOutsideCloseLocked] = React.useState(false);
   const [micVoiceFlowActive, setMicVoiceFlowActive] = React.useState(false);
@@ -786,16 +789,13 @@ export default function ChatThread() {
       }
 
       if (toPrefetch.length > 0) {
-        import('../../utils/prefetchQueue').then(({ default: prefetchQueue }) => {
-          const seen = new Set<string>();
-          for (let i = 0; i < toPrefetch.length && i < 4; i++) {
-            const uri = toPrefetch[i];
-            if (!uri || seen.has(uri)) continue;
-            seen.add(uri);
-            // enqueue with small stagger
-            setTimeout(() => { try { prefetchQueue.enqueue(uri).catch(()=>{}); } catch {} }, i * 150);
-          }
-        }).catch(() => {});
+        const seen = new Set<string>();
+        for (let i = 0; i < toPrefetch.length && i < 4; i++) {
+          const uri = toPrefetch[i];
+          if (!uri || seen.has(uri)) continue;
+          seen.add(uri);
+          setTimeout(() => { try { prefetchQueue.enqueue(uri).catch(()=>{}); } catch {} }, i * 150);
+        }
       }
     } catch {}
   }, [backgroundMediaWarmupEnabled]);
@@ -834,11 +834,6 @@ export default function ChatThread() {
             return;
           }
 
-          const [{ getCachedPath }, { default: prefetchQueue }] = await Promise.all([
-            import('../../utils/imageCache'),
-            import('../../utils/prefetchQueue'),
-          ]);
-
           const diskPromises = toPrefetch.map((u) => getCachedPath(u).catch(() => null));
 
           for (const u of toPrefetch) {
@@ -863,20 +858,12 @@ export default function ChatThread() {
     };
   }, [backgroundMediaWarmupEnabled, conversationId, processedMessages, scheduleLowPriorityTask]);
 
-  // Ensure any pending prefetch jobs scheduled by this screen are cleared
-  // when the conversation changes or the component unmounts to avoid
-  // background work competing with navigation / first paint.
   React.useEffect(() => {
     return () => {
-      try {
-        import('../../utils/prefetchQueue').then(({ default: prefetchQueue }) => {
-          try {
-            prefetchQueue.clearPending();
-          } catch {}
-        }).catch(() => {});
-      } catch {}
+      prefetchQueue.clearPending();
+      if (id) chatThreadCache.clearMessages(id);
     };
-  }, [conversationId]);
+  }, [id]);
 
   const viewabilityConfig = React.useMemo(() => ({ itemVisiblePercentThreshold: 5, waitForInteraction: false }), []);
 
@@ -1003,22 +990,26 @@ export default function ChatThread() {
           } catch {}
         }
 
-        // enqueue downloads to the shared prefetch queue so they write to disk cache
-        const { default: prefetchQueue } = await import('../../utils/prefetchQueue');
-        // log removed
+        const timeouts: ReturnType<typeof setTimeout>[] = [];
         for (let i = 0; i < toPrefetch.length && mounted; i++) {
           const uri = toPrefetch[i];
-          // stagger slightly but rely on queue concurrency; slower stagger to reduce spikes
-          setTimeout(() => {
+          const id = setTimeout(() => {
             try {
-              prefetchQueue.enqueue(uri).catch(() => {});
+              if (mounted) prefetchQueue.enqueue(uri).catch(() => {});
             } catch {}
           }, i * 220);
+          timeouts.push(id);
         }
+        prefetchTimeoutsRef.current = timeouts;
         // log removed
       })();
     });
-    return () => { mounted = false; cancel(); };
+    return () => {
+      mounted = false;
+      cancel();
+      prefetchTimeoutsRef.current.forEach(clearTimeout);
+      prefetchTimeoutsRef.current = [];
+    };
   }, [backgroundMediaWarmupEnabled, conversationId, processedMessages, scheduleLowPriorityTask]);
 
   const micSheetHeight = micVoiceFlowActive

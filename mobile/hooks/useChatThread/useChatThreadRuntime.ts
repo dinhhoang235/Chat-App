@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { InteractionManager, Image as RNImage } from "react-native";
 import { getAvatarUrl } from "@/utils/avatar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -250,19 +251,16 @@ export function useChatThreadRuntime({
   const persistMessagesCache = useCallback(
     (conversationIdValue: string, nextMessages: any[]) => {
       try {
-        // OPTIMIZATION #5: Keep a memory cache immediately for quick access
-        // and defer heavy serialization + AsyncStorage write until after
-        // UI interactions complete so it doesn't block navigation animations.
         messageCacheMemory.set(conversationIdValue, nextMessages.slice(0, 200));
 
-        setTimeout(() => {
+        InteractionManager.runAfterInteractions(() => {
           AsyncStorage.setItem(
             getMessageCacheKey(conversationIdValue),
             JSON.stringify(nextMessages.slice(0, 200)),
           ).catch((err) => {
             error("Persist messages cache error:", err);
           });
-        }, 0);
+        });
       } catch (err) {
         error("Persist messages cache error:", err);
       }
@@ -673,7 +671,7 @@ export function useChatThreadRuntime({
       }
     }
 
-    setTimeout(() => {
+    InteractionManager.runAfterInteractions(() => {
       (async () => {
         const updates = await Promise.all(
           missingMetadata.map(async (message) => {
@@ -734,7 +732,7 @@ export function useChatThreadRuntime({
           });
         }
       })();
-    }, 0);
+    });
 
     return () => {
       cancelled = true;

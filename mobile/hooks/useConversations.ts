@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Image } from "react-native";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Image, InteractionManager } from "react-native";
 import { useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useTheme } from "@/context/themeContext";
@@ -83,6 +83,9 @@ export function useConversations() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cacheReadyUserId, setCacheReadyUserId] = useState<number | null>(null);
+  const lastFetchRef = useRef(0);
+  const isFetchingRef = useRef(false);
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     selectionMode,
     setSelectionMode,
@@ -147,11 +150,12 @@ export function useConversations() {
   }, [user, colors]);
 
   const fetchConversations = useCallback(async () => {
-    // don't attempt to hit the API if we don't have a logged-in user yet
     if (!user) {
       setLoading(false);
       return;
     }
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
 
     try {
       const response = await chatApi.getConversations();
@@ -200,11 +204,11 @@ export function useConversations() {
         });
       });
     } catch (err: any) {
-      // 401 may occur if auth isn't ready; we already guard but log others
       if (err?.response?.status !== 401) {
         console.error("Fetch conversations error:", err);
       }
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
     }
   }, [user, colors]);
@@ -228,18 +232,32 @@ export function useConversations() {
     );
   }, [colors]);
 
+  const debouncedFetchConversations = useCallback(() => {
+    const now = Date.now();
+    if (now - lastFetchRef.current < 5000 || isFetchingRef.current) return;
+    if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    fetchDebounceRef.current = setTimeout(() => {
+      fetchConversations();
+    }, 300);
+  }, [fetchConversations]);
+
   useEffect(() => {
     if (isFocused && user) {
-      fetchConversations();
+      const now = Date.now();
+      if (now - lastFetchRef.current > 30000) {
+        InteractionManager.runAfterInteractions(() => {
+          lastFetchRef.current = Date.now();
+          fetchConversations();
+        });
+      }
     }
 
     const handleUpdate = (data: any) => {
-      fetchConversations();
+      debouncedFetchConversations();
     };
 
     const handleNewMessage = (message: any) => {
-      // Trigger a re-fetch to get the latest order and message text
-      fetchConversations();
+      debouncedFetchConversations();
     };
 
     const handleStatusChanged = (data: { userId: number; status: string }) => {
@@ -278,7 +296,7 @@ export function useConversations() {
           chatThreadCache.setMessages(convId, updated);
         }
       }
-      fetchConversations();
+      debouncedFetchConversations();
     };
 
     socketService.on("conversation_updated", handleUpdate);
@@ -291,8 +309,9 @@ export function useConversations() {
       socketService.off("new_message", handleNewMessage);
       socketService.off("message_revoked", handleMessageRevoked);
       socketService.off("user_status_changed", handleStatusChanged);
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
     };
-  }, [fetchConversations, isFocused, user]);
+  }, [debouncedFetchConversations, fetchConversations, isFocused, user]);
 
   return {
     data,

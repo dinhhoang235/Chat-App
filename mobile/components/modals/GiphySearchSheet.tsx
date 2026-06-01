@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Dimensions,
-  FlatList,
   Text,
   TouchableOpacity,
   View,
@@ -13,30 +12,24 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/context/themeContext";
 import { giphyApi, type GiphyGif } from "@/services/giphy";
 
-
 const GRID_GAP = 6;
 
-type GiphySheetProps = {
+type GiphySearchSheetProps = {
   visible: boolean;
   onClose: () => void;
   onSelectGif: (gif: GiphyGif) => void | Promise<void>;
-  height?: number;
   sending?: boolean;
-  inline?: boolean;
-  onSearchFocus?: () => void;
 };
 
-export default function GiphySheet({
+export default function GiphySearchSheet({
   visible,
   onClose,
   onSelectGif,
-  height,
   sending,
-  inline,
-  onSearchFocus,
-}: GiphySheetProps) {
+}: GiphySearchSheetProps) {
   const { colors } = useTheme();
   const sheetRef = useRef<BottomSheet>(null);
+  const searchInputRef = useRef<any>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextQueryLoad = useRef(false);
   const wasVisible = useRef(false);
@@ -48,10 +41,8 @@ export default function GiphySheet({
   const [loadedIds, setLoadedIds] = useState<Record<string, boolean>>({});
 
   const snapPoints = useMemo(() => {
-    const h1 = height ?? Math.round(Dimensions.get("window").height * 0.4);
-    const h2 = Math.round(Dimensions.get("window").height * 0.90);
-    return [h1, h2];
-  }, [height]);
+    return [Math.round(Dimensions.get("window").height * 0.90)];
+  }, []);
 
   const gridWidth = Dimensions.get("window").width - 24;
   const itemWidth = Math.floor((gridWidth - GRID_GAP * 2) / 3);
@@ -76,25 +67,20 @@ export default function GiphySheet({
   }, []);
 
   useEffect(() => {
-    if (inline) return;
     if (visible && !wasVisible.current) {
       wasVisible.current = true;
+      setQuery("");
       sheetRef.current?.snapToIndex(0);
       skipNextQueryLoad.current = true;
-      void loadGifs(query);
+      void loadGifs("");
+      setTimeout(() => {
+        searchInputRef.current?.focus?.();
+      }, 400);
     } else if (!visible) {
       wasVisible.current = false;
       sheetRef.current?.close();
     }
-  }, [loadGifs, query, visible, inline]);
-
-  // Load GIFs on first open (inline mode)
-  useEffect(() => {
-    if (!visible || wasVisible.current) return;
-    wasVisible.current = true;
-    skipNextQueryLoad.current = true;
-    void loadGifs(query);
-  }, [visible, loadGifs, query]);
+  }, [loadGifs, query, visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -205,112 +191,6 @@ export default function GiphySheet({
     [itemWidth, selectedId, sending, colors, loadedIds, handleSelect],
   );
 
-  const panelContent = (
-    <View style={{ flex: 1, backgroundColor: colors.surface }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: 12,
-          paddingVertical: 6,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border || colors.surfaceVariant,
-        }}
-      >
-        <MaterialIcons name="gif" size={28} color={colors.tint} />
-        {inline ? (
-          <TouchableOpacity
-            onPress={() => onSearchFocus?.()}
-            activeOpacity={0.7}
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              marginLeft: 8,
-              paddingVertical: 4,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.textSecondary,
-                fontSize: 18,
-              }}
-            >
-              {query || "Tim GIF tu GIPHY"}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <BottomSheetTextInput
-            value={query}
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            blurOnSubmit={false}
-            returnKeyType="search"
-            placeholder="Tim GIF tu GIPHY"
-            placeholderTextColor={colors.textSecondary}
-            style={{
-              flex: 1,
-              color: colors.text,
-              fontSize: 18,
-              marginLeft: 8,
-              paddingVertical: 4,
-            }}
-          />
-        )}
-        {!inline && query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery("")} hitSlop={10}>
-            <MaterialIcons name="close" size={28} color={colors.textSecondary} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {loading && gifs.length === 0 ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={colors.tint} />
-        </View>
-      ) : errorText ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: colors.textSecondary }}>{errorText}</Text>
-        </View>
-      ) : inline ? (
-        <FlatList<GiphyGif>
-          data={gifs}
-          keyExtractor={(item: GiphyGif) => item.id}
-          numColumns={3}
-          keyboardShouldPersistTaps="never"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: 12,
-            paddingBottom: 120,
-          }}
-          columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
-          renderItem={renderGifItem}
-        />
-      ) : (
-        <BottomSheetFlatList<GiphyGif>
-          data={gifs}
-          keyExtractor={(item: GiphyGif) => item.id}
-          numColumns={3}
-          keyboardShouldPersistTaps="never"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: 12,
-            paddingBottom: 120,
-          }}
-          columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
-          renderItem={renderGifItem}
-        />
-      )}
-    </View>
-  );
-
-  if (inline) {
-    return panelContent;
-  }
-
   return (
     <BottomSheet
       ref={sheetRef}
@@ -328,7 +208,68 @@ export default function GiphySheet({
       android_keyboardInputMode="adjustResize"
       handleIndicatorStyle={{ backgroundColor: colors.textSecondary, width: 40 }}
     >
-      {panelContent}
+      <View style={{ flex: 1, backgroundColor: colors.surface }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border || colors.surfaceVariant,
+          }}
+        >
+          <MaterialIcons name="gif" size={28} color={colors.tint} />
+          <BottomSheetTextInput
+            ref={searchInputRef}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            blurOnSubmit={false}
+            returnKeyType="search"
+            placeholder="Tim GIF tu GIPHY"
+            placeholderTextColor={colors.textSecondary}
+            style={{
+              flex: 1,
+              color: colors.text,
+              fontSize: 18,
+              marginLeft: 8,
+              paddingVertical: 4,
+            }}
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery("")} hitSlop={10}>
+              <MaterialIcons name="close" size={28} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {loading && gifs.length === 0 ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator color={colors.tint} />
+          </View>
+        ) : errorText ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ color: colors.textSecondary }}>{errorText}</Text>
+          </View>
+        ) : (
+          <BottomSheetFlatList<GiphyGif>
+            data={gifs}
+            keyExtractor={(item: GiphyGif) => item.id}
+            numColumns={3}
+            keyboardShouldPersistTaps="never"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: 12,
+              paddingBottom: 120,
+            }}
+            columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
+            renderItem={renderGifItem}
+          />
+        )}
+      </View>
     </BottomSheet>
   );
 }

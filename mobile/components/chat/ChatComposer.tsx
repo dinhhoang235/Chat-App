@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ActivityIndicator, Text } from 'react-native';
+import { View, TextInput, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
@@ -244,8 +244,6 @@ export default function ChatComposer({
               <TouchableOpacity
                 className="mr-4"
                 onPress={() => {
-                  inputRef.current?.blur?.();
-                  Keyboard.dismiss();
                   if (onOpenSheet) {
                     onOpenSheet('actions');
                   } else if (onMorePress) {

@@ -33,6 +33,7 @@ export default function ComposerMicSheet({
   onRequestEditTranscript,
   textMode,
   height,
+  inline,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -45,6 +46,7 @@ export default function ComposerMicSheet({
   onRequestEditTranscript?: () => void;
   textMode?: boolean;
   height?: number;
+  inline?: boolean;
 }) {
   const { colors } = useTheme();
   const sheetRef = useRef<BottomSheet>(null);
@@ -257,6 +259,7 @@ export default function ComposerMicSheet({
   };
 
   useEffect(() => {
+    if (inline) return;
     if (visible) {
       sheetRef.current?.snapToIndex(0);
     } else {
@@ -293,7 +296,7 @@ export default function ComposerMicSheet({
         cancelled = true;
       };
     }
-  }, [visible, recorderState.isRecording, recorder, player, textMode, stopDictation, resetWave, recordedAudio?.uri, deleteLocalAudioFile]);
+  }, [visible, inline, recorderState.isRecording, recorder, player, textMode, stopDictation, resetWave, recordedAudio?.uri, deleteLocalAudioFile]);
 
   const isTextPanel = composeMode === 'text' && isTextSessionActive;
   const isVoicePanel = composeMode === 'audio' && (recorderState.isRecording || !!recordedAudio);
@@ -325,6 +328,73 @@ export default function ComposerMicSheet({
     };
   }, [onLockOutsideCloseChange, onVoiceFlowChange]);
 
+  const panelContent = isTextPanel ? (
+    <TextComposePanel
+      colors={colors}
+      isDictating={isDictating}
+      dictationText={dictationText}
+      dictationError={dictationError}
+      onClear={clearDictation}
+      onSubmit={() => {
+        void submitDictation();
+      }}
+      onEdit={editDictation}
+    />
+  ) : isVoicePanel ? (
+    <VoiceComposePanel
+      colors={colors}
+      isReviewMode={isReviewMode}
+      canShowReview={canShowReview}
+      isSending={isSending}
+      elapsedSeconds={elapsedSeconds}
+      reviewSeconds={reviewSeconds}
+      reviewProgress={reviewProgress}
+      waveAmplitudes={waveAmplitudes}
+      isPlaying={playerStatus.playing}
+      onClearRecording={() => {
+        void clearRecording();
+      }}
+      onSendRecordedAudio={() => {
+        void sendRecordedAudio();
+      }}
+      onEnterReviewMode={() => {
+        void enterReviewMode();
+      }}
+      onTogglePlayback={() => {
+        void togglePlayback();
+      }}
+    />
+  ) : (
+    <ModePickerPanel
+      colors={colors}
+      composeMode={composeMode}
+      isStarting={isStarting}
+      onPrimaryPress={() => {
+        if (composeMode === 'audio') {
+          void toggleRecording();
+          return;
+        }
+        void startDictation(true);
+      }}
+      onSelectAudioMode={() => {
+        setComposeMode('audio');
+        setIsTextSessionActive(false);
+        stopDictation();
+        onAction?.('send_audio');
+      }}
+      onSelectTextMode={() => {
+        setComposeMode('text');
+        setIsTextSessionActive(false);
+        setDictationError(null);
+        onAction?.('send_text');
+      }}
+    />
+  );
+
+  if (inline) {
+    return <>{panelContent}</>;
+  }
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -340,68 +410,7 @@ export default function ComposerMicSheet({
       containerStyle={{ pointerEvents: 'box-none' }}
     >
       <BottomSheetView>
-        {isTextPanel ? (
-          <TextComposePanel
-            colors={colors}
-            isDictating={isDictating}
-            dictationText={dictationText}
-            dictationError={dictationError}
-            onClear={clearDictation}
-            onSubmit={() => {
-              void submitDictation();
-            }}
-            onEdit={editDictation}
-          />
-        ) : isVoicePanel ? (
-          <VoiceComposePanel
-            colors={colors}
-            isReviewMode={isReviewMode}
-            canShowReview={canShowReview}
-            isSending={isSending}
-            elapsedSeconds={elapsedSeconds}
-            reviewSeconds={reviewSeconds}
-            reviewProgress={reviewProgress}
-            waveAmplitudes={waveAmplitudes}
-            isPlaying={playerStatus.playing}
-            onClearRecording={() => {
-              void clearRecording();
-            }}
-            onSendRecordedAudio={() => {
-              void sendRecordedAudio();
-            }}
-            onEnterReviewMode={() => {
-              void enterReviewMode();
-            }}
-            onTogglePlayback={() => {
-              void togglePlayback();
-            }}
-          />
-        ) : (
-          <ModePickerPanel
-            colors={colors}
-            composeMode={composeMode}
-            isStarting={isStarting}
-            onPrimaryPress={() => {
-              if (composeMode === 'audio') {
-                void toggleRecording();
-                return;
-              }
-              void startDictation(true);
-            }}
-            onSelectAudioMode={() => {
-              setComposeMode('audio');
-              setIsTextSessionActive(false);
-              stopDictation();
-              onAction?.('send_audio');
-            }}
-            onSelectTextMode={() => {
-              setComposeMode('text');
-              setIsTextSessionActive(false);
-              setDictationError(null);
-              onAction?.('send_text');
-            }}
-          />
-        )}
+        {panelContent}
       </BottomSheetView>
     </BottomSheet>
   );

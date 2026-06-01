@@ -4,7 +4,7 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import { View, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
-import { GallerySheet, EmojiSheet, GiphySheet, TypingDots, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal, ReactionSheet, ReactionsDetailSheet } from '@/components';
+import { GallerySheet, EmojiSheet, GiphySheet, GiphySearchSheet, TypingDots, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal, ReactionSheet, ReactionsDetailSheet } from '@/components';
 import { resolveMediaUri } from '@/components/chat/messageParts/messageHelpers';
 import useSheetControl from '@/hooks/useSheetControl';
 import { useChatThread } from '@/hooks/useChatThread';
@@ -69,6 +69,7 @@ export default function ChatThread() {
   const [reactionsDetailVisible, setReactionsDetailVisible] = React.useState(false);
 
   const [gifVisible, setGifVisible] = React.useState(false);
+  const [gifSearchVisible, setGifSearchVisible] = React.useState(false);
   const [, setRichMessageChromeReady] = React.useState(false);
   const [chatListReady, setChatListReady] = React.useState(false);
   const visibleMessageIdSetRef = React.useRef<Set<string>>(new Set());
@@ -126,6 +127,7 @@ export default function ChatThread() {
     handleBackspace,
     insets,
     animatedContentStyle,
+    animatedSheetStyle,
     fetchMessages,
     attachments,
     addAttachments,
@@ -450,7 +452,7 @@ export default function ChatThread() {
   }, [id, isGroup, scheduleLowPriorityTask]);
 
   // unified sheet control (gallery/composer) moved to hook
-  const { openSheet, closeAll, sheetHeight } = useSheetControl(
+  const { openSheet, closeAll } = useSheetControl(
     inputRef,
     composerVisible,
     setComposerVisible,
@@ -462,6 +464,8 @@ export default function ChatThread() {
     setMicVisible,
     lastKeyboardHeight
   );
+
+  const sheetHeight = lastKeyboardHeight;
 
   const renderItem = useRenderChatItem({
     processedMessages,
@@ -734,7 +738,7 @@ export default function ChatThread() {
                   />
                 )}
 
-          {/* Wrapper for messages and composer that pushes up with keyboard */}
+          {/* Wrapper cho messages + sheet + composer (cả khối trượt lên) */}
             <Animated.View style={[{ flex: 1 }, animatedContentStyle]}>
               {showBodyLoading ? (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -890,6 +894,95 @@ export default function ChatThread() {
                 />
               )}
 
+              {/* Sheet content absolute ở bottom, trượt từ dưới lên */}
+              <Animated.View style={[animatedSheetStyle, { backgroundColor: colors.surface }]}>
+                {/* Chỉ 1 sheet được render tại 1 thời điểm */}
+                {composerVisible && (
+                  <ComposerActionsSheet
+                    inline
+                    visible={composerVisible}
+                    onClose={() => setComposerVisible(false)}
+                    loadingAction={isSendingLocation ? 'location' : null}
+                    onAction={(key) => {
+                      if (key === 'document') {
+                        closeAll();
+                        pickDocument();
+                      } else if (key === 'location') {
+                        setComposerVisible(false);
+                        setLocationModalVisible(true);
+                      } else if (key === 'gif') {
+                        if (galleryVisible) setGalleryVisible(false);
+                        if (emojiVisible) setEmojiVisible(false);
+                        if (micVisible) setMicVisible(false);
+                        setComposerVisible(false);
+                        setGifVisible(true);
+                      } else if (key === 'contact') {
+                        closeAll();
+                        setShareContactModalVisible(true);
+                      }
+                    }}
+                    height={sheetHeight}
+                  />
+                )}
+                {emojiVisible && (
+                  <EmojiSheet
+                    inline
+                    visible={emojiVisible}
+                    onClose={() => setEmojiVisible(false)}
+                    onEmojiSelected={(emoji) => handleEmojiSelect(emoji.emoji)}
+                    onBackspacePress={handleBackspace}
+                    height={sheetHeight}
+                  />
+                )}
+                {galleryVisible && (
+                  <GallerySheet
+                    inline
+                    visible={galleryVisible}
+                    onClose={() => { setGalleryVisible(false); clearAttachments(); }}
+                    attachments={attachments}
+                    addAttachment={(file) => addAttachments([file])}
+                    removeAttachment={removeAttachment}
+                    height={sheetHeight}
+                  />
+                )}
+                {micVisible && (
+                  <ComposerMicSheet
+                    inline
+                    visible={micVisible}
+                    onClose={() => setMicVisible(false)}
+                    onLockOutsideCloseChange={setMicOutsideCloseLocked}
+                    onVoiceFlowChange={setMicVoiceFlowActive}
+                    textMode={micTextMode}
+                    height={micSheetHeight}
+                    onSendAudio={async (file) => { await handleSendAttachment(file as any); }}
+                    onTranscriptChange={onTextChange}
+                    onSubmitTranscript={async (text) => { await sendTextDirect(text); setMicVisible(false); }}
+                    onRequestEditTranscript={() => {
+                      inputRef.current?.focus?.();
+                      setTimeout(() => setMicVisible(false), 0);
+                    }}
+                    onAction={(key) => {
+                      if (key === 'send_audio') setMicTextMode(false);
+                      else if (key === 'send_text') setMicTextMode(true);
+                    }}
+                  />
+                )}
+                {gifVisible && (
+                  <GiphySheet
+                    inline
+                    visible={gifVisible}
+                    onClose={() => setGifVisible(false)}
+                    height={sheetHeight}
+                    sending={isSendingGif}
+                    onSelectGif={async (gif) => {
+                      await handleSendGif(gif);
+                      setGifVisible(false);
+                    }}
+                    onSearchFocus={() => setGifSearchVisible(true)}
+                  />
+                )}
+              </Animated.View>
+
               {/* Composer: hidden when search mode is active */}
               {!searchMode && !micVoiceFlowActive && (
                 <View
@@ -942,103 +1035,16 @@ export default function ChatThread() {
 
           {renderDeferredChrome && (
             <>
-              <GallerySheet
-                visible={galleryVisible}
-                onClose={() => {
-                  setGalleryVisible(false);
-                  clearAttachments();
-                }}
-                attachments={attachments}
-                addAttachment={(file: any) => addAttachments([file])}
-                removeAttachment={removeAttachment}
-                height={sheetHeight}
-              />
-
-              <EmojiSheet
-                visible={emojiVisible}
-                onClose={() => setEmojiVisible(false)}
-                onEmojiSelected={(emoji) => {
-                  handleEmojiSelect(emoji.emoji);
-                }}
-                onBackspacePress={handleBackspace}
-                height={sheetHeight}
-              />
-
-              <ComposerActionsSheet
-                visible={composerVisible}
-                onClose={() => {
-                  setComposerVisible(false);
-                }}
-                height={sheetHeight}
-                loadingAction={isSendingLocation ? 'location' : null}
-                onAction={(key) => {
-                  if (key === 'document') {
-                    closeAll();
-                    pickDocument();
-                  } else if (key === 'location') {
-                    setComposerVisible(false);
-                    setLocationModalVisible(true);
-                  } else if (key === 'gif') {
-                    if (galleryVisible) setGalleryVisible(false);
-                    if (emojiVisible) setEmojiVisible(false);
-                    if (micVisible) setMicVisible(false);
-
-                    setComposerVisible(false);
-                    setGifVisible(true);
-                  } else if (key === 'contact') {
-                    closeAll();
-                    setShareContactModalVisible(true);
-                  }
-                }}
-              />
-
-              <GiphySheet
-                visible={gifVisible}
-                onClose={() => setGifVisible(false)}
-                height={sheetHeight}
+              <GiphySearchSheet
+                visible={gifSearchVisible}
+                onClose={() => setGifSearchVisible(false)}
                 sending={isSendingGif}
                 onSelectGif={async (gif) => {
                   await handleSendGif(gif);
                   setGifVisible(false);
+                  setGifSearchVisible(false);
                 }}
               />
-
-              <ComposerMicSheet
-                visible={micVisible}
-                onClose={() => {
-                  setMicVisible(false);
-                }}
-                onLockOutsideCloseChange={setMicOutsideCloseLocked}
-                onVoiceFlowChange={setMicVoiceFlowActive}
-                textMode={micTextMode}
-                height={micSheetHeight}
-                onSendAudio={async (file) => {
-                  await handleSendAttachment(file as any);
-                }}
-                onTranscriptChange={(text) => {
-                  onTextChange(text);
-                }}
-                onSubmitTranscript={async (text) => {
-                  await sendTextDirect(text);
-                  setMicVisible(false);
-                }}
-                onRequestEditTranscript={() => {
-                  inputRef.current?.focus?.();
-                  // Close mic sheet after requesting focus so keyboard appears immediately.
-                  setTimeout(() => {
-                    setMicVisible(false);
-                  }, 0);
-                }}
-                onAction={(key) => {
-                  if (key === 'send_audio') {
-                    // audio mode handled inside ComposerMicSheet
-                    setMicTextMode(false);
-                  } else if (key === 'send_text') {
-                    setMicTextMode(true);
-                  }
-                }}
-              />
-
               <MessageMenuModal
                 visible={messageMenuVisible}
                 menuPos={messageMenuPos}

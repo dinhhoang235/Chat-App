@@ -292,13 +292,13 @@ export function useChatThread(options?: UseChatThreadOptions) {
     handleBackspace,
   } = useChatThreadComposer({ handleType });
 
-  const { insets, lastKeyboardHeight, animatedContentStyle } =
+  const { insets, lastKeyboardHeight, animatedContentStyle, animatedSheetStyle } =
     useChatThreadSheetAnimation({
       composerVisible,
       galleryVisible,
       emojiVisible,
       micVisible,
-      gifVisible: options?.gifVisible,
+      gifVisible: options?.gifVisible ?? false,
       inputRef,
     });
 
@@ -433,6 +433,7 @@ export function useChatThread(options?: UseChatThreadOptions) {
     handleBackspace,
     insets,
     animatedContentStyle,
+    animatedSheetStyle,
     fetchMessages,
     handleSend,
     handleSendLocation,

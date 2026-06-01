@@ -24,16 +24,19 @@ export default function useSheetControl(
   lastKeyboardHeight: number
 ) {
   /**
-   * Mở sheet theo loại.
-   * - Blur & dismiss keyboard trước khi mở (tránh layout jump).
-   * - Nếu đang mở sheet cùng loại → toggle (đóng).
-   * - Nếu đang mở sheet khác → swap ngay (không có khoảng trống giữa).
-   */
+    * Mở sheet theo loại.
+    * - Set visibility state TRƯỚC, dismiss keyboard SAU (qua requestAnimationFrame)
+    *   để useChatThreadSheetAnimation kịp set sheetHeight = lastKeyboardHeight
+    *   ngay lập tức trước khi keyboardHeight.value giảm về 0.
+    * - Nếu đang mở sheet cùng loại → toggle (đóng).
+    * - Nếu đang mở sheet khác → swap ngay (không có khoảng trống giữa).
+    */
   const openSheet = (type: SheetType) => {
-    // Dismiss keyboard (nếu đang mở) — không cần await vì sheet height đã cached
-    inputRef.current?.blur?.();
-    Keyboard.dismiss();
-
+    const wasFocused = !!inputRef.current?.isFocused();
+    const isActive = type === 'gallery' ? galleryVisible
+      : type === 'emoji' ? emojiVisible
+      : type === 'mic' ? micVisible
+      : composerVisible;
     if (type === 'gallery') {
       if (composerVisible) setComposerVisible(false);
       if (emojiVisible) setEmojiVisible(false);
@@ -54,6 +57,20 @@ export default function useSheetControl(
       if (emojiVisible) setEmojiVisible(false);
       if (micVisible) setMicVisible(false);
       setComposerVisible(v => !v);
+    }
+
+    if (isActive) {
+      // Toggle OFF: đóng sheet + focus text input để hiện bàn phím
+      inputRef.current?.focus?.();
+    } else if (wasFocused) {
+      // Toggle ON từ keyboard: dismiss keyboard sau microtask
+      // (để React kịp set sheetHeightSV trước khi keyboardHeight.value giảm)
+      Promise.resolve().then(() => {
+        if (inputRef.current?.isFocused()) {
+          inputRef.current?.blur?.();
+          Keyboard.dismiss();
+        }
+      });
     }
   };
 

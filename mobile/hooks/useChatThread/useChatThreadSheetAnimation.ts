@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets, initialWindowMetrics } from 'react-native-safe-area-context';
 import { useKeyboardSheetHeight } from '../useKeyboardSheetHeight';
 

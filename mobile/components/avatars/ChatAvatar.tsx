@@ -29,16 +29,18 @@ const ChatAvatar = ({
   const fallbackUrl = getAvatarUrl(DEFAULT_FALLBACK_PATH) || undefined;
 
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'hidden' }}>
-      <ExpoImage
-        source={{ uri: (avatarUrl || fallbackUrl) as string | undefined }}
-        key={(avatarUrl || fallbackUrl) as string | undefined}
-        style={{ width: size, height: size, borderRadius: size / 2 }}
-        cachePolicy="disk"
-        priority="high"
-        contentFit="cover"
-        transition={200}
-      />
+    <View style={{ width: size, height: size }}>
+      <View style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'hidden' }}>
+        <ExpoImage
+          source={{ uri: (avatarUrl || fallbackUrl) as string | undefined }}
+          key={(avatarUrl || fallbackUrl) as string | undefined}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          cachePolicy="disk"
+          priority="high"
+          contentFit="cover"
+          transition={200}
+        />
+      </View>
       {/* online indicator */}
       {online && (
         <View

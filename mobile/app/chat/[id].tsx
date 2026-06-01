@@ -1,8 +1,9 @@
 import React from 'react';
-import { getMessageSize, setMessageSize } from '@/utils/messageSizeCache';
+import { getMessageSize } from '@/utils/messageSizeCache';
+import AntDesign from '@expo/vector-icons/AntDesign';
 import { View, ActivityIndicator, Image, TouchableOpacity, Text, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import Animated from 'react-native-reanimated';
+import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { Header, GallerySheet, EmojiSheet, GiphySheet, TypingDots, ChatAvatar, GroupAvatar, InThreadSearch, MessageBubble, ComposerActionsSheet, ComposerMicSheet, ChatComposer, GroupVideoCallModal, MessageMenuModal, DeleteMessageSheet, LocationPreviewModal, ForwardMessageSheet, ShareContactModal, ReactionSheet, ReactionsDetailSheet } from '@/components';
 import { resolveMediaUri } from '@/components/chat/messageParts/messageHelpers';
 import useSheetControl from '@/hooks/useSheetControl';
@@ -14,6 +15,7 @@ import { chatApi } from '@/services/chat';
 import { socketService } from '@/services/socket';
 import { checkFriendshipStatus, sendFriendRequest } from '@/services/friendship';
 import { chatThreadCache } from '@/utils/chatThreadCache';
+import { getChatItemType, computeChatItemSize } from '@/utils/chatThread';
 import prefetchQueue from '@/utils/prefetchQueue';
 import { getCachedPath } from '@/utils/imageCache';
 import * as Clipboard from 'expo-clipboard';
@@ -34,7 +36,6 @@ export default function ChatThread() {
   const loggedFirstItemRenderRef = React.useRef(false);
   const richChromeReadyTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const thumbnailPrefetchRunRef = React.useRef<string | null>(null);
-  const sizePrefillRunRef = React.useRef<string | null>(null);
   const mediaPrefetchRunRef = React.useRef<string | null>(null);
   const prefetchTimeoutsRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
   const [micTextMode, setMicTextMode] = React.useState(false);
@@ -53,6 +54,7 @@ export default function ChatThread() {
   const [shareContactModalVisible, setShareContactModalVisible] = React.useState(false);
   const hasUserScrolledRef = React.useRef(false);
   const lastLoadMoreAtRef = React.useRef(0);
+  const [isAtBottom, setIsAtBottom] = React.useState(true);
   
 
   const [forwardSheetVisible, setForwardSheetVisible] = React.useState(false);
@@ -475,7 +477,7 @@ export default function ChatThread() {
   const renderItem = React.useCallback(({ item, index }: any) => {
     if (item.type === 'date_separator') {
       return (
-        <View className="items-center my-4">
+        <View key={`sep-${item.id}`} className="items-center my-4">
           <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '500' }}>
             {item.date}
           </Text>
@@ -518,8 +520,9 @@ export default function ChatThread() {
     }
 
     const finalSenderName = item.sender?.fullName || item.contactName || groupSenderName;
+
     return (
-      <MessageBubble
+      <MessageBubble key={`msg-${item.id}`}
         message={item}
         simple={shouldUseSimpleMode}
         highlightQuery={searchQuery}
@@ -604,146 +607,31 @@ export default function ChatThread() {
     // log removed
   }, [chatListReady, composerVisible, conversationId, deleteSheetVisible, emojiVisible, forwardSheetVisible, gifVisible, galleryVisible, locationModalVisible, messageMenuVisible, reactionSheetVisible, reactionsDetailVisible, renderDeferredChrome, shareContactModalVisible, micVisible]);
 
-  const getChatItemType = React.useCallback((item: any) => {
-    if (!item) return 'text';
-    if (item.type === 'date_separator') return 'date_separator';
-    if (item.type === 'system' || item.type === 'separator') return 'separator';
-    if (item.type === 'image_group') return 'image_group';
-    if (item.type === 'sticker') return 'sticker';
-    if (item.type === 'image') return 'image';
-    if (item.type === 'video') return 'video';
-    if (item.type === 'audio') return 'audio';
-    if (item.type === 'file') return 'file';
-    if (item.type === 'location') return 'location';
-    if (item.type === 'call') return 'call';
-    if (item.type) return 'text';
-    return 'text';
-  }, []);
-
-  const estimateTextMessageHeight = React.useCallback((item: any) => {
-    const rawText = (item?.text || item?.content || '').toString();
-    if (!rawText) return 96;
-
-    const maxBubbleWidth = windowWidth * 0.75;
-    const horizontalChrome = 40;
-    const textAreaWidth = Math.max(140, maxBubbleWidth - horizontalChrome);
-    const avgCharWidth = 7.2;
-    const charsPerLine = Math.max(16, Math.floor(textAreaWidth / avgCharWidth));
-
-    const wrappedLines = rawText
-      .split('\n')
-      .reduce((total, paragraph) => {
-        const trimmed = paragraph.trimEnd();
-        if (!trimmed) return total + 1;
-        return total + Math.max(1, Math.ceil(trimmed.length / charsPerLine));
-      }, 0);
-
-    const lineCount = Math.max(1, wrappedLines);
-    const replyExtra = item?.replyTo ? 56 : 0;
-    const editedExtra = item?.edited ? 18 : 0;
-    const footerExtra = item?.status === 'sending' || item?.status === 'error' || item?.time ? 22 : 14;
-    const bubblePadding = 24;
-    const textLineHeight = 20;
-
-    return Math.round(replyExtra + editedExtra + footerExtra + bubblePadding + lineCount * textLineHeight);
-  }, [windowWidth]);
-
-  const overrideChatItemLayout = React.useCallback((layout: { size?: number }, item: any) => {
-    if (!item) return;
+  const overrideChatItemLayout = React.useCallback((layout: { size?: number }, item: any, index?: number) => {
+    if (!item) {
+      layout.size = 96;
+      return;
+    }
 
     // prefer measured sizes when available
     try {
       const measured = getMessageSize(item.id);
       if (measured && measured > 0) {
         layout.size = measured;
-        // log removed
         return;
       }
     } catch {
       // ignore
     }
-    const type = getChatItemType(item);
 
-    // compute accurate sizes for media items when fileInfo dimensions exist
-    if ((type === 'image' || type === 'video') && item.fileInfo && item.fileInfo.width && item.fileInfo.height) {
-      try {
-        const maxWidth = windowWidth * 0.75;
-        const maxHeight = windowHeight * 0.48;
-        const aspect = item.fileInfo.width / item.fileInfo.height || 1;
-        let imgH = maxWidth / aspect;
-        if (imgH > maxHeight) {
-          imgH = maxHeight;
-        }
-        // include bubble padding + footer estimate
-        layout.size = Math.round(imgH + 12 + 10);
-        // log removed
-        return;
-      } catch {
-        // fall through
-      }
+    // log estimate for first few items in dev
+    if (__DEV__ && index != null && index < 10 && blankAreaCountRef.current < 1) {
+      const type = getChatItemType(item);
+      console.warn(`[Layout] idx=${index} type=${type} id=${item.id} NO_MEASURED_SIZE`);
     }
 
-    if (type === 'image_group' && Array.isArray(item.images) && item.images.length > 0) {
-      // estimate grid height using per-image aspect ratios when available
-      const count = item.images.length;
-      const maxWidth = windowWidth * 0.75;
-      const per = count === 2 ? 2 : Math.min(3, count);
-      const gap = 6;
-      const cellW = Math.floor((maxWidth - gap * (per - 1)) / per);
-      const maxCellHeightCap = Math.round(windowHeight * 0.48);
-      // compute max cell height among images in a row using fileInfo if present
-      let maxCellH = 0;
-      for (let i = 0; i < count; i++) {
-        const img = item.images[i];
-        const w = img?.fileInfo?.width;
-        const h = img?.fileInfo?.height;
-        const aspect = (w && h) ? (w / h) : 1;
-        let cellH = Math.round(cellW / aspect);
-        if (cellH > maxCellHeightCap) cellH = maxCellHeightCap;
-        if (cellH > maxCellH) maxCellH = cellH;
-      }
-      const rows = Math.ceil(count / per);
-      const totalH = rows * maxCellH + (rows - 1) * gap;
-      layout.size = Math.round(totalH + 12 + 10);
-      return;
-    }
-
-    if (type === 'text') {
-      layout.size = estimateTextMessageHeight(item);
-      return;
-    }
-
-    switch (type) {
-      case 'date_separator':
-      case 'separator':
-        layout.size = 40;
-        return;
-      case 'sticker':
-      case 'audio':
-        layout.size = 104;
-        return;
-      case 'location':
-        layout.size = 196;
-        return;
-      case 'file':
-        layout.size = 128;
-        return;
-      case 'call':
-        layout.size = 128;
-        return;
-      case 'image':
-        layout.size = 260;
-        return;
-      case 'video':
-        layout.size = 300;
-        return;
-      case 'image_group':
-        layout.size = 320;
-        return;
-      default:
-        layout.size = 96;
-    }
-  }, [estimateTextMessageHeight, getChatItemType, windowHeight, windowWidth]);
+    layout.size = computeChatItemSize(item, windowWidth, windowHeight);
+  }, [windowHeight, windowWidth]);
 
   const visibleItemsRef = React.useRef<any[]>([]);
 
@@ -867,104 +755,44 @@ export default function ChatThread() {
 
   const viewabilityConfig = React.useMemo(() => ({ itemVisiblePercentThreshold: 5, waitForInteraction: false }), []);
 
+  // Debug: log processedMessages duplicate IDs and blank area events
+  const processedMessagesJsonRef = React.useRef('');
+  React.useEffect(() => {
+    if (!__DEV__ || !processedMessages.length) return;
+    // Check for duplicate keys
+    const keys = new Set<string>();
+    const dupes: string[] = [];
+    for (const msg of processedMessages) {
+      const k = msg.id != null ? msg.id.toString() : '';
+      if (k && keys.has(k)) dupes.push(k);
+      keys.add(k);
+    }
+    if (dupes.length > 0) {
+      console.warn(`[ChatThread] 🔴 Duplicate processedMessages IDs:`, dupes);
+    }
+
+    const json = processedMessages.map(m => `${m.type}:${m.id}`).join(',');
+    if (json !== processedMessagesJsonRef.current) {
+      // log removed
+      processedMessagesJsonRef.current = json;
+    }
+  }, [processedMessages]);
+
+  const blankAreaCountRef = React.useRef(0);
   const handleBlankArea = React.useCallback((event: { offsetStart: number; offsetEnd: number; blankArea: number }) => {
     if (event.blankArea <= 0) return;
-    // log removed
-  }, []);
+    blankAreaCountRef.current += 1;
+    if (__DEV__ && blankAreaCountRef.current <= 5) {
+      console.warn(
+        `[FlashList] Blank area #${blankAreaCountRef.current}: ${event.blankArea.toFixed(1)}px ` +
+        `(offset ${event.offsetStart.toFixed(1)} to ${event.offsetEnd.toFixed(1)}, ` +
+        `span ${(event.offsetEnd - event.offsetStart).toFixed(1)}px, ` +
+        `items=${processedMessages.length})`
+      );
+    }
+  }, [processedMessages.length]);
 
-  // Prefill cache with estimated sizes after interactions, and only for a
-  // small visible window. This keeps the first paint responsive.
-  React.useEffect(() => {
-    if (!backgroundMediaWarmupEnabled) return;
-    if (!processedMessages || processedMessages.length === 0) return;
-    if (sizePrefillRunRef.current === conversationId) return;
-    sizePrefillRunRef.current = conversationId;
-
-    // timing removed
-    let cancelled = false;
-
-    const cancelSchedule = scheduleLowPriorityTask(() => {
-      if (cancelled) return;
-
-      // log removed
-
-      try {
-        const prefillItems = processedMessages.slice(0, 24);
-        prefillItems.forEach((item: any) => {
-          try {
-            const type = getChatItemType(item);
-            let size = undefined as number | undefined;
-
-            if ((type === 'image' || type === 'video') && item.fileInfo && item.fileInfo.width && item.fileInfo.height) {
-              const maxWidth = windowWidth * 0.75;
-              const maxHeight = windowHeight * 0.48;
-              const aspect = item.fileInfo.width / item.fileInfo.height || 1;
-              let imgH = maxWidth / aspect;
-              if (imgH > maxHeight) imgH = maxHeight;
-              size = Math.round(imgH + 12 + 10);
-            } else if (type === 'image_group' && Array.isArray(item.images) && item.images.length > 0) {
-              const count = item.images.length;
-              const per = count === 2 ? 2 : Math.min(3, count);
-              const gap = 6;
-              const cellW = Math.floor((windowWidth * 0.75 - gap * (per - 1)) / per);
-              const maxCellHeightCap = Math.round(windowHeight * 0.48);
-              let maxCellH = 0;
-              for (let i = 0; i < count; i++) {
-                const img = item.images[i];
-                const w = img?.fileInfo?.width;
-                const h = img?.fileInfo?.height;
-                const aspect = (w && h) ? (w / h) : 1;
-                let cellH = Math.round(cellW / aspect);
-                if (cellH > maxCellHeightCap) cellH = maxCellHeightCap;
-                if (cellH > maxCellH) maxCellH = cellH;
-              }
-              const rows = Math.ceil(count / per);
-              const totalH = rows * maxCellH + (rows - 1) * gap;
-              size = Math.round(totalH + 12 + 10);
-            } else {
-              switch (type) {
-                case 'date_separator':
-                case 'separator':
-                  size = 40; break;
-                case 'sticker':
-                case 'audio':
-                  size = 104; break;
-                case 'location':
-                  size = 196; break;
-                case 'file':
-                  size = 128; break;
-                case 'call':
-                  size = 128; break;
-                case 'image':
-                  size = 260; break;
-                case 'video':
-                  size = 300; break;
-                case 'text':
-                  size = estimateTextMessageHeight(item); break;
-                default:
-                  size = 96; break;
-              }
-            }
-
-            if (size && item.id != null) {
-              setMessageSize(item.id, size);
-            }
-          } catch {
-            // ignore per-item
-          }
-        });
-      } catch {
-        // ignore
-      }
-
-      // log removed
-    });
-
-    return () => {
-      cancelled = true;
-      cancelSchedule();
-    };
-  }, [backgroundMediaWarmupEnabled, conversationId, estimateTextMessageHeight, processedMessages, windowWidth, windowHeight, getChatItemType, scheduleLowPriorityTask]);
+  // Debug: log size cache state for first few items
 
   // Prefetch thumbnails and a few full images to improve perceived load times.
   // Keep the list small to avoid triggering too much work on open.
@@ -1184,9 +1012,9 @@ export default function ChatThread() {
               onClose={() => setGroupVideoCallVisible(false)}
               onStart={(selectedMembers) => {
                 startGroupVideoCall(selectedMembers);
-              }}
-            />
-          )}
+                    }}
+                  />
+                )}
 
           {/* Wrapper for messages and composer that pushes up with keyboard */}
             <Animated.View style={[{ flex: 1 }, animatedContentStyle]}>
@@ -1201,7 +1029,7 @@ export default function ChatThread() {
                 >
                   <FlashList
                     extraData={{ groupDetails, targetUser, colors, searchQuery, highlightedMessageId }}
-                    initialNumToRender={4}
+                    initialNumToRender={8}
                     ref={flatListRef}
                     data={processedMessages}
                     inverted
@@ -1219,7 +1047,7 @@ export default function ChatThread() {
                       // the backend returns a message with a missing id.
                       return `msg-${idx}`;
                     }}
-                    estimatedItemSize={220}
+                    estimatedItemSize={300}
                     estimatedListSize={{ height: windowHeight, width: windowWidth }}
                     getItemType={getChatItemType}
                     overrideItemLayout={overrideChatItemLayout}
@@ -1228,14 +1056,14 @@ export default function ChatThread() {
                       loggedFlashListLayoutRef.current = true;
                       // log removed
                     }}
-                    // Keep the initial draw window smaller so the list does less
-                    // work while the first page is still settling.
-                    drawDistance={Math.round(windowHeight * 2)}
+                    drawDistance={Math.round(windowHeight * 10)}
                     onBlankArea={handleBlankArea}
                     removeClippedSubviews={false}
                     scrollEventThrottle={16}
                     onScroll={(event) => {
-                      if (!hasUserScrolledRef.current && event.nativeEvent.contentOffset.y > 24) {
+                      const offsetY = event.nativeEvent.contentOffset.y;
+                      setIsAtBottom(offsetY <= 50);
+                      if (!hasUserScrolledRef.current && offsetY > 24) {
                         hasUserScrolledRef.current = true;
                         if (!backgroundMediaWarmupEnabled) {
                           setBackgroundMediaWarmupEnabled(true);
@@ -1244,10 +1072,6 @@ export default function ChatThread() {
                     }}
                     onViewableItemsChanged={onViewableItemsChanged}
                     viewabilityConfig={viewabilityConfig}
-                    maintainVisibleContentPosition={{
-                      minIndexForVisible: 0,
-                      autoscrollToTopThreshold: 10,
-                    }}
                     contentContainerStyle={{
                       paddingVertical: 12,
                       paddingBottom: 0
@@ -1304,6 +1128,32 @@ export default function ChatThread() {
                       return renderItem(info);
                     }}
                   />
+                  {!isAtBottom && (
+                    <Animated.View entering={SlideInDown} exiting={SlideOutDown.duration(120)} style={{ position: 'absolute', bottom: 24, alignSelf: 'center' }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          flatListRef.current?.scrollToIndex({ index: 0, animated: true, viewPosition: 1 });
+                          setIsAtBottom(true);
+                        }}
+                        activeOpacity={0.7}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: colors.surface,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 4,
+                          elevation: 5,
+                        }}
+                      >
+                        <AntDesign name="arrow-down" size={22} color={colors.text} />
+                      </TouchableOpacity>
+                    </Animated.View>
+                  )}
                 </View>
               )}
 

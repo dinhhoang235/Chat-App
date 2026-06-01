@@ -12,7 +12,7 @@ import MessageReplyPreview from './messageParts/MessageReplyPreview';
 import MessageCallBubble from './messageParts/MessageCallBubble';
 import MessageSwipeableBubble from './messageParts/MessageSwipeableBubble';
 import MessageFooter from './messageParts/MessageFooter';
-import { setMessageSize } from '@/utils/messageSizeCache';
+import { setMessageSize, getMessageSize } from '@/utils/messageSizeCache';
 import { getAvatarUrl, getDefaultAvatarUrl } from '@/utils/avatar';
 
 
@@ -45,6 +45,7 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
   const swipeableRef = useRef<SwipeableMethods>(null);
   const swipeTranslation = useSharedValue(0);
   const renderCountRef = useRef(0);
+  const measuredHeightRef = useRef(0);
   renderCountRef.current++;
 
   useEffect(() => {
@@ -267,7 +268,21 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
     }
 
     return (
-      <View style={{ paddingVertical: 8, paddingHorizontal: 16 }}>
+      <View
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout?.height;
+          if (h && Math.abs(h - measuredHeightRef.current) > 0.5) {
+            measuredHeightRef.current = h;
+            setMessageSize(message.id, h);
+            if (__DEV__) {
+              const prev = getMessageSize(message.id);
+              if (prev !== Math.round(h)) {
+                console.warn(`[onLayout] id=${message.id} type=${message.type} h=${h} cached=${prev} -> ${Math.round(h)}`);
+              }
+            }
+          }
+        }}
+        style={{ paddingVertical: 8, paddingHorizontal: 16 }}>
         {showSenderNameSimple && (
           <View style={{ marginLeft: isOutgoing ? 0 : 52, maxWidth: '85%', alignSelf: isOutgoing ? 'flex-end' : 'flex-start' }}>
             <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 4 }} numberOfLines={1}>
@@ -281,9 +296,9 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
               <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ opacity: isLastInGroup ? 1 : 0 }}>
                 <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'hidden' }}>
                   {avatarUri ? (
-                    <Image source={{ uri: avatarUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                    <Image key={`av-${avatarUri}`} source={{ uri: avatarUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                   ) : (
-                    <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                    <Image key={`av-default`} source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
                   )}
                 </View>
               </TouchableOpacity>

@@ -288,6 +288,7 @@ export default function MessageImageGroupBubble({ message, screenWidth, colors, 
             activeOpacity={0.9}
             >
             <Image
+              key={`grp-${uri || idx}`}
               source={{ uri: localUriMap[uri] || uri }}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"

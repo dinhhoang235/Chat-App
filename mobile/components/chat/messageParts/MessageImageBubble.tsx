@@ -307,6 +307,7 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
         <View style={{ width: imageWidth, height: imageHeight, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.surfaceVariant }}>
           {localThumb ? (
             <Image
+              key={`thumb-${localThumb}`}
               source={thumbnailSource}
               style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }}
               contentFit="cover"
@@ -316,6 +317,7 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
             />
           ) : thumbnailUri ? (
             <Image
+              key={`thumb-${thumbnailUri}`}
               source={thumbnailSource}
               style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }}
               contentFit="cover"
@@ -326,6 +328,7 @@ function MessageImageBubble({ message, screenWidth, colors, allMedia, progress, 
           ) : null}
 
           <Image
+            key={`full-${fullImageUri || 'empty'}`}
             source={fullSource}
             style={{
               width: '100%',

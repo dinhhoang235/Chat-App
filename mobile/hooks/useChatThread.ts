@@ -1,4 +1,5 @@
 import { useMemo, useCallback, useEffect } from "react";
+import { useWindowDimensions } from "react-native";
 import { useTheme } from "@/context/themeContext";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
@@ -19,7 +20,8 @@ import { useChatThreadRuntime } from "./useChatThread/useChatThreadRuntime";
 import { useChatThreadGroupCall } from "./useChatThread/useChatThreadGroupCall";
 import { useChatThreadLocation } from "./useChatThread/useChatThreadLocation";
 import { useChatThreadGif } from "./useChatThread/useChatThreadGif";
-import { buildProcessedMessages, mapThreadMessage } from "@/utils/chatThread";
+import { buildProcessedMessages, mapThreadMessage, computeChatItemSize } from "@/utils/chatThread";
+import { getMessageSize, setMessageSize } from "@/utils/messageSizeCache";
 import { chatThreadCache } from "@/utils/chatThreadCache";
 import { chatApi } from "@/services/chat";
 import { error } from "@/utils/logger";
@@ -30,6 +32,7 @@ type UseChatThreadOptions = {
 };
 
 export function useChatThread(options?: UseChatThreadOptions) {
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { colors } = useTheme();
   const { user } = useAuth();
   const params = useLocalSearchParams();
@@ -212,11 +215,19 @@ export function useChatThread(options?: UseChatThreadOptions) {
   });
 
   const processedMessages = useMemo(() => {
-    // timing removed
     const processed = buildProcessedMessages(messages, user?.id);
-    // log removed
+    // Prefill size cache synchronously — runs before FlashList renders
+    for (const item of processed) {
+      if (item.id == null) continue;
+      if (getMessageSize(item.id)) continue;
+      const size = computeChatItemSize(item, windowWidth, windowHeight);
+      setMessageSize(item.id, size);
+      if (__DEV__) {
+        // log removed
+      }
+    }
     return processed;
-  }, [id, messages, user?.id]);
+  }, [id, messages, user?.id, windowWidth, windowHeight]);
 
   useEffect(() => {
     // log removed

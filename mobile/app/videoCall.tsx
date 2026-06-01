@@ -397,9 +397,7 @@ export default function VideoCallScreen() {
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} className="w-[120px] h-[120px] rounded-[60px] border border-white/20" />
             ) : (
-              <View className="w-[120px] h-[120px] rounded-[60px] border border-white/20 bg-[#0A84FF] items-center justify-center">
-                <Image source={{ uri: getDefaultAvatarUrl() }} className="w-[100px] h-[100px] rounded-[50px]" />
-              </View>
+              <Image source={{ uri: getDefaultAvatarUrl() }} className="w-[120px] h-[120px] rounded-[60px] border border-white/20" />
             )}
             <Text className="text-white text-xl mt-4 opacity-80">Đã tắt camera</Text>
           </View>
@@ -466,9 +464,7 @@ export default function VideoCallScreen() {
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} className="w-[100px] h-[100px] rounded-[50px] border-2 border-white mb-4" />
             ) : (
-              <View className="w-[100px] h-[100px] rounded-[50px] border-2 border-white bg-blue-600 items-center justify-center mb-4">
-                <Image source={{ uri: getDefaultAvatarUrl() }} className="w-[84px] h-[84px] rounded-[42px]" />
-              </View>
+              <Image source={{ uri: getDefaultAvatarUrl() }} className="w-[100px] h-[100px] rounded-[50px] border-2 border-white mb-4" />
             )}
             <Text
               className="text-white text-[28px] font-bold text-center mb-2"

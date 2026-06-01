@@ -109,9 +109,10 @@ export function IncomingCallModal() {
               className="w-[140px] h-[140px] rounded-[70px] border border-white/40"
             />
             ) : (
-            <View className="w-[140px] h-[140px] rounded-[70px] border border-white/40 bg-blue-500 items-center justify-center">
-              <Image source={{ uri: getDefaultAvatarUrl() }} style={{ width: 120, height: 120, borderRadius: 60 }} />
-            </View>
+            <Image
+              source={{ uri: getDefaultAvatarUrl() }}
+              className="w-[140px] h-[140px] rounded-[70px] border border-white/40"
+            />
           )}
         </View>
 

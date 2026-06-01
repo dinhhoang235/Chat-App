@@ -248,6 +248,7 @@ export const buildProcessedMessages = (messages: any[], currentUserId?: number) 
     });
 
     const nextMsg = grouped[i + 1];
+    withDates[withDates.length - 1]._hasFooter = !nextMsg || nextMsg.senderId !== msg.senderId;
     const currentDate = formatDateKey(msg.createdAt);
     const nextDate = nextMsg ? formatDateKey(nextMsg.createdAt) : null;
 
@@ -262,6 +263,107 @@ export const buildProcessedMessages = (messages: any[], currentUserId?: number) 
   }
 
   return withDates;
+};
+
+export const getChatItemType = (item: any): string => {
+  if (!item) return 'text';
+  if (item.type === 'date_separator') return 'date_separator';
+  if (item.type === 'system' || item.type === 'separator') return 'separator';
+  if (item.type === 'image_group') return 'image_group';
+  if (item.type === 'sticker') return 'sticker';
+  if (item.type === 'image') return 'image';
+  if (item.type === 'video') return 'video';
+  if (item.type === 'audio') return 'audio';
+  if (item.type === 'file') return 'file';
+  if (item.type === 'location') return 'location';
+  if (item.type === 'call') return 'call';
+  if (item.type) return 'text';
+  return 'text';
+};
+
+export const estimateTextMessageHeight = (item: any, windowWidth: number): number => {
+  const rawText = (item?.text || item?.content || '').toString();
+  if (!rawText) return 96;
+
+  const maxBubbleWidth = windowWidth * 0.75;
+  const horizontalChrome = 40;
+  const textAreaWidth = Math.max(140, maxBubbleWidth - horizontalChrome);
+  const avgCharWidth = 7.2;
+  const charsPerLine = Math.max(16, Math.floor(textAreaWidth / avgCharWidth));
+
+  const wrappedLines = rawText
+    .split('\n')
+    .reduce((total: number, paragraph: string) => {
+      const trimmed = paragraph.trimEnd();
+      if (!trimmed) return total + 1;
+      return total + Math.max(1, Math.ceil(trimmed.length / charsPerLine));
+    }, 0);
+
+  const lineCount = Math.max(1, wrappedLines);
+  const replyExtra = item?.replyTo ? 56 : 0;
+  const editedExtra = item?.edited ? 18 : 0;
+  const footerExtra = item?.status === 'sending' || item?.status === 'error' || item?.time ? 22 : 14;
+  const bubblePadding = 24;
+  const textLineHeight = 20;
+
+  return Math.round(replyExtra + editedExtra + footerExtra + bubblePadding + lineCount * textLineHeight);
+};
+
+export const computeChatItemSize = (
+  item: any,
+  windowWidth: number,
+  windowHeight: number,
+): number => {
+  if (!item) return 96;
+
+  const footerH = item._hasFooter ? 20 : 0;
+  let size = 96;
+  const type = getChatItemType(item);
+
+  if ((type === 'image' || type === 'video') && item.fileInfo?.width && item.fileInfo?.height) {
+    const maxWidth = windowWidth * 0.75;
+    const maxHeight = windowHeight * 0.48;
+    const aspect = item.fileInfo.width / item.fileInfo.height || 1;
+    let imgH = maxWidth / aspect;
+    if (imgH > maxHeight) imgH = maxHeight;
+    size = Math.round(8 + imgH + footerH + 8);
+  } else if (type === 'image_group' && Array.isArray(item.images) && item.images.length > 0) {
+    const count = item.images.length;
+    const maxWidth = windowWidth * 0.75;
+    const per = count === 2 ? 2 : Math.min(3, count);
+    const gap = 6;
+    const cellW = Math.floor((maxWidth - gap * (per - 1)) / per);
+    const maxCellHeightCap = Math.round(windowHeight * 0.48);
+    let maxCellH = 0;
+    for (let i = 0; i < count; i++) {
+      const img = item.images[i];
+      const w = img?.fileInfo?.width;
+      const h = img?.fileInfo?.height;
+      const aspect = (w && h) ? (w / h) : 1;
+      let cellH = Math.round(cellW / aspect);
+      if (cellH > maxCellHeightCap) cellH = maxCellHeightCap;
+      if (cellH > maxCellH) maxCellH = cellH;
+    }
+    const rows = Math.ceil(count / per);
+    const totalH = rows * maxCellH + (rows - 1) * gap;
+    size = Math.round(8 + totalH + footerH + 8);
+  } else if (type === 'text') {
+    size = estimateTextMessageHeight(item, windowWidth);
+  } else {
+    switch (type) {
+      case 'date_separator':
+      case 'separator': size = 40; break;
+      case 'sticker':
+      case 'audio': size = 104; break;
+      case 'location': size = 196; break;
+      case 'file': size = 128; break;
+      case 'call': size = 128; break;
+      case 'image': size = 260; break;
+      case 'video': size = 300; break;
+      case 'image_group': size = 320; break;
+    }
+  }
+  return size;
 };
 
 export const getThreadStatusText = (

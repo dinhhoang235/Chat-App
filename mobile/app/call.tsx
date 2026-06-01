@@ -406,9 +406,7 @@ export default function CallScreen() {
               {avatarUrl ? (
                 <Image source={{ uri: avatarUrl }} className="w-[140px] h-[140px] rounded-[70px] border-[3px] border-white/90" />
               ) : (
-                <View className="w-[140px] h-[140px] rounded-[70px] border-[3px] border-white/90 bg-blue-600 items-center justify-center">
-                  <Image source={{ uri: getDefaultAvatarUrl() }} className="w-[120px] h-[120px] rounded-[60px]" />
-                </View>
+                <Image source={{ uri: getDefaultAvatarUrl() }} className="w-[140px] h-[140px] rounded-[70px] border-[3px] border-white/90" />
               )}
             </View>
 

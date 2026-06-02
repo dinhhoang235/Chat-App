@@ -348,6 +348,92 @@ Mục đích:
 - Socket.IO xử lý signaling, event điều khiển, quản lý call state
 - LiveKit xử lý media routing, truyền audio/video cho call nhóm
 
+### Câu hỏi: "STUN của Google dùng để làm gì? Sao không thấy trong sơ đồ?"
+
+**STUN (Session Traversal Utilities for NAT, RFC 5389)** là giao thức giúp client phát hiện địa chỉ IP public và port public của chính nó sau khi qua NAT.
+
+**Cơ chế hoạt động — từng bước:**
+
+```
+Client (sau NAT)                   Google STUN (stun.l.google.com:19302)
+      │                                         │
+      │ 1. UDP Binding Request                  │
+      │    src=192.168.1.5:54321                │
+      │    ──────────────────────────────────►  │
+      │                                         │
+      │ 2. Server thấy gói đến từ               │
+      │    IP public: 1.2.3.4, port: 45000      │
+      │                                         │
+      │ 3. UDP Binding Response                 │
+      │    { mappedAddress: 1.2.3.4:45000 }     │
+      │    ◀──────────────────────────────────  │
+      │                                         │
+      │ 4. Client có ICE candidate "srflx"      │
+      │    1.2.3.4:45000                        │
+```
+
+1. Client tạo `RTCPeerConnection` với `iceServers` chứa Google STUN.
+2. WebRTC engine tự động gửi **STUN Binding Request** (một gói UDP nhỏ, ~20 byte) đến `stun.l.google.com:19302`.
+3. Google STUN server nhìn thấy gói tin — nó thấy địa chỉ nguồn thực tế là `1.2.3.4:45000` (sau khi qua NAT). Nó ghi địa chỉ đó vào **STUN Binding Response** và gửi lại.
+4. Client nhận response, biết được public IP:port của mình. WebRTC tạo ra một **ICE candidate** loại `srflx` (server reflexive) với giá trị `1.2.3.4:45000`.
+5. Candidate này được gửi qua signaling (`webrtc_ice_candidate`) cho peer kia.
+6. Peer kia thử kết nối trực tiếp đến `1.2.3.4:45000` — nếu thành công thì media đi **P2P direct**.
+
+**STUN khác TURN thế nào?**
+
+| | STUN | TURN (CoTurn) |
+|---|---|---|
+| Nhiệm vụ | Hỏi "Tôi có IP public là gì?" | Relay media khi P2P không được |
+| Số gói tin | 1 request + 1 response (vài ms) | Luồng UDP liên tục (tốn băng thông) |
+| Chi phí | Miễn phí (Google cung cấp public) | Tốn server, băng thông |
+| Có trong sơ đồ? | Không — chỉ là 1 dòng config | Có — là hạ tầng deploy thật |
+
+**Tại sao Google lại cho dùng free?**
+- Google sử dụng STUN internally cho Google Meet, Google Voice, v.v.
+- Họ public server `stun.l.google.com:19302` vì STUN cực kỳ nhẹ (vài byte, không stateful gần như).
+- Nó là một lợi ích chung cho toàn bộ WebRTC ecosystem — Google không mất gì đáng kể.
+
+**Tại sao không vẽ trong sơ đồ kiến trúc?**
+- Vì nó **không phải thành phần của hệ thống** — không deploy, không config server, không monitoring.
+- Nó chỉ là một URL string trong client code (`mobile/services/webrtc.ts:17`):
+  ```typescript
+  const servers: RTCIceServer[] = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ];
+  ```
+- Tương tự như bạn không vẽ "DNS server" hay "NTP server" vào sơ đồ — nó là hạ tầng internet, không phải hạ tầng hệ thống.
+- Trong sơ đồ, chỉ vẽ **đường media** (luồng RTP video/audio). STUN không relay media, nó chỉ giúp khám phá địa chỉ trong pha ICE gathering — xong rồi thôi.
+
+**Luồng thực tế trong project:**
+```
+1. RTCPeerConnection khởi tạo
+      │
+2. ICE gathering phase (tự động, ~100-500ms)
+      ├── Google STUN → srflx candidate (1.2.3.4:45000)
+      ├── Host candidate (192.168.1.5:54321)
+      └── CoTurn TURN → relay candidate (nếu P2P không được)
+      │
+3. Signaling exchange
+      └── webrtc_ice_candidate → peer kia
+      │
+4. ICE connectivity checks
+      ├── Thử direct P2P → OK → media đi thẳng
+      └── Thử direct P2P → FAIL → media qua TURN (CoTurn :3478)
+```
+
+### Câu hỏi: "Emit incoming_call từ đâu ra?"
+
+Server phát `incoming_call` tại `server/src/socket/callHandlers.ts` (dòng ~226) khi nhận được `call_invite` từ caller:
+
+```typescript
+io.to(`user:${targetUserId}`).emit("incoming_call", {
+  callId, conversationId, callerId, callerName, ...
+});
+```
+
+Client lắng nghe ở `mobile/context/callContext.tsx` — handler `handleIncomingCall` set state `incomingCall` + `callStatus='incoming'` để hiển thị UI đổ chuông.
+
 ## 14. File liên quan
 
 - `mobile/services/socket.ts`

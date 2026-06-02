@@ -16,7 +16,7 @@ phân tầng rõ ràng giữa lớp **Public** (Internet), lớp **Proxy**, và 
 | Redis | Cache & Socket.io pub/sub adapter | Redis 6.x | 6379 (internal) |
 | MinIO | Lưu trữ object (ảnh, video) | MinIO S3‑compatible | 9000 (internal) |
 | LiveKit | Máy chủ WebRTC signaling | LiveKit Server | 7880 (internal) |
-| CoTurn | STUN/TURN relay cho LiveKit | coturn | 3478 (public) |
+| CoTurn | STUN/TURN relay cho LiveKit + P2P | coturn | 3478, 5349 (public), relay UDP 20000-20100 |
 | FCM | Thông báo push | Firebase Cloud Messaging | — (external service) |
 
 ---
@@ -43,7 +43,7 @@ flowchart LR
     end
 
     subgraph Proxy["🛡️ PROXY LAYER"]
-        Nginx["💻 NGINX<br/>:80 / :443<br/>(SSL Termination, Load Balancing)"]
+        Nginx["💻 NGINX<br/>:80 / :443<br/>(SSL Termination, LB)"]
     end
 
     subgraph Internal["🔒 INTERNAL NETWORK (Docker Compose)"]
@@ -58,29 +58,28 @@ flowchart LR
         end
 
         subgraph Realtime["🎥 Realtime (Audio/Video)"]
-            LiveKit["📹 LiveKit<br/>:7880<br/>(WebRTC Signaling)"]
+            LiveKit["📹 LiveKit<br/>:7880<br/>(WebRTC SFU)"]
         end
     end
 
     subgraph TURN["📡 TURN LAYER (Public)"]
-        CoTurn["📶 CoTurn<br/>:3478<br/>(STUN + TURN Relay)"]
+        CoTurn["📶 CoTurn<br/>:3478 / :5349<br/>relay UDP 20000-20100<br/>(STUN + TURN)"]
     end
 
     %% === FLOWS ===
-    Mobile -->|"STUN Request<br/>(Discover Public IP)"| CoTurn
-    Mobile -->|"If NAT blocks → Use TURN Relay"| CoTurn
-    Mobile -->|"HTTPS / WSS :443<br/>Login / Messaging / Upload"| NAT
+    Mobile -->|"UDP :3478 / 20000-20100<br/>TURN relay media (P2P failed)"| CoTurn
+    Mobile -->|"HTTPS/WSS :443<br/>Login / Messaging / Upload"| NAT
     NAT --> Nginx
-    FCM -->|"Push Messages"| Mobile
+    FCM -->|"Push notification"| Mobile
 
-    Nginx -->|"HTTP Proxy<br/>REST / Socket.io"| API
-    API -->|"SQL Queries"| MySQL
-    API -->|"Cache Lookup / Pub-Sub"| Redis
-    API -->|"PUT / GET Objects"| MinIO
-    API -->|"Signaling (WebSocket)"| LiveKit
-    API -->|"Push Notification (HTTPS)"| FCM
-    LiveKit -->|"STUN/TURN Config"| CoTurn
-    CoTurn -.->|"P2P Media Stream<br/>(via NAT or Relay)"| Mobile
+    Nginx -->|"HTTP :3000<br/>REST / Socket.io WS"| API
+    API -->|"TCP :3306<br/>SQL Queries"| MySQL
+    API -->|"TCP :6379<br/>Cache / Pub-Sub"| Redis
+    API -->|"HTTP :9000<br/>PUT / GET Objects"| MinIO
+    API -->|"WS :7880<br/>Signaling + LiveKit API"| LiveKit
+    API -->|"HTTPS (outbound)<br/>Push notification"| FCM
+    LiveKit -->|"UDP :3478<br/>TURN relay config"| CoTurn
+    CoTurn -.->|"UDP 20000-20100<br/>Relay media stream"| Mobile
 
     %% === STYLE CLASSES ===
     classDef client fill:#fefce8,stroke:#facc15,stroke-width:1.5px,color:#333
@@ -91,7 +90,7 @@ flowchart LR
     classDef subgroup fill:#f0f9ff,stroke:#06b6d4,stroke-width:1px,color:#333
 
     class ClientSide,Mobile,NAT client
-    class Internet,FCM internet
+    class Internet,FCM,GoogleSTUN internet
     class Proxy,Nginx proxy
     class Internal internal
     class Backend,Storage,Realtime subgroup
@@ -99,50 +98,16 @@ flowchart LR
     class CoTurn turn
 ```
 
----
+## 3. Luồng dữ liệu chi tiết
 
-## 3. Sơ đồ phân tầng mạng (Network Layer)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                     INTERNET (Public)                    │
-│                                                          │
-│   📱 Mobile App          🔔 FCM (Google Service)        │
-└───────────┬────────────────────────────┬────────────────┘
-            │ HTTPS/WSS :443             │ HTTPS Push
-            ▼                            ▼
-┌───────────────────────┐   ┌────────────────────────────┐
-│   PROXY LAYER         │   │   TURN LAYER (Public)       │
-│                       │   │                             │
-│   Nginx :80/:443      │   │   CoTurn :3478 (UDP/TCP)   │
-│   (SSL Termination,   │   │   (STUN/TURN Relay)        │
-│    Load Balancing)    │   └────────────────────────────┘
-└───────────┬───────────┘               ▲
-            │ HTTP Proxy                │ TURN
-            ▼                           │
-┌─────────────────────────────────────────────────────────┐
-│                  INTERNAL NETWORK (Docker)               │
-│                                                          │
-│   API Server :3000 ──── MySQL :3306                     │
-│        │           ──── Redis :6379                     │
-│        │           ──── MinIO :9000                     │
-│        └───────────────► LiveKit :7880 ─────────────────┤
-│                                                          │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## 4. Luồng dữ liệu chi tiết
-
-### 4.1 Đăng nhập / Đăng ký
+### 3.1 Đăng nhập / Đăng ký
 ```
 Mobile ──HTTPS──► Nginx ──HTTP──► API ──SQL──► MySQL
                                   │
                                   └──► Trả về JWT token
 ```
 
-### 4.2 Gửi & nhận tin nhắn (Real‑time)
+### 3.2 Gửi & nhận tin nhắn (Real‑time)
 ```
 Mobile ──WSS──► Nginx ──WS──► API
                                │
@@ -151,15 +116,21 @@ Mobile ──WSS──► Nginx ──WS──► API
                                └──► MySQL (lưu lịch sử)
 ```
 
-### 4.3 Upload file / media
+### 3.3 Upload file / media
 ```
 Mobile ──HTTPS──► Nginx ──HTTP──► API ──S3 PUT──► MinIO
                                   │
                                   └──► Lưu URL vào MySQL
 ```
 
-### 4.4 Cuộc gọi video / audio (WebRTC)
+### 3.4 Cuộc gọi video / audio (WebRTC)
+
+> **Lưu ý về Google STUN (`stun:stun.l.google.com:19302`):**
+> Google STUN là dịch vụ public miễn phí, không phải hạ tầng của hệ thống. Client dùng nó để **khám phá IP public** của chính nó (gửi 1 gói UDP hỏi đáp) trước khi thiết lập P2P. Nó là ICE server được cấu hình trong `RTCPeerConnection` ở client (`mobile/services/webrtc.ts`), không cần cài đặt server riêng. CoTurn vừa làm STUN (nếu cấu hình) vừa làm TURN relay khi P2P không khả thi.
+
 ```
+Google STUN ──1 UDP query──► Mobile (trả về public IP:port)
+                                   
 Mobile ──WSS──► LiveKit (Signaling)
   │                    │
   │             CoTurn (TURN Relay)
@@ -167,12 +138,12 @@ Mobile ──WSS──► LiveKit (Signaling)
   └────────P2P Media (UDP)──────────► Mobile khác
 ```
 
-### 4.5 Push Notification
+### 3.5 Push Notification
 ```
 API ──HTTPS──► FCM ──Push──► Mobile (kể cả khi app đóng)
 ```
 
-### 4.6 Caching
+### 3.6 Caching
 ```
 API ──GET──► Redis (cache hit → trả về ngay, TTL: 5–10 phút)
          └──► MySQL (cache miss → truy vấn → lưu Redis)
@@ -180,25 +151,61 @@ API ──GET──► Redis (cache hit → trả về ngay, TTL: 5–10 phút)
 
 ---
 
-## 5. Điểm lưu ý kiến trúc
+## 4. Điểm lưu ý kiến trúc
 
-### 5.1 Single Point of Failure (SPOF)
+### 4.1 Single Point of Failure (SPOF)
 | Thành phần | Rủi ro | Giải pháp đề xuất |
 |---|---|---|
 | Nginx | Toàn bộ traffic bị chặn nếu down | Chạy 2 instance + keepalived |
 | MySQL | Mất dữ liệu nếu không có replica | MySQL Replica / backup định kỳ |
 | Redis | Socket.io mất pub/sub | Redis Sentinel hoặc Cluster |
 
-### 5.2 Security Checklist
+### 4.2 Security Checklist
 - [ ] Nginx là **cổng vào duy nhất** từ Internet — không expose port nội bộ ra ngoài
 - [ ] JWT token có TTL hợp lý, lưu refresh token trong Redis
 - [ ] MinIO không public bucket — tất cả file trả qua signed URL
 - [ ] `MYSQL_ROOT_PASSWORD`, `MINIO_ROOT_PASSWORD`, `FCM_SERVER_KEY` lưu trong `.env`, **không commit lên Git**
 - [ ] CoTurn giới hạn relay IP, tránh bị dùng làm proxy
 
+### 4.3 Tại sao CoTurn ở "Public Layer" dù chạy trong Docker?
+
+CoTurn được vẽ ở **TURN LAYER (Public)** bên ngoài Internal Network vì:
+
+- **Expose trực tiếp ra Internet** — Client mobile kết nối tới CoTurn qua UDP port 3478 (và dải port relay `20000-20100/udp`), **không qua Nginx**. Các service khác (API, MySQL, Redis) chỉ giao tiếp nội bộ và qua Nginx ra ngoài.
+- Dù map port kiểu Docker thông thường (`ports: - "3478:3478"`) và nằm trong `chat-network`, nhưng bản chất TURN là endpoint public mà client UDP trực tiếp, khác với REST API đi qua Nginx.
+
+Cấu hình thực tế trong `server/docker-compose.yml`:
+```yaml
+coturn:
+  image: coturn/coturn:latest
+  ports:
+    - "3478:3478"           # STUN + TURN UDP
+    - "3478:3478/udp"
+    - "5349:5349"           # TLS
+    - "5349:5349/udp"
+    - "20000-20100:20000-20100/udp"   # Dải port relay media
+  command: >
+    -n --log-file=stdout
+    --external-ip=${TURN_EXTERNAL_IP}
+    --listening-port=3478
+    --min-port=20000 --max-port=20100
+    --user=${TURN_USERNAME}:${TURN_PASSWORD}
+    --lt-cred-mech
+  env_file: .env
+  networks: [chat-network]
+```
+Biến môi trường lấy từ `server/.env`:
+- `TURN_EXTERNAL_IP=192.168.0.19`, `TURN_USERNAME=chatuser`, `TURN_PASSWORD=chatpass`
+
+Client mobile dùng thông tin này trong `mobile/.env`:
+- `EXPO_PUBLIC_TURN_HOST=192.168.0.19`, `TURN_USERNAME`, `TURN_PASSWORD`
+
+**So sánh với Google STUN:**
+Google STUN (`stun:stun.l.google.com:19302`) là dịch vụ ngoài hoàn toàn, không có Docker, không có deploy — chỉ là URL được cấu hình trong client code (`mobile/services/webrtc.ts`). Nó trả lời 1 UDP query giúp client biết IP public, không relay media.
+
 ---
 
-## 6. Docker‑Compose (đầy đủ)
+## 5. Docker‑Compose (đầy đủ)
 
 ```yaml
 version: "3.9"
@@ -282,7 +289,7 @@ volumes:
 
 ---
 
-## 7. Biến môi trường (.env mẫu)
+## 6. Biến môi trường (.env mẫu)
 
 ```env
 # MySQL

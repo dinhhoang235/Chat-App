@@ -248,7 +248,8 @@ export const buildProcessedMessages = (messages: any[], currentUserId?: number) 
     });
 
     const nextMsg = grouped[i + 1];
-    withDates[withDates.length - 1]._hasFooter = !nextMsg || nextMsg.senderId !== msg.senderId;
+    const prevMsg = grouped[i - 1];
+    withDates[withDates.length - 1]._hasFooter = !prevMsg || prevMsg.senderId !== msg.senderId;
     const currentDate = formatDateKey(msg.createdAt);
     const nextDate = nextMsg ? formatDateKey(nextMsg.createdAt) : null;
 

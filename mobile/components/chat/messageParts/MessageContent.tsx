@@ -99,7 +99,7 @@ export default function MessageContent({
   }
 
   if (message.type === 'file' && message.fileInfo) {
-    return <MessageFileBubble message={message} textColor={textColor} colors={colors} />;
+    return <MessageFileBubble message={message} textColor={textColor} colors={colors} onLongPress={onLongPress} />;
   }
 
   if (message.type === 'call') {
@@ -124,6 +124,7 @@ export default function MessageContent({
         fromMe={message.fromMe}
         senderName={message.sender?.fullName}
         avatar={message.sender?.avatar}
+        onLongPress={onLongPress}
       />
     );
   }

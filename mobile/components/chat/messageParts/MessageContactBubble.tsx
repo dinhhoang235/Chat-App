@@ -15,6 +15,7 @@ type MessageContactBubbleProps = {
   onPress?: () => void;
   onAvatarPress?: () => void;
   colors: any;
+  onLongPress?: () => void;
 };
 
 export default function MessageContactBubble({
@@ -22,6 +23,7 @@ export default function MessageContactBubble({
   onPress,
   onAvatarPress,
   colors,
+  onLongPress,
 }: MessageContactBubbleProps) {
   const router = useRouter();
   const { startCall } = useCall();
@@ -105,7 +107,7 @@ export default function MessageContactBubble({
 
   return (
     <View style={{ width: 240, backgroundColor: colors.tint, borderRadius: 12, overflow: 'hidden' }}>
-      <TouchableOpacity onPress={handleProfilePress} activeOpacity={0.8} style={{ paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center' }}>
+      <TouchableOpacity onPress={handleProfilePress} onLongPress={onLongPress} activeOpacity={0.8} style={{ paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center' }}>
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 10, overflow: 'hidden', backgroundColor: 'transparent' }}>
           {avatar ? (
             <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} />
@@ -128,16 +130,16 @@ export default function MessageContactBubble({
       {!isMe && (
         <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)', backgroundColor: '#fff' }}>
           {isFriend ? (
-            <TouchableOpacity onPress={handleCallPress} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6 }}>
+            <TouchableOpacity onPress={handleCallPress} onLongPress={onLongPress} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6 }}>
               <Text style={{ color: colors.tint, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>Gọi điện</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={handleProfilePress} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6 }}>
+            <TouchableOpacity onPress={handleProfilePress} onLongPress={onLongPress} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6 }}>
               <Text style={{ color: colors.tint, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>Kết bạn </Text>
             </TouchableOpacity>
           )}
           <View style={{ width: 1, backgroundColor: colors.border || '#eee' }} />
-          <TouchableOpacity onPress={handleMessagePress} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6 }}>
+          <TouchableOpacity onPress={handleMessagePress} onLongPress={onLongPress} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6 }}>
             <Text style={{ color: colors.tint, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>Nhắn tin </Text>
           </TouchableOpacity>
         </View>

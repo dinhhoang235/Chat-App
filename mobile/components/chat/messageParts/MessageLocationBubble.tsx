@@ -23,6 +23,7 @@ interface MessageLocationBubbleProps {
   fromMe?: boolean;
   senderName?: string;
   avatar?: string;
+  onLongPress?: () => void;
 }
 
 export default function MessageLocationBubble({
@@ -32,6 +33,7 @@ export default function MessageLocationBubble({
   fromMe = false,
   senderName,
   avatar,
+  onLongPress,
 }: MessageLocationBubbleProps) {
   const [loading, setLoading] = useState(false);
 
@@ -84,6 +86,7 @@ export default function MessageLocationBubble({
   return (
     <TouchableOpacity
       onPress={handleOpenMap}
+      onLongPress={onLongPress}
       activeOpacity={0.7}
       disabled={loading}
       style={{

@@ -8,9 +8,10 @@ type MessageFileBubbleProps = {
   message: any;
   textColor: string;
   colors: any;
+  onLongPress?: () => void;
 };
 
-export default function MessageFileBubble({ message, textColor, colors }: MessageFileBubbleProps) {
+export default function MessageFileBubble({ message, textColor, colors, onLongPress }: MessageFileBubbleProps) {
   if (!message.fileInfo) return null;
 
   const { url, name, size, mime } = message.fileInfo;
@@ -33,7 +34,7 @@ export default function MessageFileBubble({ message, textColor, colors }: Messag
   const readableSize = size != null ? `${(size / 1024 / 1024).toFixed(1)} MB` : '';
 
   return (
-    <TouchableOpacity onPress={() => Linking.openURL(uri)} activeOpacity={0.8}>
+    <TouchableOpacity onPress={() => Linking.openURL(uri)} onLongPress={onLongPress} activeOpacity={0.8}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <MaterialIcons name="download" size={24} color={textColor} />
         <View style={{ marginLeft: 8, maxWidth: 200 }}>

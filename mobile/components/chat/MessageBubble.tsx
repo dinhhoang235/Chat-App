@@ -150,6 +150,11 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
             onPress={onPress}
             onAvatarPress={onAvatarPress}
             colors={colors}
+            onLongPress={() => {
+              bubbleRef.current?.measureInWindow((x, y, w, h) => {
+                onLongPress?.(message, x, y, w, h);
+              });
+            }}
           />
         );
       }
@@ -169,6 +174,11 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
               onCallAction={onCallAction}
               isGroupThread={isGroupThread}
               deferHeavyMediaWork={simple}
+              onLongPress={() => {
+                bubbleRef.current?.measureInWindow((x, y, w, h) => {
+                  onLongPress?.(message, x, y, w, h);
+                });
+              }}
             />
           );
         }
@@ -186,6 +196,11 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
           onVideoCall={onVideoCall}
           onCallAction={onCallAction}
           isGroupThread={isGroupThread}
+          onLongPress={() => {
+            bubbleRef.current?.measureInWindow((x, y, w, h) => {
+              onLongPress?.(message, x, y, w, h);
+            });
+          }}
         />
       );
     })();
@@ -292,17 +307,21 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
         )}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: isOutgoing ? 'flex-end' : 'flex-start' }}>
           {!isOutgoing && (
-            <View style={{ width: 40, height: 40, marginRight: 12 }}>
-              <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={{ opacity: isLastInGroup ? 1 : 0 }}>
-                <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'hidden' }}>
-                  {avatarUri ? (
-                    <Image key={`av-${avatarUri}`} source={{ uri: avatarUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                  ) : (
-                    <Image key={`av-default`} source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                  )}
-                </View>
-              </TouchableOpacity>
-            </View>
+            isLastInGroup ? (
+              <View style={{ width: 40, height: 40, marginRight: 12 }}>
+                <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'hidden' }}>
+                    {avatarUri ? (
+                      <Image key={`av-${avatarUri}`} source={{ uri: avatarUri }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                    ) : (
+                      <Image key={`av-default`} source={{ uri: getDefaultAvatarUrl() }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ width: 52 }} />
+            )
           )}
           <View style={{ alignSelf: isOutgoing ? 'flex-end' : 'flex-start', alignItems: 'flex-start' }}>
             <Swipeable
@@ -519,6 +538,11 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
         onPress={onPress}
         onAvatarPress={onAvatarPress}
         colors={colors}
+        onLongPress={() => {
+          bubbleRef.current?.measureInWindow((x, y, w, h) => {
+            onLongPress?.(message, x, y, w, h);
+          });
+        }}
       />
     );
   } else {
@@ -536,6 +560,11 @@ function MessageBubbleComponent({ message, onPress, highlightQuery, onAvatarPres
         onCallAction={onCallAction}
         isGroupThread={isGroupThread}
         deferHeavyMediaWork={simple}
+        onLongPress={() => {
+          bubbleRef.current?.measureInWindow((x, y, w, h) => {
+            onLongPress?.(message, x, y, w, h);
+          });
+        }}
       />
     );
   }

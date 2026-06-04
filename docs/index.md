@@ -17,3 +17,5 @@ Danh sách tài liệu chức năng (mỗi mục theo chuẩn 11 phần):
 - [Calls](calls.md)
 - [Groups Management](groups.md)
 - [Search & History](search.md)
+- [Database ERD](database_erd.md)
+
